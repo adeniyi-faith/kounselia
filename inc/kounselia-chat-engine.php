@@ -43,9 +43,26 @@ window.KOUNSELIA = {
 };
 
 // Expose the dynamically managed Database UI values into the global C object.
-// This allows the Chat Javascript UI to instantly respect changes made in the 
+// This allows the Chat Javascript UI to instantly respect changes made in the
 // Admin Counselor Studio without needing any Javascript rewrites.
-window.C = <?php echo wp_json_encode( function_exists('kounselia_get_all_ui') ? kounselia_get_all_ui() : array() ); ?>;
+//
+// kounselia_get_all_ui() only carries display fields (name/spec/icon/desc),
+// never voice_enabled -- that flag lives in the separate
+// kounselia_counselor_prompts DB table alongside the system prompt. Merge
+// just that one flag in here (never the system prompt itself, which must
+// stay server-side) so the "Start voice conversation" call icon actually
+// reflects what's toggled in Counselor Studio.
+<?php
+$kounselia_ui_for_js = function_exists( 'kounselia_get_all_ui' ) ? kounselia_get_all_ui() : array();
+if ( function_exists( 'kounselia_get_counselor_prompt' ) ) {
+    foreach ( $kounselia_ui_for_js as $kounselia_slug => &$kounselia_ui_row ) {
+        $kounselia_prompt_row = kounselia_get_counselor_prompt( $kounselia_slug );
+        $kounselia_ui_row['voice_enabled'] = $kounselia_prompt_row ? (bool) $kounselia_prompt_row['voice_enabled'] : false;
+    }
+    unset( $kounselia_ui_row );
+}
+?>
+window.C = <?php echo wp_json_encode( $kounselia_ui_for_js ); ?>;
 </script>
 <script>
 <?php readfile( $kounselia_chat_engine_dir . '/assets/kounselia-chat.js' ); ?>

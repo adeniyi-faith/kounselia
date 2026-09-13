@@ -955,7 +955,7 @@ function fmtTimer(s){
 }
 
 async function startVoiceCall(){
-  if(!cur||!cur.voice){return;}
+  if(!cur||!(cur.voice||parseInt(cur.voice_enabled)===1||cur.voice_enabled===true)){return;}
   if(!loggedIn){openModal('login');return;}
   if(liveCallActive||liveCallConnecting) return;
   liveCallConnecting=true;
