@@ -332,10 +332,11 @@ function kounselia_ajax_transcribe() {
     $error = '';
 
     // Use gemini-3.6-flash for multimodal audio transcription (extremely fast and accurate)
-    // maxOutputTokens raised from 2000 to 8000 and timeout from 25s to 60s: a
+    // maxOutputTokens raised from 2000 to 8000 and timeout from 25s to 75s: a
     // long voice note needs more output tokens for its transcript and more
     // time for Gemini to process, otherwise the transcript comes back cut
-    // off mid-sentence with no indication anything was truncated.
+    // off mid-sentence with no indication anything was truncated. 75s
+    // leaves a 15s buffer under the server's max_execution_time (90s).
     $reply = kounselia_call_gemini(
         "You are a highly accurate audio transcription assistant. Your only job is to transcribe audio to text perfectly.",
         $contents,
@@ -344,7 +345,7 @@ function kounselia_ajax_transcribe() {
         8000,
         $error,
         'text/plain',
-        60
+        75
     );
 
     if ( ! empty( $reply ) ) {
