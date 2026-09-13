@@ -1,0 +1,40 @@
+# Environment & Server Configs
+.htaccess
+php.ini
+.user.ini
+cgi-bin/
+.well-known/
+
+# WordPress Core Folders inside /portal
+portal/wp-admin/
+portal/wp-includes/
+portal/wp-content/themes/
+portal/wp-content/plugins/
+portal/wp-content/uploads/
+portal/wp-content/upgrade/
+portal/wp-content/backuply/
+portal/wp-content/cache/
+
+# WordPress Root Loose Files
+portal/*.php
+portal/*.txt
+portal/*.html
+portal/*.xml
+portal/*.zip
+portal/*.json
+portal/*.sql
+portal/*.tar.gz
+
+# WordPress Config & Sensitive Data
+portal/wp-config.php
+config.php
+
+# Whitelist: Keep Custom Architecture
+!portal/admin/
+!portal/admin/**
+!portal/wp-content/mu-plugins/
+!portal/wp-content/mu-plugins/**
+*.log
+*.zip
+portal/.htaccess*
+portal/wp-content/index.php
