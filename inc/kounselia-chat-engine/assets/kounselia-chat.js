@@ -767,7 +767,8 @@ function openModal(type){
       </div>
       <input type="text" id="r-hp" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
       <button class="modal-btn" onclick="doRegister()">Create free account</button>
-      <p class="modal-switch">Already have an account? <a onclick="openModal('login')">Sign in</a></p>`;
+      <p class="modal-switch">Already have an account? <a onclick="openModal('login')">Sign in</a></p>
+      <p class="modal-switch">Licensed therapist or counselor? <a href="/apply.php">Apply as a professional</a></p>`;
   }
 }
 

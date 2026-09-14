@@ -327,7 +327,7 @@ function kounselia_ajax_apply_professional() {
 
     wp_send_json_success( array(
         'message'  => 'Application submitted. We will review it and email you.',
-        'redirect' => '/apply.php',
+        'redirect' => '/dashboard.php',
         'nonce'    => wp_create_nonce( 'kounselia_auth' ),
     ) );
 }

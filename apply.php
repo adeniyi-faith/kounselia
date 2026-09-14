@@ -159,7 +159,7 @@ if (form) {
         if (res.success) {
           msg.classList.add('notice');
           msg.textContent = res.data.message || 'Application submitted.';
-          setTimeout(() => { window.location.reload(); }, 1200);
+          setTimeout(() => { window.location.href = (res.data && res.data.redirect) || '/dashboard.php'; }, 1200);
         } else {
           btn.disabled = false;
           btn.textContent = 'Submit application';
