@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.11.0'; // Bumped version: Smart Check-ins (kounselia_memory_upcoming_events)
+    $current_version   = '1.12.0'; // Bumped version: Professional marketplace (kounselia_professionals, kounselia_professional_documents)
 
     if ( $installed_version === $current_version ) {
         return;
@@ -256,6 +256,52 @@ function kounselia_install_tables() {
         KEY user_status (user_id, status)
     ) {$charset_collate};";
 
+    /*
+     * A human professional's application to join the platform. Created
+     * the moment they apply (status 'pending'); an admin reviews their
+     * uploaded documents and either approves it (status 'verified',
+     * which is what grants the kounselia_professional WP role) or
+     * rejects it with a reason. Rate is the professional's own — they
+     * set it, admin can only view/override it, never invent it for them.
+     */
+    $sql_professionals = "CREATE TABLE {$prefix}kounselia_professionals (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        title VARCHAR(191) NOT NULL,
+        license_number VARCHAR(191) NULL,
+        specialty VARCHAR(191) NULL,
+        years_experience SMALLINT UNSIGNED NULL,
+        bio TEXT NULL,
+        rate_amount DECIMAL(10,2) NULL,
+        rate_currency VARCHAR(8) NOT NULL DEFAULT 'NGN',
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        rejection_reason VARCHAR(500) NULL,
+        submitted_at DATETIME NOT NULL,
+        reviewed_at DATETIME NULL,
+        reviewed_by BIGINT UNSIGNED NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY user_id (user_id),
+        KEY status (status)
+    ) {$charset_collate};";
+
+    // Verification documents (license, government ID, certificates) tied
+    // to an application. Files are stored outside the public media
+    // library — see kounselia_professional_docs_dir() in professionals.php
+    // — and only ever served through an authenticated endpoint, never a
+    // direct public URL.
+    $sql_professional_documents = "CREATE TABLE {$prefix}kounselia_professional_documents (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        professional_id BIGINT UNSIGNED NOT NULL,
+        doc_type VARCHAR(32) NOT NULL,
+        original_filename VARCHAR(255) NOT NULL,
+        stored_filename VARCHAR(255) NOT NULL,
+        uploaded_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        KEY professional_id (professional_id)
+    ) {$charset_collate};";
+
     dbDelta( $sql_sessions );
     dbDelta( $sql_messages );
     dbDelta( $sql_guest_limits );
@@ -271,6 +317,12 @@ function kounselia_install_tables() {
     dbDelta( $sql_memory_preferences );
     dbDelta( $sql_safety_escalations );
     dbDelta( $sql_memory_upcoming_events );
+    dbDelta( $sql_professionals );
+    dbDelta( $sql_professional_documents );
+
+    if ( function_exists( 'kounselia_ensure_professional_docs_dir' ) ) {
+        kounselia_ensure_professional_docs_dir();
+    }
 
     update_option( 'kounselia_db_version', $current_version );
 
