@@ -76,6 +76,7 @@ $nonce    = wp_create_nonce( 'kounselia_auth' );
       <?php if ( 'pending' === $application->status ) : ?>
         <span class="status-badge status-pending"><i class="ti ti-clock"></i> Under review</span>
         <p style="margin-top:16px;color:var(--text2);font-size:14.5px;line-height:1.6;">Thanks for applying. Our team is reviewing your documents — we'll email you at your account address once there's a decision, usually within a few business days.</p>
+        <a class="apply-submit" style="display:block;text-align:center;text-decoration:none;margin-top:16px" href="/pro-dashboard.php">Go to your professional home</a>
       <?php elseif ( 'verified' === $application->status ) : ?>
         <span class="status-badge status-verified"><i class="ti ti-check"></i> Verified</span>
         <p style="margin-top:16px;color:var(--text2);font-size:14.5px;line-height:1.6;">You're approved as a professional on Kounselia.</p>
@@ -159,7 +160,7 @@ if (form) {
         if (res.success) {
           msg.classList.add('notice');
           msg.textContent = res.data.message || 'Application submitted.';
-          setTimeout(() => { window.location.href = (res.data && res.data.redirect) || '/dashboard.php'; }, 1200);
+          setTimeout(() => { window.location.href = (res.data && res.data.redirect) || '/pro-dashboard.php'; }, 1200);
         } else {
           btn.disabled = false;
           btn.textContent = 'Submit application';
