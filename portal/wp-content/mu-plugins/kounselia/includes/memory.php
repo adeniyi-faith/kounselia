@@ -44,22 +44,42 @@ function kounselia_imported_memory_clause( $user_id ) {
 
     $clause = "\n\nPERSONAL CONTEXT (Structured Memory Profile): The following is a validated JSON profile of the user. Use this information to deeply understand them, but DO NOT reference it explicitly (e.g., never say 'According to my notes' or 'I see in your profile'). Let this context naturally inform your empathy and the direction of the conversation.\n\n" . $json_to_inject;
 
-    // FEATURE: CLINICAL PATTERN DETECTION (Feed insights back into the active prompt)
+    $clause .= kounselia_live_pattern_clause( $user_id );
+
+    return $clause;
+}
+
+/**
+ * The full Milestone Reflection has six sections (patterns, growth,
+ * fears, blind spots, achievements, recommendations) — that's report
+ * content, meant to be read once, not re-sent to the model on every
+ * single message. Every chat turn only gets the couple of patterns most
+ * worth knowing in the moment, each trimmed to one line, so a counselor
+ * can notice a repeating theme without every request carrying the
+ * weight of a full clinical report.
+ */
+function kounselia_live_pattern_clause( $user_id ) {
     $reflection_json = get_user_meta( $user_id, 'kounselia_latest_reflection', true );
-    if ( ! empty( $reflection_json ) ) {
-        $reflections = json_decode( $reflection_json, true );
-        if ( is_array( $reflections ) ) {
-            $patterns    = isset( $reflections['patterns'] ) ? implode( "\n- ", (array) $reflections['patterns'] ) : '';
-            $blind_spots = isset( $reflections['blind_spots'] ) ? implode( "\n- ", (array) $reflections['blind_spots'] ) : '';
-            
-            if ( $patterns || $blind_spots ) {
-                $clause .= "\n\nUNDERLYING CONTEXT: You know the following deeper patterns about this person:\n";
-                if ( $patterns ) $clause .= "Patterns:\n- {$patterns}\n";
-                if ( $blind_spots ) $clause .= "Blind Spots:\n- {$blind_spots}\n";
-                $clause .= "\nCRITICAL INSTRUCTION: Use this context to deeply understand them, but DO NOT sound like a psychologist analyzing them. If you notice them repeating a pattern, bring it up casually and warmly, like a friend noticing a habit, rather than a doctor pointing out a symptom. Never diagnose or lecture.";
-            }
-        }
+    if ( empty( $reflection_json ) ) {
+        return '';
     }
+
+    $reflections = json_decode( $reflection_json, true );
+    if ( ! is_array( $reflections ) || empty( $reflections['patterns'] ) || ! is_array( $reflections['patterns'] ) ) {
+        return '';
+    }
+
+    $patterns = array_slice( array_filter( (array) $reflections['patterns'] ), 0, 2 );
+    if ( empty( $patterns ) ) {
+        return '';
+    }
+
+    $patterns = array_map( function( $p ) {
+        return wp_trim_words( (string) $p, 30, '…' );
+    }, $patterns );
+
+    $clause  = "\n\nRECURRING PATTERN (from this person's longer history, not just this chat): \n- " . implode( "\n- ", $patterns );
+    $clause .= "\nIf it's naturally relevant to what they're saying right now, you can notice it out loud, casually and warmly, like a friend noticing a habit — not like a diagnosis. Don't force it in if it doesn't fit this conversation.";
 
     return $clause;
 }
@@ -335,6 +355,11 @@ TRANSCRIPT DELTA:
         unset( $decoded_json['upcoming_events'] ); // Tracked separately — not part of the profile schema itself.
 
         kounselia_memory_save_profile( $user_id, $decoded_json );
+
+        if ( function_exists( 'kounselia_maybe_schedule_reflection_refresh' ) ) {
+            kounselia_maybe_schedule_reflection_refresh( $user_id );
+        }
+
         wp_send_json_success( array( 'synthesized' => true ) );
     }
 
@@ -355,11 +380,27 @@ function kounselia_ajax_generate_reflection() {
         wp_send_json_error( array( 'message' => 'Unauthorized' ), 401 );
     }
 
-    $user_id = get_current_user_id();
+    $result = kounselia_generate_reflection( get_current_user_id() );
+
+    if ( ! $result['success'] ) {
+        wp_send_json_error( array( 'message' => $result['message'] ), $result['status'] );
+    }
+
+    wp_send_json_success( array( 'reflection' => $result['reflection'], 'date' => $result['date'] ) );
+}
+add_action( 'wp_ajax_kounselia_generate_reflection', 'kounselia_ajax_generate_reflection' );
+
+/**
+ * The actual reflection generation, independent of being an AJAX request,
+ * so a background refresh (see kounselia_run_reflection_refresh_cron
+ * below) can call the exact same logic the manual "Generate Reflection"
+ * button uses, instead of duplicating it.
+ */
+function kounselia_generate_reflection( $user_id ) {
     $memory_json = get_user_meta( $user_id, 'kounselia_core_memory', true );
-    
+
     if ( empty( $memory_json ) || strlen( $memory_json ) < 50 ) {
-        wp_send_json_error( array( 'message' => 'Not enough memory data to generate a reflection yet. Have a few more conversations first!' ), 400 );
+        return array( 'success' => false, 'status' => 400, 'message' => 'Not enough memory data to generate a reflection yet. Have a few more conversations first!' );
     }
 
     $prompt = "You are a Senior Supervising Psychologist. Review the following structured memory profile of a user.
@@ -406,7 +447,7 @@ USER PROFILE:
     );
 
     if ( null === $reflection_json ) {
-        wp_send_json_error( array( 'message' => 'Analysis failed. Try again later.' ), 502 );
+        return array( 'success' => false, 'status' => 502, 'message' => 'Analysis failed. Try again later.' );
     }
 
     // Robust JSON extraction: Strip out any conversational fluff or markdown
@@ -438,16 +479,56 @@ USER PROFILE:
 
         update_user_meta( $user_id, 'kounselia_latest_reflection', wp_json_encode( $decoded ) );
         update_user_meta( $user_id, 'kounselia_reflection_date', current_time( 'mysql' ) );
-        wp_send_json_success( array( 'reflection' => $decoded, 'date' => current_time('mysql') ) );
+        return array( 'success' => true, 'reflection' => $decoded, 'date' => current_time( 'mysql' ) );
     }
 
-    // Output the exact parsing error to the browser console for debugging if it still fails
-    wp_send_json_error( array( 
+    // Output the exact parsing error for debugging if it still fails
+    return array(
+        'success' => false,
+        'status'  => 500,
         'message' => 'Failed to parse insights. Error: ' . json_last_error_msg(),
-        'raw'     => substr( $reflection_json, 0, 200 )
-    ), 500 );
+    );
 }
-add_action( 'wp_ajax_kounselia_generate_reflection', 'kounselia_ajax_generate_reflection' );
+
+/* -------------------------------------------------------------------------
+ * 18C-2. REFLECTION ENGINE — automatic background refresh
+ *
+ * The reflection above used to only ever get generated when a user
+ * clicked "Generate Reflection" on the dashboard — most people never
+ * would, so kounselia_latest_reflection stayed empty and the pattern
+ * context injected into live chats (kounselia_imported_memory_clause)
+ * never had anything to say. This keeps it current automatically,
+ * without adding a slow Pro-model call to the fast, high-frequency
+ * synthesis path: it schedules a one-off WP-Cron job instead, so it
+ * runs decoupled from the user's request.
+ * ---------------------------------------------------------------------- */
+
+define( 'KOUNSELIA_REFLECTION_REFRESH_INTERVAL', 7 * DAY_IN_SECONDS );
+
+/**
+ * Called after a memory synthesis. Schedules a background reflection
+ * refresh if this user's is missing or stale, and nothing is already
+ * queued for them.
+ */
+function kounselia_maybe_schedule_reflection_refresh( $user_id ) {
+    $last_date = get_user_meta( $user_id, 'kounselia_reflection_date', true );
+    $is_stale  = empty( $last_date ) || ( strtotime( $last_date ) < time() - KOUNSELIA_REFLECTION_REFRESH_INTERVAL );
+
+    if ( ! $is_stale ) {
+        return;
+    }
+
+    if ( wp_next_scheduled( 'kounselia_run_reflection_refresh', array( $user_id ) ) ) {
+        return; // Already queued, don't stack duplicate jobs.
+    }
+
+    wp_schedule_single_event( time() + 30, 'kounselia_run_reflection_refresh', array( $user_id ) );
+}
+
+function kounselia_run_reflection_refresh_cron( $user_id ) {
+    kounselia_generate_reflection( (int) $user_id ); // Fire-and-forget; errors just mean it stays stale until the next attempt.
+}
+add_action( 'kounselia_run_reflection_refresh', 'kounselia_run_reflection_refresh_cron' );
 
 /* -------------------------------------------------------------------------
  * 18-A2. INTAKE ENGINE (Initial Profile Setup)
