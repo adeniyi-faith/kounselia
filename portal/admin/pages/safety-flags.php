@@ -28,7 +28,7 @@ $kounselia_messages_table = $wpdb->prefix . 'kounselia_messages';
  * Handle keyword add/remove first (POST-redirect-GET, so a page reload
  * never resubmits the form).
  * -------------------------------------------------------------------- */
-if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_safety_action'] ) ) {
+if ( 'POST' === $_SERVER['REQUEST_METHOD'] && in_array( $_POST['kounselia_safety_action'] ?? '', array( 'add', 'remove' ), true ) ) {
 
     if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( $_POST['_wpnonce'], 'kounselia_safety_keywords' ) ) {
         wp_die( 'Security check failed, please go back and try again.' );
@@ -57,12 +57,19 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_safety_ac
     exit;
 }
 
+// Acknowledge action (own handler, since it also needs to write the escalation row).
+kounselia_handle_safety_acknowledge_post();
+
 $kounselia_keywords = kounselia_get_safety_keywords();
 sort( $kounselia_keywords );
 
 /* -------------------------------------------------------------------------
- * Flagged messages, most recent first, paginated.
+ * Flagged messages, most recent first, paginated. Joins in the escalation
+ * case for each message: severity (was staff paged immediately?) and
+ * whether anyone has acknowledged it yet.
  * -------------------------------------------------------------------- */
+$kounselia_escalations_table = $wpdb->prefix . 'kounselia_safety_escalations';
+
 $kounselia_page     = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1;
 $kounselia_per_page = 20;
 $kounselia_offset   = ( $kounselia_page - 1 ) * $kounselia_per_page;
@@ -72,15 +79,21 @@ $kounselia_total_pages = max( 1, (int) ceil( $kounselia_total / $kounselia_per_p
 
 $kounselia_flagged = $wpdb->get_results( $wpdb->prepare(
     "SELECT m.id AS message_id, m.session_id, m.content, m.flag_reason, m.created_at,
-            s.user_id, s.guest_token, s.counselor_slug
+            s.user_id, s.guest_token, s.counselor_slug,
+            e.id AS escalation_id, e.severity, e.status, e.acknowledged_by, e.acknowledged_at
      FROM {$kounselia_messages_table} m
      INNER JOIN {$kounselia_sessions_table} s ON m.session_id = s.id
+     LEFT JOIN {$kounselia_escalations_table} e ON e.message_id = m.id
      WHERE m.flagged_safety = 1
      ORDER BY m.created_at DESC
      LIMIT %d OFFSET %d",
     $kounselia_per_page,
     $kounselia_offset
 ) );
+
+$kounselia_open_critical = (int) $wpdb->get_var(
+    "SELECT COUNT(*) FROM {$kounselia_escalations_table} WHERE severity = 'critical' AND status = 'open'"
+);
 
 $kounselia_nonce = wp_create_nonce( 'kounselia_safety_keywords' );
 ?>
@@ -115,6 +128,14 @@ $kounselia_nonce = wp_create_nonce( 'kounselia_safety_keywords' );
 .flag-snippet{font-size:13px;color:var(--text2);max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-block;vertical-align:middle}
 .flag-reason{font-size:11px;color:var(--rose);font-weight:600}
 .note{background:var(--gold-light);border:1px solid #EBD9BC;color:#6B4A1F;border-radius:var(--r-md);padding:12px 16px;font-size:13px;margin-bottom:20px;line-height:1.5}
+.alert-banner{background:#FBE4E4;border:1px solid #E8A9A9;color:#7A1F1F;border-radius:var(--r-md);padding:14px 16px;font-size:13.5px;font-weight:600;margin-bottom:20px}
+.sev-badge{display:inline-block;border-radius:var(--r-full);padding:3px 10px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.02em}
+.sev-critical{background:#FBE4E4;color:#A31F1F}
+.sev-elevated{background:var(--gold-light);color:#6B4A1F}
+.status-open{color:var(--rose);font-weight:600;font-size:12px}
+.status-acknowledged{color:var(--text3);font-size:12px}
+.ack-btn{background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:5px 10px;font-size:12px;cursor:pointer;font-family:inherit;color:var(--text2)}
+.ack-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -125,8 +146,12 @@ $kounselia_nonce = wp_create_nonce( 'kounselia_safety_keywords' );
   <h1 class="admin-title">Safety</h1>
   <div class="admin-subtitle"><?php echo esc_html( number_format_i18n( $kounselia_total ) ); ?> flagged messages, all time</div>
 
+  <?php if ( $kounselia_open_critical > 0 ) : ?>
+    <div class="alert-banner">⚠ <?php echo (int) $kounselia_open_critical; ?> critical case<?php echo $kounselia_open_critical === 1 ? '' : 's'; ?> still open — staff was already alerted by email, this needs a look now.</div>
+  <?php endif; ?>
+
   <div class="note">
-    Keyword matching catches obvious phrasing quickly, but it can miss things worded differently and can occasionally flag something harmless. Treat this list as "worth a look," and keep an eye on new conversations directly from time to time too.
+    Keyword matching catches obvious phrasing quickly, but it can miss things worded differently and can occasionally flag something harmless. A <span class="sev-badge sev-critical">Critical</span> match pages every admin/staff member by email the moment it happens; an <span class="sev-badge sev-elevated">Elevated</span> match is queued here for review without an alert. Treat both as "worth a look," and keep an eye on new conversations directly from time to time too.
   </div>
 
   <div class="panel">
@@ -164,7 +189,7 @@ $kounselia_nonce = wp_create_nonce( 'kounselia_safety_keywords' );
       <div class="empty-state">No flagged messages yet.</div>
     <?php else : ?>
       <table class="admin-table">
-        <thead><tr><th>Who</th><th>Counselor</th><th>Matched</th><th>Message</th><th>When</th><th></th></tr></thead>
+        <thead><tr><th>Who</th><th>Counselor</th><th>Severity</th><th>Matched</th><th>Message</th><th>Status</th><th>When</th><th></th></tr></thead>
         <tbody>
         <?php foreach ( $kounselia_flagged as $row ) : ?>
           <tr>
@@ -173,8 +198,37 @@ $kounselia_nonce = wp_create_nonce( 'kounselia_safety_keywords' );
               <span class="badge <?php echo $row->user_id ? 'member' : 'guest'; ?>"><?php echo $row->user_id ? 'Member' : 'Guest'; ?></span></span>
             </td>
             <td data-label="Counselor"><?php echo esc_html( kounselia_admin_counselor_name( $row->counselor_slug ) ); ?></td>
+            <td data-label="Severity">
+              <?php if ( $row->severity ) : ?>
+                <span class="sev-badge sev-<?php echo esc_attr( $row->severity ); ?>"><?php echo esc_html( ucfirst( $row->severity ) ); ?></span>
+              <?php else : ?>
+                <span class="sev-badge sev-elevated">Elevated</span>
+              <?php endif; ?>
+            </td>
             <td data-label="Matched"><span class="flag-reason">"<?php echo esc_html( $row->flag_reason ); ?>"</span></td>
             <td data-label="Message"><span class="flag-snippet" title="<?php echo esc_attr( $row->content ); ?>"><?php echo esc_html( $row->content ); ?></span></td>
+            <td data-label="Status">
+              <?php if ( $row->status === 'acknowledged' ) : ?>
+                <span class="status-acknowledged">✓ Acknowledged<?php
+                  if ( $row->acknowledged_by ) {
+                    $ack_user = get_userdata( $row->acknowledged_by );
+                    if ( $ack_user ) {
+                      echo ' by ' . esc_html( $ack_user->display_name ?: $ack_user->user_email );
+                    }
+                  }
+                ?></span>
+              <?php elseif ( $row->escalation_id ) : ?>
+                <span class="status-open">Open</span>
+                <form method="post" style="display:inline;margin-left:8px">
+                  <input type="hidden" name="_wpnonce" value="<?php echo esc_attr( $kounselia_nonce ); ?>">
+                  <input type="hidden" name="kounselia_safety_action" value="acknowledge">
+                  <input type="hidden" name="escalation_id" value="<?php echo (int) $row->escalation_id; ?>">
+                  <button type="submit" class="ack-btn">Acknowledge</button>
+                </form>
+              <?php else : ?>
+                <span class="status-open">—</span>
+              <?php endif; ?>
+            </td>
             <td data-label="When"><?php echo esc_html( kounselia_admin_time_label( $row->created_at ) ); ?></td>
             <td data-label=""><a href="/portal/admin/pages/session.php?id=<?php echo (int) $row->session_id; ?>">View transcript →</a></td>
           </tr>
