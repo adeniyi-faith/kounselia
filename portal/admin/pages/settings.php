@@ -150,7 +150,22 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
             $kounselia_error = 'Core table installation function not found. Ensure kounselia-core.php is loaded.';
         }
         
-    // 10. Save Platform Settings
+    // 10. Save Safety Alert Recipients
+    } elseif ( 'save_safety_alert_emails' === $kounselia_action
+        && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_safety_alerts' ) ) {
+
+        $raw    = isset( $_POST['safety_alert_emails'] ) ? (string) wp_unslash( $_POST['safety_alert_emails'] ) : '';
+        $parts  = array_filter( array_map( 'trim', explode( ',', str_replace( array( "\r", "\n" ), ',', $raw ) ) ) );
+        $emails = array_values( array_unique( array_filter( array_map( 'sanitize_email', $parts ), 'is_email' ) ) );
+
+        update_option( 'kounselia_safety_alert_emails', implode( ',', $emails ) );
+        kounselia_admin_log( 'update_safety_alert_emails', 'settings' );
+
+        $kounselia_notice = empty( $emails )
+            ? 'Safety alert recipients cleared — critical alerts will go to every admin/staff account again.'
+            : count( $emails ) . ' safety alert recipient' . ( 1 === count( $emails ) ? '' : 's' ) . ' saved.';
+
+    // 11. Save Platform Settings
     } elseif ( 'save_platform_settings' === $kounselia_action
         && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_platform' ) ) {
             
@@ -176,6 +191,8 @@ $kounselia_gemini_key_source = ( empty( get_option( 'kounselia_gemini_key', '' )
 
 $kounselia_safety_keywords = kounselia_get_safety_keywords();
 sort( $kounselia_safety_keywords );
+
+$kounselia_safety_alert_emails = get_option( 'kounselia_safety_alert_emails', '' );
 
 global $wpdb;
 $active_tts_transients = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '\_transient\_kounselia\_tts\_%'" );
@@ -336,7 +353,31 @@ $opt_live_model    = get_option('kounselia_live_model', 'gemini-3.1-flash-live-p
       <button type="submit" class="clear" style="background:none;border:none;font-size:12.5px;cursor:pointer;font-family:inherit;padding:0;color:var(--rose);text-decoration:underline;">Reset list to built-in defaults</button>
     </form>
   </div>
-  
+
+  <!-- ===============================================================
+       2B. SAFETY ALERT RECIPIENTS
+  ================================================---------------- -->
+  <div class="panel">
+    <div class="panel-title">
+      Safety Alert Recipients
+      <span style="font-weight:400;color:var(--text3);font-size:12px;">
+        <?php echo empty( $kounselia_safety_alert_emails ) ? 'currently: every admin/staff account' : count( array_filter( explode( ',', $kounselia_safety_alert_emails ) ) ) . ' custom recipient(s)'; ?>
+      </span>
+    </div>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px;line-height:1.55;max-width:64ch;">
+      When a message matches a critical safety phrase, an alert email goes out immediately. By default that goes to every admin and staff account. Set a specific on-call list here instead — useful once the team grows and not everyone needs to be paged for every case. Leave blank to go back to alerting everyone.
+    </p>
+    <form method="post">
+      <?php wp_nonce_field( 'kounselia_settings_safety_alerts' ); ?>
+      <input type="hidden" name="kounselia_action" value="save_safety_alert_emails">
+      <div class="login-field">
+        <label for="safety_alert_emails">On-call emails (comma or newline separated)</label>
+        <textarea id="safety_alert_emails" name="safety_alert_emails" class="bulk-input" placeholder="oncall@kounselia.com, clinical-lead@kounselia.com"><?php echo esc_textarea( implode( ",\n", array_filter( explode( ',', $kounselia_safety_alert_emails ) ) ) ); ?></textarea>
+      </div>
+      <button type="submit" class="login-submit" style="width:auto;padding:10px 20px;">Save Recipients</button>
+    </form>
+  </div>
+
   <!-- ===============================================================
        3. PLATFORM CONFIGURATION & LIMITS
   ================================================---------------- -->

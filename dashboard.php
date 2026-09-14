@@ -29,6 +29,7 @@ $mood_map      = function_exists( 'kounselia_mood_counselor_map' ) ? kounselia_m
 $today_mood    = function_exists( 'kounselia_get_today_mood' ) ? kounselia_get_today_mood( $user->ID ) : null;
 $recent_moods  = function_exists( 'kounselia_get_recent_moods' ) ? kounselia_get_recent_moods( $user->ID, 7 ) : array();
 $today_journal = function_exists( 'kounselia_get_today_journal' ) ? kounselia_get_today_journal( $user->ID ) : '';
+$next_checkin  = function_exists( 'kounselia_get_next_checkin' ) ? kounselia_get_next_checkin( $user->ID ) : null;
 
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_auth' );
@@ -562,6 +563,23 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       </div>
     </section>
 
+    <?php if ( $next_checkin ) :
+      $checkin_slug      = ! empty( $tried_slugs ) ? $tried_slugs[0] : $recommended_slug;
+      $checkin_counselor = isset( $counselors[ $checkin_slug ] ) ? $counselors[ $checkin_slug ] : $recommended;
+    ?>
+    <section class="rec-card" id="checkin-card" style="margin-bottom:20px;">
+      <div class="rec-av <?php echo esc_attr( $checkin_counselor['class'] ); ?>"><i class="ti <?php echo esc_attr( $checkin_counselor['icon'] ); ?>"></i></div>
+      <div class="rec-meta">
+        <h3><?php echo esc_html( $checkin_counselor['name'] ); ?> wants to check in</h3>
+        <p class="reason">You mentioned "<?php echo esc_html( $next_checkin->event_text ); ?>" — how did it go?</p>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
+        <a class="btn-rec" href="/talk.php?checkin=<?php echo (int) $next_checkin->id; ?>#<?php echo esc_attr( $checkin_slug ); ?>">Tell them</a>
+        <button type="button" onclick="dismissCheckin(<?php echo (int) $next_checkin->id; ?>)" style="background:none;border:none;color:var(--text3,#8a8578);font-size:12px;cursor:pointer;font-family:inherit;padding:2px;">Not now</button>
+      </div>
+    </section>
+    <?php endif; ?>
+
     <section class="mood-card">
       <div class="mood-head">
         <h3>How are you feeling today?</h3>
@@ -1088,6 +1106,16 @@ function setupPasswordSave(curId, newId, cfmId, btnId, msgId){
   });
 }
 setupPasswordSave('pw-current','pw-new','pw-confirm','pw-save','pw-msg');
+
+function dismissCheckin(checkinId){
+  const card=document.getElementById('checkin-card');
+  if(card){ card.style.opacity='0'; setTimeout(()=>card.remove(),200); }
+  fetch(KOUNSELIA.ajaxUrl,{
+    method:'POST',
+    headers:{'Content-Type':'application/x-www-form-urlencoded'},
+    body:new URLSearchParams({action:'kounselia_dismiss_checkin',nonce:KOUNSELIA.nonce,checkin_id:checkinId})
+  });
+}
 
 function saveMood(mood){
   document.querySelectorAll('.mood-btn').forEach(b=>b.classList.toggle('selected', b.dataset.mood===mood));

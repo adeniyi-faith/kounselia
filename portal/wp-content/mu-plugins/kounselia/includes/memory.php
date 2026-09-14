@@ -267,10 +267,14 @@ function kounselia_ajax_synthesize_memory() {
     }
 
     // 3. Prompt Gemini to merge
+    $today_date = current_time( 'Y-m-d' );
+
     $synthesis_prompt = "You are a clinical data extraction assistant acting as an autonomous MEMORY MANAGER.
 
 Below is the user's CURRENT JSON profile, followed by a TRANSCRIPT of their most recent chat messages (the delta).
 Your job is to read the transcript and intelligently MERGE new context into the JSON profile.
+
+Today's date is {$today_date}.
 
 MEMORY MANAGER RULES:
 1. PERMANENT VS TEMPORARY: If the user mentions a fleeting feeling ('I had a bad day today'), put it in `temporary_context`. If `temporary_context` contains old, resolved issues, DELETE THEM (Garbage Collection). Only put long-term facts in the main arrays.
@@ -279,6 +283,7 @@ MEMORY MANAGER RULES:
 4. UPDATE EXISTING: If a fact is new, add it. If it contradicts old data, update the old data.
 5. PRESERVE EVERYTHING ELSE: You must return the COMPLETE profile, not just what changed. Any field the transcript does not touch must be copied over unchanged from the CURRENT JSON exactly as it was. Never drop, shorten, or blank out a field just because this transcript didn't mention it again.
 6. Do NOT add conversational fluff. Maintain the exact same JSON schema keys.
+7. UPCOMING EVENTS: If the user mentions a specific event tied to a real calendar date — something happening today, already happened very recently, or coming up (an interview, a presentation, a doctor's appointment, a hard conversation they're planning, a court date, a wedding) — add it to a top-level `upcoming_events` array (this is IN ADDITION to the normal profile keys, not a replacement for `life_timeline` or `current_challenges`). Each item: `{\"event\": \"short description in their words, e.g. 'your job interview'\", \"date\": \"YYYY-MM-DD\"}`. Resolve relative phrases ('tomorrow', 'next Tuesday', 'in two weeks') into an actual date using today's date above. Only include events with a genuine, resolvable date — never guess a date for something vague. If none are mentioned in this transcript, return an empty array. Do not re-list events from earlier syntheses; only what's newly mentioned in this transcript delta.
 
 CURRENT JSON:
 ---
@@ -324,6 +329,11 @@ TRANSCRIPT DELTA:
 
     // Safety check: ensure the LLM returned a valid structure, allowing full schema replacements safely
     if ( is_array( $decoded_json ) ) {
+        if ( ! empty( $decoded_json['upcoming_events'] ) && function_exists( 'kounselia_record_upcoming_events' ) ) {
+            kounselia_record_upcoming_events( $user_id, $decoded_json['upcoming_events'] );
+        }
+        unset( $decoded_json['upcoming_events'] ); // Tracked separately — not part of the profile schema itself.
+
         kounselia_memory_save_profile( $user_id, $decoded_json );
         wp_send_json_success( array( 'synthesized' => true ) );
     }
