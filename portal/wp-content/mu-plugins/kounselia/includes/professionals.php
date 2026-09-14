@@ -442,3 +442,56 @@ function kounselia_ajax_admin_review_professional() {
     kounselia_send_pure_json_success( array( 'status' => 'approve' === $decision ? 'verified' : 'rejected' ) );
 }
 add_action( 'wp_ajax_kounselia_admin_review_professional', 'kounselia_ajax_admin_review_professional' );
+
+/* -------------------------------------------------------------------------
+ * PROFESSIONAL PROFILE — Slice 2
+ *
+ * Once verified, a professional manages their own listing (title,
+ * specialty, bio) and — this is the important one — sets their own
+ * rate. Admin can see it (the review page already reads straight from
+ * this same table, so any edit shows up there automatically) but never
+ * writes it for them. License number is intentionally left out of what
+ * can be edited here: changing the credential you were verified against
+ * is a re-verification event, not a profile tweak.
+ * ---------------------------------------------------------------------- */
+
+function kounselia_ajax_update_professional_profile() {
+    kounselia_verify_nonce();
+
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( array( 'message' => 'Please sign in first.' ), 401 );
+    }
+
+    $user_id     = get_current_user_id();
+    $application = kounselia_get_professional_application( $user_id );
+
+    if ( ! $application || 'verified' !== $application->status ) {
+        wp_send_json_error( array( 'message' => 'Your professional profile is not active yet.' ), 403 );
+    }
+
+    $title     = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
+    $specialty = isset( $_POST['specialty'] ) ? sanitize_text_field( wp_unslash( $_POST['specialty'] ) ) : '';
+    $years     = isset( $_POST['years_experience'] ) ? absint( $_POST['years_experience'] ) : 0;
+    $bio       = isset( $_POST['bio'] ) ? sanitize_textarea_field( wp_unslash( $_POST['bio'] ) ) : '';
+    $rate      = isset( $_POST['rate_amount'] ) ? (float) $_POST['rate_amount'] : 0;
+
+    if ( '' === $title ) {
+        wp_send_json_error( array( 'message' => 'Please enter your professional title.' ), 400 );
+    }
+    if ( $rate <= 0 ) {
+        wp_send_json_error( array( 'message' => 'Please enter a rate greater than zero.' ), 400 );
+    }
+
+    global $wpdb;
+    $wpdb->update( $wpdb->prefix . 'kounselia_professionals', array(
+        'title'            => $title,
+        'specialty'        => $specialty,
+        'years_experience' => $years ?: null,
+        'bio'              => $bio,
+        'rate_amount'      => $rate,
+        'updated_at'       => current_time( 'mysql' ),
+    ), array( 'id' => $application->id ) );
+
+    wp_send_json_success( array( 'message' => 'Profile updated.' ) );
+}
+add_action( 'wp_ajax_kounselia_update_professional_profile', 'kounselia_ajax_update_professional_profile' );

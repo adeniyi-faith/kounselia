@@ -78,7 +78,8 @@ $nonce    = wp_create_nonce( 'kounselia_auth' );
         <p style="margin-top:16px;color:var(--text2);font-size:14.5px;line-height:1.6;">Thanks for applying. Our team is reviewing your documents — we'll email you at your account address once there's a decision, usually within a few business days.</p>
       <?php elseif ( 'verified' === $application->status ) : ?>
         <span class="status-badge status-verified"><i class="ti ti-check"></i> Verified</span>
-        <p style="margin-top:16px;color:var(--text2);font-size:14.5px;line-height:1.6;">You're approved as a professional on Kounselia. Your profile and rate setup is coming in the next step of this rollout — we'll be in touch.</p>
+        <p style="margin-top:16px;color:var(--text2);font-size:14.5px;line-height:1.6;">You're approved as a professional on Kounselia.</p>
+        <a class="apply-submit" style="display:block;text-align:center;text-decoration:none;margin-top:16px" href="/pro-dashboard.php">Manage your profile &amp; rate</a>
       <?php else : ?>
         <span class="status-badge status-rejected"><i class="ti ti-x"></i> Not approved</span>
         <?php if ( $application->rejection_reason ) : ?>
