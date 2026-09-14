@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.9.0'; // Bumped version: split the single kounselia_core_memory JSON blob into normalized memory tables
+    $current_version   = '1.10.0'; // Bumped version: safety escalation tracking (kounselia_safety_escalations)
 
     if ( $installed_version === $current_version ) {
         return;
@@ -210,6 +210,32 @@ function kounselia_install_tables() {
         UNIQUE KEY user_pref (user_id, pref_key)
     ) {$charset_collate};";
 
+    /*
+     * A safety keyword match used to just flip a flag on the message row
+     * and wait for a staff member to happen to check the Safety page.
+     * This table gives each match its own tracked case: how urgent it is,
+     * whether it's been acted on, and by whom — so an acute-risk message
+     * triggers an immediate alert instead of sitting in a queue.
+     */
+    $sql_safety_escalations = "CREATE TABLE {$prefix}kounselia_safety_escalations (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        message_id BIGINT UNSIGNED NOT NULL,
+        session_id BIGINT UNSIGNED NOT NULL,
+        user_id BIGINT UNSIGNED NULL,
+        guest_token VARCHAR(64) NULL,
+        severity VARCHAR(10) NOT NULL DEFAULT 'elevated',
+        flag_reason VARCHAR(255) NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'open',
+        notified_at DATETIME NULL,
+        acknowledged_by BIGINT UNSIGNED NULL,
+        acknowledged_at DATETIME NULL,
+        created_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        KEY session_id (session_id),
+        KEY status (status),
+        KEY severity (severity)
+    ) {$charset_collate};";
+
     dbDelta( $sql_sessions );
     dbDelta( $sql_messages );
     dbDelta( $sql_guest_limits );
@@ -223,6 +249,7 @@ function kounselia_install_tables() {
     dbDelta( $sql_memory_relationships );
     dbDelta( $sql_memory_list_items );
     dbDelta( $sql_memory_preferences );
+    dbDelta( $sql_safety_escalations );
 
     update_option( 'kounselia_db_version', $current_version );
 

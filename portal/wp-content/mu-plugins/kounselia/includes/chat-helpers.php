@@ -108,7 +108,13 @@ function kounselia_log_message( $session_id, $sender, $content ) {
         'flagged_safety' => $flagged_safety,
         'flag_reason'    => $flag_reason,
     ) );
-    return (int) $wpdb->insert_id;
+    $message_id = (int) $wpdb->insert_id;
+
+    if ( $flagged_safety && function_exists( 'kounselia_record_safety_escalation' ) ) {
+        kounselia_record_safety_escalation( $message_id, $session_id, $flag_reason );
+    }
+
+    return $message_id;
 }
 
 
