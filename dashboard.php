@@ -572,14 +572,14 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <div class="rec-meta">
         <h3>Your professional application</h3>
         <?php if ( 'pending' === $pro_application->status ) : ?>
-          <p class="reason">Under review. Everything else here is yours to use in the meantime — talk to a counselor, check in, journal. We'll email you once there's a decision.</p>
+          <p class="reason">Under review. We'll email you once there's a decision — your professional profile is ready to manage in the meantime.</p>
         <?php elseif ( 'verified' === $pro_application->status ) : ?>
           <p class="reason">Verified. Your professional profile and rate are ready to manage.</p>
         <?php else : ?>
           <p class="reason">Not approved yet<?php echo $pro_application->rejection_reason ? ' — ' . esc_html( $pro_application->rejection_reason ) : ''; ?>. You can update your documents and reapply.</p>
         <?php endif; ?>
       </div>
-      <a class="btn-rec" href="<?php echo 'verified' === $pro_application->status ? '/pro-dashboard.php' : '/apply.php'; ?>"><?php echo 'verified' === $pro_application->status ? 'Manage profile' : 'View status'; ?></a>
+      <a class="btn-rec" href="/pro-dashboard.php">Go there</a>
     </section>
     <?php endif; ?>
 

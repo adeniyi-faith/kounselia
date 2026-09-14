@@ -327,7 +327,7 @@ function kounselia_ajax_apply_professional() {
 
     wp_send_json_success( array(
         'message'  => 'Application submitted. We will review it and email you.',
-        'redirect' => '/dashboard.php',
+        'redirect' => '/pro-dashboard.php',
         'nonce'    => wp_create_nonce( 'kounselia_auth' ),
     ) );
 }
@@ -446,13 +446,16 @@ add_action( 'wp_ajax_kounselia_admin_review_professional', 'kounselia_ajax_admin
 /* -------------------------------------------------------------------------
  * PROFESSIONAL PROFILE — Slice 2
  *
- * Once verified, a professional manages their own listing (title,
- * specialty, bio) and — this is the important one — sets their own
- * rate. Admin can see it (the review page already reads straight from
- * this same table, so any edit shows up there automatically) but never
- * writes it for them. License number is intentionally left out of what
- * can be edited here: changing the credential you were verified against
- * is a re-verification event, not a profile tweak.
+ * A professional manages their own listing (title, specialty, bio) and
+ * — this is the important one — sets their own rate, from the moment
+ * they apply, not just once verified: editing it while pending just
+ * means it's ready to go live the instant they're approved, it's not
+ * shown to clients either way until then. Admin can see it (the review
+ * page already reads straight from this same table, so any edit shows
+ * up there automatically) but never writes it for them. License number
+ * is intentionally left out of what can be edited here: changing the
+ * credential you were verified against is a re-verification event, not
+ * a profile tweak.
  * ---------------------------------------------------------------------- */
 
 function kounselia_ajax_update_professional_profile() {
@@ -465,8 +468,8 @@ function kounselia_ajax_update_professional_profile() {
     $user_id     = get_current_user_id();
     $application = kounselia_get_professional_application( $user_id );
 
-    if ( ! $application || 'verified' !== $application->status ) {
-        wp_send_json_error( array( 'message' => 'Your professional profile is not active yet.' ), 403 );
+    if ( ! $application ) {
+        wp_send_json_error( array( 'message' => 'You do not have a professional application on file.' ), 403 );
     }
 
     $title     = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
