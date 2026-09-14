@@ -135,7 +135,30 @@ function kounselia_safety_session_recently_notified( $session_id ) {
 }
 
 /**
- * Email every admin/staff account with a direct link to the transcript,
+ * Who gets paged for a critical safety escalation. Defaults to every
+ * admin/staff account; an operator can narrow this to a specific
+ * on-call list from Settings (kounselia_safety_alert_emails) once the
+ * team is big enough that not everyone needs to be woken up for every
+ * case.
+ */
+function kounselia_safety_alert_recipients() {
+    $custom = get_option( 'kounselia_safety_alert_emails', '' );
+    if ( ! empty( $custom ) ) {
+        $emails = array_filter( array_map( 'trim', explode( ',', $custom ) ), 'is_email' );
+        if ( ! empty( $emails ) ) {
+            return array_values( array_unique( $emails ) );
+        }
+    }
+
+    $recipients = get_users( array(
+        'role__in' => array( 'administrator', 'kounselia_staff' ),
+        'fields'   => array( 'user_email' ),
+    ) );
+    return array_values( array_filter( array_unique( wp_list_pluck( $recipients, 'user_email' ) ) ) );
+}
+
+/**
+ * Email the configured recipients with a direct link to the transcript,
  * and mark the case as notified.
  */
 function kounselia_notify_safety_escalation( $escalation_id ) {
@@ -160,11 +183,7 @@ function kounselia_notify_safety_escalation( $escalation_id ) {
         $who  = $user ? ( $user->display_name ?: $user->user_email ) : ( 'member #' . $escalation->user_id );
     }
 
-    $recipients = get_users( array(
-        'role__in' => array( 'administrator', 'kounselia_staff' ),
-        'fields'   => array( 'user_email' ),
-    ) );
-    $emails = array_filter( array_unique( wp_list_pluck( $recipients, 'user_email' ) ) );
+    $emails = kounselia_safety_alert_recipients();
 
     if ( empty( $emails ) ) {
         return false;

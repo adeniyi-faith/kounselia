@@ -62,4 +62,5 @@ require_once KOUNSELIA_CORE_DIR . '/includes/mood.php';              // 15. Mood
 require_once KOUNSELIA_CORE_DIR . '/includes/journal.php';           // 16. Private journal
 require_once KOUNSELIA_CORE_DIR . '/includes/password-reset.php';    // 17. Forgot password
 require_once KOUNSELIA_CORE_DIR . '/includes/memory.php';            // 18. Structured memory engine (import + delta synth)
+require_once KOUNSELIA_CORE_DIR . '/includes/check-ins.php';         // 18B. Smart Check-ins: dated events extracted from memory synthesis
 require_once KOUNSELIA_CORE_DIR . '/includes/admin-access.php';      // 19. Admin capability, staff role, audit log

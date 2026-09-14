@@ -129,14 +129,31 @@ $kounselia_nonce        = wp_create_nonce( 'kounselia_auth' );
 <?php require __DIR__ . '/inc/kounselia-chat-engine.php'; ?>
 
 <script>
-document.addEventListener('DOMContentLoaded',function(){
+document.addEventListener('DOMContentLoaded',async function(){
   const slug=(location.hash||'').replace('#','');
   if(slug&&C[slug]){
-    
+
     // Personalize the loader if counselor is known
     const loaderText = document.getElementById('loading-text');
     if(loaderText && C[slug].name) {
       loaderText.textContent = 'Connecting you with ' + C[slug].name + '...';
+    }
+
+    // Arrived from a dashboard "Smart Check-in" card: swap the usual
+    // generic greeting for the actual check-in question, so the
+    // counselor opens with it directly instead of "where should we start?"
+    const checkinId = new URLSearchParams(location.search).get('checkin');
+    if(checkinId){
+      try{
+        const res = await fetch(KOUNSELIA.ajaxUrl,{
+          method:'POST',
+          headers:{'Content-Type':'application/x-www-form-urlencoded'},
+          body:new URLSearchParams({action:'kounselia_get_checkin',nonce:KOUNSELIA.nonce,checkin_id:checkinId})
+        }).then(r=>r.json());
+        if(res.success && res.data && res.data.question){
+          C[slug].greeting = res.data.question;
+        }
+      }catch(e){ /* fall back silently to the normal greeting */ }
     }
 
     // Start the chat interface rendering logic under the hood immediately
