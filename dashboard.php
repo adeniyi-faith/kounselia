@@ -30,6 +30,7 @@ $today_mood    = function_exists( 'kounselia_get_today_mood' ) ? kounselia_get_t
 $recent_moods  = function_exists( 'kounselia_get_recent_moods' ) ? kounselia_get_recent_moods( $user->ID, 7 ) : array();
 $today_journal = function_exists( 'kounselia_get_today_journal' ) ? kounselia_get_today_journal( $user->ID ) : '';
 $next_checkin  = function_exists( 'kounselia_get_next_checkin' ) ? kounselia_get_next_checkin( $user->ID ) : null;
+$pro_application = function_exists( 'kounselia_get_professional_application' ) ? kounselia_get_professional_application( $user->ID ) : null;
 
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_auth' );
@@ -562,6 +563,25 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <button class="btn-w ghost" onclick="switchTab('sessions')"><i class="ti ti-history"></i> View your sessions</button>
       </div>
     </section>
+
+    <?php if ( $pro_application ) : ?>
+    <section class="rec-card" id="pro-status-card" style="margin-bottom:20px;">
+      <div class="rec-av ic-gold"><i class="ti <?php
+        echo 'verified' === $pro_application->status ? 'ti-check' : ( 'rejected' === $pro_application->status ? 'ti-x' : 'ti-clock' );
+      ?>"></i></div>
+      <div class="rec-meta">
+        <h3>Your professional application</h3>
+        <?php if ( 'pending' === $pro_application->status ) : ?>
+          <p class="reason">Under review. Everything else here is yours to use in the meantime — talk to a counselor, check in, journal. We'll email you once there's a decision.</p>
+        <?php elseif ( 'verified' === $pro_application->status ) : ?>
+          <p class="reason">Verified. Your professional profile and rate are ready to manage.</p>
+        <?php else : ?>
+          <p class="reason">Not approved yet<?php echo $pro_application->rejection_reason ? ' — ' . esc_html( $pro_application->rejection_reason ) : ''; ?>. You can update your documents and reapply.</p>
+        <?php endif; ?>
+      </div>
+      <a class="btn-rec" href="<?php echo 'verified' === $pro_application->status ? '/pro-dashboard.php' : '/apply.php'; ?>"><?php echo 'verified' === $pro_application->status ? 'Manage profile' : 'View status'; ?></a>
+    </section>
+    <?php endif; ?>
 
     <?php if ( $next_checkin ) :
       $checkin_slug      = ! empty( $tried_slugs ) ? $tried_slugs[0] : $recommended_slug;
