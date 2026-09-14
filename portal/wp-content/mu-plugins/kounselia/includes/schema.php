@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.10.0'; // Bumped version: safety escalation tracking (kounselia_safety_escalations)
+    $current_version   = '1.11.0'; // Bumped version: Smart Check-ins (kounselia_memory_upcoming_events)
 
     if ( $installed_version === $current_version ) {
         return;
@@ -236,6 +236,26 @@ function kounselia_install_tables() {
         KEY severity (severity)
     ) {$charset_collate};";
 
+    /*
+     * A dated event the user mentioned in conversation (e.g. "my
+     * presentation is tomorrow"), extracted during memory synthesis.
+     * Separate from the memory-profile tables above: this one tracks a
+     * status (pending / checked_in / dismissed / expired) across
+     * synthesis runs, which the wipe-and-reinsert profile tables don't.
+     */
+    $sql_memory_upcoming_events = "CREATE TABLE {$prefix}kounselia_memory_upcoming_events (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        event_text VARCHAR(191) NOT NULL,
+        event_date DATE NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        created_at DATETIME NOT NULL,
+        checked_in_at DATETIME NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY user_event (user_id, event_date, event_text),
+        KEY user_status (user_id, status)
+    ) {$charset_collate};";
+
     dbDelta( $sql_sessions );
     dbDelta( $sql_messages );
     dbDelta( $sql_guest_limits );
@@ -250,6 +270,7 @@ function kounselia_install_tables() {
     dbDelta( $sql_memory_list_items );
     dbDelta( $sql_memory_preferences );
     dbDelta( $sql_safety_escalations );
+    dbDelta( $sql_memory_upcoming_events );
 
     update_option( 'kounselia_db_version', $current_version );
 
