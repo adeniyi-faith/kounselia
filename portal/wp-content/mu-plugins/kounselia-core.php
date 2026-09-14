@@ -45,6 +45,7 @@ add_filter( 'wp_mail_from', function( $original_email ) {
     return 'hello@' . $domain; // Sends from hello@kounselia.com
 } );
 
+require_once KOUNSELIA_CORE_DIR . '/includes/memory-store.php';      // 0.  Normalized memory table read/write layer (used by schema.php's backfill)
 require_once KOUNSELIA_CORE_DIR . '/includes/schema.php';            // 1.  Custom tables, install/upgrade, backfills
 require_once KOUNSELIA_CORE_DIR . '/includes/security-helpers.php';  // 2.  Nonce / honeypot / rate limit
 require_once KOUNSELIA_CORE_DIR . '/includes/personas.php';          // 2B. Counselor personas & default prompts

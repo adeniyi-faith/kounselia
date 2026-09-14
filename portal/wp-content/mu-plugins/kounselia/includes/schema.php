@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.8.0'; // Bumped version to trigger DB expansion for the sender column
+    $current_version   = '1.9.0'; // Bumped version: split the single kounselia_core_memory JSON blob into normalized memory tables
 
     if ( $installed_version === $current_version ) {
         return;
@@ -124,6 +124,92 @@ function kounselia_install_tables() {
         KEY target (target_type, target_id)
     ) {$charset_collate};";
 
+    /*
+     * ---------------------------------------------------------------------
+     * MEMORY TABLES (v1.9.0)
+     *
+     * The structured memory profile used to live as one giant JSON blob in
+     * wp_usermeta ('kounselia_core_memory'). Every read, and every write,
+     * had to load and parse that entire blob even when a feature only
+     * needed one piece of it (e.g. "what happened to this user recently").
+     * These tables split it into its natural parts so future features can
+     * query just the part they need directly in SQL. See memory-store.php
+     * for the read/write layer built on top of these tables.
+     * ---------------------------------------------------------------------
+     */
+
+    // One row per user: the single-value fields of the profile.
+    $sql_memory_profile = "CREATE TABLE {$prefix}kounselia_memory_profile (
+        user_id BIGINT UNSIGNED NOT NULL,
+        identity TEXT NULL,
+        career TEXT NULL,
+        health TEXT NULL,
+        communication_style VARCHAR(255) NULL,
+        personality TEXT NULL,
+        faith VARCHAR(255) NULL,
+        temporary_context TEXT NULL,
+        updated_at DATETIME NULL,
+        PRIMARY KEY  (user_id)
+    ) {$charset_collate};";
+
+    // life_timeline: one row per remembered life event.
+    $sql_memory_life_events = "CREATE TABLE {$prefix}kounselia_memory_life_events (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        event_year VARCHAR(16) NULL,
+        event_text TEXT NOT NULL,
+        impact TEXT NULL,
+        created_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        KEY user_id (user_id)
+    ) {$charset_collate};";
+
+    // emotional_map: how the user feels about a person/place/topic, one row per entity.
+    $sql_memory_emotions = "CREATE TABLE {$prefix}kounselia_memory_emotions (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        entity_name VARCHAR(191) NOT NULL,
+        emotion VARCHAR(100) NULL,
+        intensity VARCHAR(10) NULL,
+        context TEXT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY user_entity (user_id, entity_name)
+    ) {$charset_collate};";
+
+    // relationships: one row per named person/group in the user's life.
+    $sql_memory_relationships = "CREATE TABLE {$prefix}kounselia_memory_relationships (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        person_name VARCHAR(191) NOT NULL,
+        context TEXT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY user_person (user_id, person_name)
+    ) {$charset_collate};";
+
+    // Generic list fields (goals, important_people, values, triggers, traumas,
+    // current_challenges, wins, habits) — one row per item, tagged by list_type.
+    $sql_memory_list_items = "CREATE TABLE {$prefix}kounselia_memory_list_items (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        list_type VARCHAR(32) NOT NULL,
+        item_text TEXT NOT NULL,
+        created_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        KEY user_list (user_id, list_type)
+    ) {$charset_collate};";
+
+    // preferences: free-form key/value pairs.
+    $sql_memory_preferences = "CREATE TABLE {$prefix}kounselia_memory_preferences (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        pref_key VARCHAR(191) NOT NULL,
+        pref_value TEXT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY user_pref (user_id, pref_key)
+    ) {$charset_collate};";
+
     dbDelta( $sql_sessions );
     dbDelta( $sql_messages );
     dbDelta( $sql_guest_limits );
@@ -131,12 +217,19 @@ function kounselia_install_tables() {
     dbDelta( $sql_moods );
     dbDelta( $sql_journal );
     dbDelta( $sql_audit_log );
+    dbDelta( $sql_memory_profile );
+    dbDelta( $sql_memory_life_events );
+    dbDelta( $sql_memory_emotions );
+    dbDelta( $sql_memory_relationships );
+    dbDelta( $sql_memory_list_items );
+    dbDelta( $sql_memory_preferences );
 
     update_option( 'kounselia_db_version', $current_version );
 
     kounselia_seed_counselor_prompts();
     kounselia_backfill_tts_voices();
     kounselia_cleanup_message_slashes();
+    kounselia_backfill_memory_tables();
 }
 add_action( 'init', 'kounselia_install_tables' );
 
@@ -178,6 +271,34 @@ function kounselia_backfill_tts_voices() {
             'tts_voice'     => $p['tts_voice'],
             'voice_enabled' => $p['voice_enabled'],
         ), array( 'counselor_slug' => $slug ) );
+    }
+}
+
+/**
+ * One-time backfill: every user who already has a 'kounselia_core_memory'
+ * JSON blob gets it split into the new normalized memory tables, via the
+ * same save routine new writes use (see memory-store.php). Safe to run
+ * more than once — kounselia_memory_save_profile() always replaces a
+ * user's rows wholesale, so re-running just re-writes the same data.
+ * The original usermeta blob is left in place; it becomes a generated
+ * cache going forward (see memory-store.php) rather than dead data.
+ */
+function kounselia_backfill_memory_tables() {
+    global $wpdb;
+
+    if ( ! function_exists( 'kounselia_memory_save_profile' ) ) {
+        return; // memory-store.php not loaded yet; nothing to do this pass.
+    }
+
+    $rows = $wpdb->get_results(
+        "SELECT user_id, meta_value FROM {$wpdb->usermeta} WHERE meta_key = 'kounselia_core_memory'"
+    );
+
+    foreach ( $rows as $row ) {
+        $decoded = json_decode( $row->meta_value, true );
+        if ( is_array( $decoded ) ) {
+            kounselia_memory_save_profile( (int) $row->user_id, $decoded, false ); // false = don't rewrite the meta cache, it's already correct
+        }
     }
 }
 
