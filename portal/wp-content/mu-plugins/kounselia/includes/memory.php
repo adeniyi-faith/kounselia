@@ -160,7 +160,7 @@ Text to extract from:
         ), 400 );
     }
 
-    update_user_meta( get_current_user_id(), 'kounselia_core_memory', wp_json_encode( $decoded_json ) );
+    kounselia_memory_save_profile( get_current_user_id(), $decoded_json );
     update_user_meta( get_current_user_id(), 'kounselia_memory_imported_at', current_time( 'mysql' ) );
 
     wp_send_json_success( array(
@@ -181,7 +181,7 @@ function kounselia_ajax_delete_memory() {
     }
 
     $user_id = get_current_user_id();
-    delete_user_meta( $user_id, 'kounselia_core_memory' );
+    kounselia_memory_delete_profile( $user_id );
     delete_user_meta( $user_id, 'kounselia_imported_memory' ); // Clean up legacy key just in case
     delete_user_meta( $user_id, 'kounselia_memory_imported_at' );
     delete_user_meta( $user_id, 'kounselia_latest_reflection' );
@@ -201,12 +201,7 @@ function kounselia_ajax_edit_memory() {
     }
 
     $user_id = get_current_user_id();
-    $memory_json = get_user_meta( $user_id, 'kounselia_core_memory', true );
-    $memory = $memory_json ? json_decode( $memory_json, true ) : array();
-
-    if ( ! is_array( $memory ) ) {
-        $memory = array();
-    }
+    $memory  = kounselia_memory_load_profile( $user_id );
 
     // Update String Fields
     if ( isset( $_POST['identity'] ) ) $memory['identity'] = sanitize_textarea_field( wp_unslash( $_POST['identity'] ) );
@@ -222,7 +217,7 @@ function kounselia_ajax_edit_memory() {
         }
     }
 
-    update_user_meta( $user_id, 'kounselia_core_memory', wp_json_encode( $memory ) );
+    kounselia_memory_save_profile( $user_id, $memory );
     wp_send_json_success( array( 'memory' => $memory ) );
 }
 add_action( 'wp_ajax_kounselia_edit_memory', 'kounselia_ajax_edit_memory' );
@@ -254,20 +249,8 @@ function kounselia_ajax_synthesize_memory() {
 
     $user_id = get_current_user_id();
 
-    // 1. Fetch current profile
-    $current_profile_json = get_user_meta( $user_id, 'kounselia_core_memory', true );
-    if ( empty( $current_profile_json ) ) {
-        // Initialize an empty schema if they never did an import
-        $current_profile_json = wp_json_encode( array(
-            'identity' => '', 'life_timeline' => array(), 'emotional_map' => new stdClass(), 
-            'goals' => array(), 'relationships' => new stdClass(),
-            'important_people' => array(), 'career' => '', 'health' => '',
-            'values' => array(), 'triggers' => array(), 'traumas' => array(),
-            'current_challenges' => array(), 'wins' => array(), 'preferences' => new stdClass(),
-            'communication_style' => '', 'personality' => '', 'faith' => '', 'habits' => array(),
-            'temporary_context' => ''
-        ) );
-    }
+    // 1. Fetch current profile (from the normalized tables; empty schema if they never did an import)
+    $current_profile_json = wp_json_encode( kounselia_memory_load_profile( $user_id ) );
 
     // 2. Fetch the Delta (last 12 messages of this specific session to capture the back-and-forth).
     $delta_history = kounselia_build_gemini_history( $session_id, 12 );
@@ -341,7 +324,7 @@ TRANSCRIPT DELTA:
 
     // Safety check: ensure the LLM returned a valid structure, allowing full schema replacements safely
     if ( is_array( $decoded_json ) ) {
-        update_user_meta( $user_id, 'kounselia_core_memory', wp_json_encode( $decoded_json ) );
+        kounselia_memory_save_profile( $user_id, $decoded_json );
         wp_send_json_success( array( 'synthesized' => true ) );
     }
 
@@ -493,7 +476,7 @@ function kounselia_ajax_submit_intake() {
         'temporary_context' => "User just signed up. When asked what brought them here, they said: '{$q1}'. When asked about their goals, they said: '{$q2}'."
     );
 
-    update_user_meta( $user_id, 'kounselia_core_memory', wp_json_encode( $initial_memory ) );
+    kounselia_memory_save_profile( $user_id, $initial_memory );
     delete_user_meta( $user_id, 'kounselia_is_new_user' );
 
     wp_send_json_success();
