@@ -151,6 +151,19 @@ function kounselia_professional_document_url( $doc_id ) {
     );
 }
 
+/**
+ * The actual "who is allowed to see this" decision, factored out on
+ * its own so it's testable without exercising the file-streaming side
+ * effect below it (which ends the request on purpose, by design, on a
+ * real request — not something a test suite should ever trigger).
+ */
+function kounselia_user_can_view_professional_document( $user_id, $doc_owner_user_id ) {
+    if ( ! $user_id ) {
+        return false;
+    }
+    return ( (int) $doc_owner_user_id === (int) $user_id ) || kounselia_user_is_admin( $user_id );
+}
+
 function kounselia_ajax_view_professional_document() {
     if ( ! is_user_logged_in() ) {
         wp_die( 'Please sign in.', 'Unauthorized', array( 'response' => 401 ) );
@@ -175,8 +188,7 @@ function kounselia_ajax_view_professional_document() {
         wp_die( 'Not found.', 'Not found', array( 'response' => 404 ) );
     }
 
-    $is_owner = ( (int) $doc->user_id === get_current_user_id() );
-    if ( ! $is_owner && ! kounselia_user_is_admin() ) {
+    if ( ! kounselia_user_can_view_professional_document( get_current_user_id(), $doc->user_id ) ) {
         wp_die( 'You do not have access to this document.', 'Unauthorized', array( 'response' => 403 ) );
     }
 

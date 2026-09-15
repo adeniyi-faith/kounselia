@@ -38,3 +38,7 @@ config.php
 *.zip
 portal/.htaccess*
 portal/wp-content/index.php
+
+# Test tooling (see tests/, composer.json) — never part of the deployed site
+vendor/
+!tests/.htaccess
