@@ -1,0 +1,15 @@
+{
+    "name": "kounselia/kounselia",
+    "description": "Test tooling for the Kounselia mu-plugins. Not used at runtime — the site itself has no build step and no Composer autoloading; this exists purely so `vendor/bin/phpunit` can run the suite under tests/.",
+    "private": true,
+    "license": "proprietary",
+    "require-dev": {
+        "phpunit/phpunit": "^9.6",
+        "yoast/phpunit-polyfills": "^2.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "yoast/phpunit-polyfills": true
+        }
+    }
+}
