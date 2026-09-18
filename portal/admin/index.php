@@ -27,8 +27,37 @@ if ( is_user_logged_in() && kounselia_user_is_admin() ) {
 }
 
 $kounselia_error = '';
+$kounselia_pending_2fa_user = kounselia_2fa_get_pending_user_id();
 
-if ( 'POST' === $_SERVER['REQUEST_METHOD'] ) {
+if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['totp_code'] ) ) {
+
+    // Step 2: the account/password already checked out, now the code does too.
+    if ( kounselia_rate_limited( 'admin_login_2fa', 8, 600 ) ) {
+        $kounselia_error = 'Too many attempts. Please wait a few minutes and try again.';
+    } elseif ( ! $kounselia_pending_2fa_user ) {
+        $kounselia_error = 'Your sign-in expired, please start again.';
+    } else {
+        $kounselia_code   = sanitize_text_field( wp_unslash( $_POST['totp_code'] ) );
+        $kounselia_secret = get_user_meta( $kounselia_pending_2fa_user, 'kounselia_2fa_secret', true );
+
+        $kounselia_ok = $kounselia_secret && kounselia_totp_verify( $kounselia_secret, $kounselia_code );
+        if ( ! $kounselia_ok ) {
+            $kounselia_ok = kounselia_2fa_consume_backup_code( $kounselia_pending_2fa_user, $kounselia_code );
+        }
+
+        if ( ! $kounselia_ok ) {
+            $kounselia_error = 'Incorrect code. Please try again.';
+        } else {
+            kounselia_2fa_clear_pending_login();
+            wp_set_auth_cookie( $kounselia_pending_2fa_user, false, is_ssl() );
+            wp_set_current_user( $kounselia_pending_2fa_user );
+            update_user_meta( $kounselia_pending_2fa_user, 'kounselia_admin_last_seen', time() );
+            kounselia_admin_log( 'admin_login', 'user', $kounselia_pending_2fa_user );
+            wp_safe_redirect( '/portal/admin/pages/dashboard.php' );
+            exit;
+        }
+    }
+} elseif ( 'POST' === $_SERVER['REQUEST_METHOD'] ) {
 
     // Honeypot: a hidden field real humans never fill in.
     if ( ! empty( $_POST['website'] ) ) {
@@ -39,19 +68,21 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] ) {
         $kounselia_email    = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
         $kounselia_password = isset( $_POST['password'] ) ? (string) wp_unslash( $_POST['password'] ) : '';
 
-        $kounselia_signon = wp_signon( array(
-            'user_login'    => $kounselia_email,
-            'user_password' => $kounselia_password,
-            'remember'      => false, // short admin sessions on purpose, see admin-auth.php
-        ), is_ssl() );
+        $kounselia_user = wp_authenticate( $kounselia_email, $kounselia_password );
 
-        if ( is_wp_error( $kounselia_signon ) ) {
+        if ( is_wp_error( $kounselia_user ) ) {
             $kounselia_error = 'Incorrect email or password.';
-        } elseif ( ! kounselia_user_is_admin( $kounselia_signon->ID ) ) {
-            wp_logout();
+        } elseif ( ! kounselia_user_is_admin( $kounselia_user->ID ) ) {
             $kounselia_error = 'Incorrect email or password.';
+        } elseif ( kounselia_2fa_is_enabled( $kounselia_user->ID ) ) {
+            // Credentials good, but the session cookie is withheld until
+            // the code step below also passes.
+            kounselia_2fa_start_pending_login( $kounselia_user->ID );
+            $kounselia_pending_2fa_user = $kounselia_user->ID;
         } else {
-            update_user_meta( $kounselia_signon->ID, 'kounselia_admin_last_seen', time() );
+            wp_set_auth_cookie( $kounselia_user->ID, false, is_ssl() );
+            wp_set_current_user( $kounselia_user->ID );
+            update_user_meta( $kounselia_user->ID, 'kounselia_admin_last_seen', time() );
             wp_safe_redirect( '/portal/admin/pages/dashboard.php' );
             exit;
         }
@@ -93,32 +124,43 @@ if ( empty( $kounselia_error ) && ! empty( $kounselia_notices[ $kounselia_reason
       <div class="login-msg notice"><?php echo esc_html( $kounselia_notice ); ?></div>
     <?php endif; ?>
 
-    <form method="post" autocomplete="off">
-      <div class="login-field hp-field">
-        <label for="website">Website</label>
-        <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
-      </div>
-
-      <div class="login-field">
-        <label for="email">Email</label>
-        <!-- Added a clear placeholder here -->
-        <input type="email" id="email" name="email" placeholder="name@kounselia.com" inputmode="email" autocapitalize="off" autocorrect="off" required autofocus>
-      </div>
-
-      <div class="login-field">
-        <label for="password">Password</label>
-        <div class="pw-wrap">
-          <!-- Added a clear placeholder here -->
-          <input type="password" id="password" name="password" placeholder="••••••••" required>
-          <button type="button" class="pw-toggle" id="pwToggle" aria-label="Show password" aria-pressed="false">
-            <svg id="pwIconOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
-            <svg id="pwIconClosed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.6 20.6 0 0 1 5.06-6.06M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a20.7 20.7 0 0 1-3.22 4.44M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
-          </button>
+    <?php if ( $kounselia_pending_2fa_user ) : ?>
+      <form method="post" autocomplete="off">
+        <p style="font-size:13px;color:var(--text2,#5B574D);margin-bottom:16px;line-height:1.5;">Enter the 6-digit code from your authenticator app, or one of your backup codes.</p>
+        <div class="login-field">
+          <label for="totp_code">Authentication code</label>
+          <input type="text" id="totp_code" name="totp_code" placeholder="123456" inputmode="numeric" autocomplete="one-time-code" maxlength="10" required autofocus>
         </div>
-      </div>
+        <button type="submit" class="login-submit">Verify &amp; sign in</button>
+      </form>
+    <?php else : ?>
+      <form method="post" autocomplete="off">
+        <div class="login-field hp-field">
+          <label for="website">Website</label>
+          <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+        </div>
 
-      <button type="submit" class="login-submit">Sign in</button>
-    </form>
+        <div class="login-field">
+          <label for="email">Email</label>
+          <!-- Added a clear placeholder here -->
+          <input type="email" id="email" name="email" placeholder="name@kounselia.com" inputmode="email" autocapitalize="off" autocorrect="off" required autofocus>
+        </div>
+
+        <div class="login-field">
+          <label for="password">Password</label>
+          <div class="pw-wrap">
+            <!-- Added a clear placeholder here -->
+            <input type="password" id="password" name="password" placeholder="••••••••" required>
+            <button type="button" class="pw-toggle" id="pwToggle" aria-label="Show password" aria-pressed="false">
+              <svg id="pwIconOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg id="pwIconClosed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.6 20.6 0 0 1 5.06-6.06M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a20.7 20.7 0 0 1-3.22 4.44M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <button type="submit" class="login-submit">Sign in</button>
+      </form>
+    <?php endif; ?>
   </div>
 </div>
 <script>
