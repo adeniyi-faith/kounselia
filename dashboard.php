@@ -237,8 +237,10 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .rec-meta h3{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:21px;margin-bottom:2px}
 .rec-meta p.spec{font-size:13px;color:var(--gold);font-weight:600;letter-spacing:.3px;text-transform:uppercase;margin-bottom:6px}
 .rec-meta p.reason{font-size:13.5px;color:var(--text2)}
-.btn-rec{padding:11px 20px;border-radius:50px;background:var(--accent);color:#fff;border:none;font-family:inherit;font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s ease;text-decoration:none;display:inline-block}
+.btn-rec{padding:11px 20px;border-radius:50px;background:var(--accent);color:#fff;border:none;font-family:inherit;font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap;transition:all .2s ease;text-decoration:none;display:inline-block;flex-shrink:0}
 .btn-rec:hover{background:var(--accent2);transform:translateY(-1px)}
+.btn-rec.secondary{background:none;border:1.5px solid var(--border);color:var(--text2)}
+.btn-rec.secondary:hover{background:none;border-color:var(--text3);color:var(--text)}
 
 .counselor-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .counselor-tile{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:18px 14px;text-align:center;text-decoration:none;color:inherit;box-shadow:var(--shadow-sm);transition:all .2s ease}
@@ -466,6 +468,9 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
   .plans-grid{grid-template-columns:1fr}
   .welcome{padding:28px 22px}
   .welcome h1{font-size:26px}
+  .welcome-actions .btn-w{width:100%;justify-content:center}
+  .rec-card{flex-direction:column;align-items:flex-start;gap:14px}
+  .rec-card .btn-rec{width:100%;text-align:center;white-space:normal}
   .mood-options{gap:8px}
   .mood-btn{flex:0 1 calc(33.333% - 6px);min-width:0;max-width:120px;padding:12px 6px}
 
@@ -601,7 +606,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
           <p class="reason">Your professional application wasn't approved<?php echo $pro_application->rejection_reason ? ' — ' . esc_html( $pro_application->rejection_reason ) : ''; ?>. You can update your documents and reapply.</p>
         <?php endif; ?>
       </div>
-      <a class="btn-rec" href="/pro-dashboard.php"><i class="ti ti-switch-horizontal" style="margin-right:6px;"></i>Back to professional dashboard</a>
+      <a class="btn-rec secondary" href="/pro-dashboard.php"><i class="ti ti-switch-horizontal" style="margin-right:6px;"></i>Switch back</a>
     </section>
     <?php endif; ?>
 
