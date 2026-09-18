@@ -23,19 +23,39 @@
  *   $kounselia_is_logged_in   bool
  *   $kounselia_ajax_url       string, e.g. admin_url( 'admin-ajax.php' )
  *   $kounselia_nonce          string, e.g. wp_create_nonce( 'kounselia_auth' )
+ *
+ * There are now two chat UIs sharing this loader:
+ *
+ *   - The original hand-written HTML/CSS/JS under assets/ (default).
+ *     index.php's guest trial funnel stays on this one: it also leans on
+ *     this script's global openModal()/logout()/updateUserUI() functions
+ *     for the marketing nav's sign-in UI, which the React rebuild below
+ *     doesn't provide.
+ *
+ *   - A React + TypeScript rebuild under assets/react/ (source lives in
+ *     the separate chat-app/ project; `npm run build` there produces
+ *     these two files). It's a self-contained conversation screen only,
+ *     no site nav wiring. Set $kounselia_use_react_chat = true before
+ *     requiring this file to opt a page into it, as talk.php does.
  */
 
 $kounselia_chat_engine_dir = __DIR__ . '/kounselia-chat-engine';
+$kounselia_use_react_chat  = ! empty( $kounselia_use_react_chat );
+$kounselia_assets_dir      = $kounselia_chat_engine_dir . '/assets' . ( $kounselia_use_react_chat ? '/react' : '' );
 ?>
 <style>
-<?php readfile( $kounselia_chat_engine_dir . '/assets/kounselia-chat.css' ); ?>
+<?php readfile( $kounselia_assets_dir . '/kounselia-chat.css' ); ?>
 </style>
 
+<?php if ( $kounselia_use_react_chat ) : ?>
+<div id="kounselia-chat-root"></div>
+<?php else : ?>
 <?php require $kounselia_chat_engine_dir . '/templates/chat-markup.html'; ?>
+<?php endif; ?>
 
 <script>
-// Handed off to kounselia-chat-engine/assets/kounselia-chat.js, which reads
-// window.KOUNSELIA instead of having these values echoed directly into it.
+// Handed off to the chat JS bundle below, which reads window.KOUNSELIA
+// instead of having these values echoed directly into it.
 window.KOUNSELIA = {
   ajaxUrl: <?php echo wp_json_encode( $kounselia_ajax_url ); ?>,
   nonce: <?php echo wp_json_encode( $kounselia_nonce ); ?>,
@@ -65,5 +85,5 @@ if ( function_exists( 'kounselia_get_counselor_prompt' ) ) {
 window.C = <?php echo wp_json_encode( $kounselia_ui_for_js ); ?>;
 </script>
 <script>
-<?php readfile( $kounselia_chat_engine_dir . '/assets/kounselia-chat.js' ); ?>
+<?php readfile( $kounselia_assets_dir . '/kounselia-chat.js' ); ?>
 </script>
