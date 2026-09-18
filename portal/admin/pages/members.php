@@ -13,13 +13,29 @@ $kounselia_admin_active = 'members';
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_admin_nonce' );
 
-// Fetch members (Limit to 500 for performance, ideally we'd paginate via AJAX for 10k+ users)
+$kounselia_view = ( isset( $_GET['view'] ) && 'trash' === $_GET['view'] ) ? 'trash' : 'active';
+
+// Fetch members (Limit to 500 for performance, ideally we'd paginate via AJAX for 10k+ users).
+// Soft-deleted members carry a 'kounselia_deleted_at' meta value and are
+// kept out of the everyday list — see admin-access.php's soft-delete
+// logic — but stay queryable here for the Trash tab.
 $members = get_users( array(
-    'role'    => 'subscriber',
-    'orderby' => 'registered',
-    'order'   => 'DESC',
-    'number'  => 500
+    'role'       => 'subscriber',
+    'orderby'    => 'registered',
+    'order'      => 'DESC',
+    'number'     => 500,
+    'meta_query' => 'trash' === $kounselia_view
+        ? array( array( 'key' => 'kounselia_deleted_at', 'compare' => 'EXISTS' ) )
+        : array( array( 'key' => 'kounselia_deleted_at', 'compare' => 'NOT EXISTS' ) ),
 ) );
+
+$kounselia_trash_count = 'trash' === $kounselia_view
+    ? count( $members )
+    : count( get_users( array(
+        'role'       => 'subscriber',
+        'fields'     => 'ID',
+        'meta_query' => array( array( 'key' => 'kounselia_deleted_at', 'compare' => 'EXISTS' ) ),
+    ) ) );
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -246,15 +262,34 @@ table.admin-table tbody tr:hover td {
   <h1 class="admin-title">Members CRM</h1>
   <div class="admin-subtitle">Manage your <?php echo count($members); ?> registered users.</div>
 
+  <div style="display:flex; gap:8px; margin-bottom:16px;">
+    <a href="members.php" class="d-tab<?php echo 'active' === $kounselia_view ? '' : ''; ?>" style="text-decoration:none; padding:8px 16px; border-radius:20px; font-size:13px; font-weight:500; <?php echo 'active' === $kounselia_view ? 'background:var(--accent);color:#fff;' : 'background:var(--surface2);color:var(--text2);'; ?>">Active</a>
+    <a href="members.php?view=trash" style="text-decoration:none; padding:8px 16px; border-radius:20px; font-size:13px; font-weight:500; <?php echo 'trash' === $kounselia_view ? 'background:var(--rose);color:#fff;' : 'background:var(--surface2);color:var(--text2);'; ?>">Trash (<?php echo (int) $kounselia_trash_count; ?>)</a>
+  </div>
+
   <div class="search-bar">
     <i class="ti ti-search search-icon"></i>
     <input type="text" id="memberSearch" placeholder="Search by name or email..." onkeyup="filterMembers()">
+  </div>
+
+  <div id="bulkBar" style="display:none; align-items:center; gap:12px; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-md); padding:10px 16px; margin-bottom:14px;">
+    <span id="bulkCount" style="font-size:13px; font-weight:500; color:var(--text2);">0 selected</span>
+    <?php if ( 'trash' === $kounselia_view ) : ?>
+      <button class="btn-view-profile" onclick="bulkApply('restore')">Restore</button>
+    <?php else : ?>
+      <button class="btn-view-profile" onclick="bulkApply('upgrade')">Upgrade to Pro</button>
+      <button class="btn-view-profile" onclick="bulkApply('downgrade')">Downgrade to Free</button>
+      <button class="btn-view-profile" onclick="bulkApply('ban')">Ban</button>
+      <button class="btn-view-profile" onclick="bulkApply('unban')">Unban</button>
+      <button class="btn-view-profile" style="color:var(--rose);border-color:var(--rose);" onclick="bulkApply('delete')">Move to Trash</button>
+    <?php endif; ?>
   </div>
 
   <div class="crm-table-wrap">
     <table class="admin-table" id="membersTable">
       <thead>
         <tr>
+          <th style="width:36px;"><input type="checkbox" id="selectAll" onclick="toggleSelectAll(this)"></th>
           <th>User</th>
           <th>Email</th>
           <th>Joined</th>
@@ -263,22 +298,25 @@ table.admin-table tbody tr:hover td {
         </tr>
       </thead>
       <tbody>
-        <?php foreach ( $members as $u ) : 
+        <?php foreach ( $members as $u ) :
           $initial = strtoupper(substr($u->display_name ?: $u->user_email, 0, 1));
           $plan = get_user_meta( $u->ID, 'kounselia_plan', true ) ?: 'free';
           $banned = get_user_meta( $u->ID, 'kounselia_banned', true );
         ?>
-        <tr onclick="openDrawer(<?php echo $u->ID; ?>)">
-          <td data-label="User">
+        <tr>
+          <td data-label="" onclick="event.stopPropagation();"><input type="checkbox" class="row-check" value="<?php echo (int) $u->ID; ?>" onclick="updateBulkBar()"></td>
+          <td data-label="User" onclick="openDrawer(<?php echo $u->ID; ?>)">
             <div class="cell-who">
               <div class="user-avatar"><?php echo esc_html($initial); ?></div>
               <strong style="font-size:14.5px;"><?php echo esc_html( $u->display_name ?: '—' ); ?></strong>
             </div>
           </td>
-          <td data-label="Email"><?php echo esc_html( $u->user_email ); ?></td>
-          <td data-label="Joined"><?php echo date_i18n( 'M j, Y', strtotime( $u->user_registered ) ); ?></td>
-          <td data-label="Plan">
-            <?php if($banned): ?>
+          <td data-label="Email" onclick="openDrawer(<?php echo $u->ID; ?>)"><?php echo esc_html( $u->user_email ); ?></td>
+          <td data-label="Joined" onclick="openDrawer(<?php echo $u->ID; ?>)"><?php echo date_i18n( 'M j, Y', strtotime( $u->user_registered ) ); ?></td>
+          <td data-label="Plan" onclick="openDrawer(<?php echo $u->ID; ?>)">
+            <?php if('trash' === $kounselia_view): ?>
+                <span class="plan-badge banned">Trashed <?php echo esc_html( kounselia_admin_time_label( get_user_meta( $u->ID, 'kounselia_deleted_at', true ) ) ); ?></span>
+            <?php elseif($banned): ?>
                 <span class="plan-badge banned">Banned</span>
             <?php else: ?>
                 <span class="plan-badge <?php echo esc_attr($plan); ?>"><?php echo esc_html($plan); ?></span>
@@ -286,14 +324,22 @@ table.admin-table tbody tr:hover td {
             <i class="ti ti-chevron-right row-chevron"></i>
           </td>
           <td data-label="Action" style="text-align:right;">
-            <a href="member-profile.php?id=<?php echo esc_attr( $u->ID ); ?>" class="btn-view-profile" onclick="event.stopPropagation();">
-              <i class="ti ti-brain"></i> Intelligence Profile
-            </a>
+            <?php if ( 'trash' === $kounselia_view ) : ?>
+              <button class="btn-view-profile" onclick="event.stopPropagation(); restoreMember(<?php echo (int) $u->ID; ?>)">Restore</button>
+              <button class="btn-view-profile" style="color:var(--rose);border-color:var(--rose);" onclick="event.stopPropagation(); purgeMember(<?php echo (int) $u->ID; ?>)">Purge</button>
+            <?php else : ?>
+              <a href="member-profile.php?id=<?php echo esc_attr( $u->ID ); ?>" class="btn-view-profile" onclick="event.stopPropagation();">
+                <i class="ti ti-brain"></i> Intelligence Profile
+              </a>
+            <?php endif; ?>
           </td>
         </tr>
         <?php endforeach; ?>
       </tbody>
     </table>
+    <?php if ( empty( $members ) ) : ?>
+      <div class="empty-state" style="padding:32px;text-align:center;"><?php echo 'trash' === $kounselia_view ? 'Trash is empty.' : 'No members yet.'; ?></div>
+    <?php endif; ?>
   </div>
 </div>
 
@@ -354,8 +400,8 @@ table.admin-table tbody tr:hover td {
           <button class="btn-action" id="btn-ban" onclick="toggleBan()"></button>
         </div>
         <div class="d-control" style="border-color: #F3D9E0; background: var(--rose-light);">
-          <div>Delete Account <span>Permanently erase user and data</span></div>
-          <button class="btn-action ban" onclick="deleteUser()">Delete</button>
+          <div>Move to Trash <span>Locks them out; restore any time from the Trash tab</span></div>
+          <button class="btn-action ban" onclick="deleteUser()">Move to Trash</button>
         </div>
       </div>
 
@@ -638,10 +684,69 @@ function toggleBan() {
 }
 
 function deleteUser() {
-    if(confirm("DANGER: Are you absolutely sure you want to permanently delete this user and ALL their conversation history? This cannot be undone.")) {
+    if(confirm("Move this user to Trash? They'll be signed out immediately, but nothing is deleted — you can restore them (or permanently purge them) from the Trash tab.")) {
         executeUpdate('delete');
         setTimeout(() => window.location.reload(), 1500); // Reload to clear them from the table
     }
+}
+
+/* Selection + bulk actions ------------------------------------------------ */
+function toggleSelectAll(box) {
+    document.querySelectorAll('.row-check').forEach(cb => cb.checked = box.checked);
+    updateBulkBar();
+}
+
+function updateBulkBar() {
+    const checked = document.querySelectorAll('.row-check:checked');
+    const bar = document.getElementById('bulkBar');
+    document.getElementById('bulkCount').textContent = checked.length + ' selected';
+    bar.style.display = checked.length ? 'flex' : 'none';
+}
+
+function bulkApply(action) {
+    const ids = Array.from(document.querySelectorAll('.row-check:checked')).map(cb => cb.value);
+    if (!ids.length) return;
+
+    const labels = { ban: 'ban', unban: 'unban', upgrade: 'upgrade to Pro', downgrade: 'downgrade to Free', delete: 'move to Trash', restore: 'restore' };
+    if (!confirm(`Are you sure you want to ${labels[action] || action} ${ids.length} member(s)?`)) return;
+
+    fetch(ADMIN_AJAX_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'kounselia_admin_bulk_update_members', nonce: ADMIN_NONCE, do_action: action, user_ids: ids.join(',') })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.success) {
+            showToast(data.data.message);
+            setTimeout(() => window.location.reload(), 1200);
+        } else {
+            showToast(data.data.message || 'Bulk action failed.');
+        }
+    });
+}
+
+/* Trash tab: restore / purge single member --------------------------------- */
+function trashAction(userId, action, confirmMsg) {
+    if (!confirm(confirmMsg)) return;
+    fetch(ADMIN_AJAX_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'kounselia_admin_update_member', nonce: ADMIN_NONCE, user_id: userId, do_action: action })
+    })
+    .then(res => res.json())
+    .then(data => {
+        showToast((data.data && data.data.message) || (data.success ? 'Done.' : 'Action failed.'));
+        setTimeout(() => window.location.reload(), 1200);
+    });
+}
+
+function restoreMember(userId) {
+    trashAction(userId, 'restore', 'Restore this user? Their access and data come back immediately.');
+}
+
+function purgeMember(userId) {
+    trashAction(userId, 'purge', 'DANGER: This permanently erases this user and ALL their conversation history. This cannot be undone. Continue?');
 }
 </script>
 </body>
