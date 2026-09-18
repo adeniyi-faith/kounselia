@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.12.0'; // Bumped version: Professional marketplace (kounselia_professionals, kounselia_professional_documents)
+    $current_version   = '1.13.0'; // Bumped version: Paystack subscriptions (kounselia_subscriptions, kounselia_payments)
 
     if ( $installed_version === $current_version ) {
         return;
@@ -302,6 +302,49 @@ function kounselia_install_tables() {
         KEY professional_id (professional_id)
     ) {$charset_collate};";
 
+    // A user's current subscription. One row per user (unique user_id) —
+    // history of individual charges lives in kounselia_payments instead,
+    // this table only ever tracks "what plan is this user on right now."
+    $sql_subscriptions = "CREATE TABLE {$prefix}kounselia_subscriptions (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        plan_id VARCHAR(64) NOT NULL,
+        plan_name VARCHAR(191) NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'active',
+        amount DECIMAL(10,2) NOT NULL,
+        currency VARCHAR(8) NOT NULL DEFAULT 'NGN',
+        paystack_reference VARCHAR(100) NULL,
+        paystack_customer_code VARCHAR(100) NULL,
+        current_period_start DATETIME NULL,
+        current_period_end DATETIME NULL,
+        cancelled_at DATETIME NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY user_id (user_id),
+        KEY status (status)
+    ) {$charset_collate};";
+
+    // Every Paystack transaction attempt, one row per reference — created
+    // as 'pending' the moment checkout is initialized, then flipped to
+    // 'success'/'failed' once verified. Keeps a receipt trail independent
+    // of whatever the current subscription row says.
+    $sql_payments = "CREATE TABLE {$prefix}kounselia_payments (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        plan_id VARCHAR(64) NOT NULL,
+        reference VARCHAR(100) NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        currency VARCHAR(8) NOT NULL DEFAULT 'NGN',
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        gateway_response TEXT NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY reference (reference),
+        KEY user_id (user_id)
+    ) {$charset_collate};";
+
     dbDelta( $sql_sessions );
     dbDelta( $sql_messages );
     dbDelta( $sql_guest_limits );
@@ -319,6 +362,8 @@ function kounselia_install_tables() {
     dbDelta( $sql_memory_upcoming_events );
     dbDelta( $sql_professionals );
     dbDelta( $sql_professional_documents );
+    dbDelta( $sql_subscriptions );
+    dbDelta( $sql_payments );
 
     if ( function_exists( 'kounselia_ensure_professional_docs_dir' ) ) {
         kounselia_ensure_professional_docs_dir();

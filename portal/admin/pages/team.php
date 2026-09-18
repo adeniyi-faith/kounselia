@@ -205,6 +205,7 @@ table.admin-table tbody tr:hover td { background: #FAFAF8; }
         <div class="perm-row"><input type="checkbox" id="p-counselors" value="counselors" class="perm-check"> <label for="p-counselors">Counselors Studio</label></div>
         <div class="perm-row"><input type="checkbox" id="p-safety" value="safety" class="perm-check"> <label for="p-safety">Safety & Flags</label></div>
         <div class="perm-row"><input type="checkbox" id="p-professionals" value="professionals" class="perm-check"> <label for="p-professionals">Professionals</label></div>
+        <div class="perm-row"><input type="checkbox" id="p-plans" value="plans" class="perm-check"> <label for="p-plans">Plans & Pricing</label></div>
         <div class="perm-row"><input type="checkbox" id="p-conversations" value="conversations" class="perm-check"> <label for="p-conversations">Conversations</label></div>
         <div class="perm-row"><input type="checkbox" id="p-broadcasts" value="broadcasts" class="perm-check"> <label for="p-broadcasts">Broadcasts</label></div>
         <div class="perm-row"><input type="checkbox" id="p-audit-log" value="audit-log" class="perm-check"> <label for="p-audit-log">Audit Log</label></div>
