@@ -17,20 +17,74 @@ $kounselia_page        = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] 
 $kounselia_per_page    = 40;
 $kounselia_offset      = ( $kounselia_page - 1 ) * $kounselia_per_page;
 
-$kounselia_total       = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$kounselia_audit_table}" );
+$kounselia_filter_admin  = isset( $_GET['admin'] ) ? (int) $_GET['admin'] : 0;
+$kounselia_filter_action = isset( $_GET['action_filter'] ) ? sanitize_key( $_GET['action_filter'] ) : '';
+
+$kounselia_where  = array( '1=1' );
+$kounselia_params = array();
+if ( $kounselia_filter_admin ) {
+    $kounselia_where[]  = 'admin_id = %d';
+    $kounselia_params[] = $kounselia_filter_admin;
+}
+if ( $kounselia_filter_action ) {
+    $kounselia_where[]  = 'action = %s';
+    $kounselia_params[] = $kounselia_filter_action;
+}
+$kounselia_where_sql = implode( ' AND ', $kounselia_where );
+
+$kounselia_count_sql = "SELECT COUNT(*) FROM {$kounselia_audit_table} WHERE {$kounselia_where_sql}";
+$kounselia_total     = $kounselia_params
+    ? (int) $wpdb->get_var( $wpdb->prepare( $kounselia_count_sql, $kounselia_params ) )
+    : (int) $wpdb->get_var( $kounselia_count_sql );
 $kounselia_total_pages = max( 1, (int) ceil( $kounselia_total / $kounselia_per_page ) );
 
-$kounselia_rows = $wpdb->get_results( $wpdb->prepare(
-    "SELECT * FROM {$kounselia_audit_table} ORDER BY created_at DESC LIMIT %d OFFSET %d",
-    $kounselia_per_page,
-    $kounselia_offset
-) );
+$kounselia_rows_sql = "SELECT * FROM {$kounselia_audit_table} WHERE {$kounselia_where_sql} ORDER BY created_at DESC LIMIT %d OFFSET %d";
+$kounselia_rows     = $wpdb->get_results( $wpdb->prepare( $kounselia_rows_sql, array_merge( $kounselia_params, array( $kounselia_per_page, $kounselia_offset ) ) ) );
+
+// Every admin who has ever logged an action, for the filter dropdown.
+$kounselia_admin_ids = $wpdb->get_col( "SELECT DISTINCT admin_id FROM {$kounselia_audit_table} ORDER BY admin_id" );
+// Every distinct action ever logged, for the other filter dropdown.
+$kounselia_distinct_actions = $wpdb->get_col( "SELECT DISTINCT action FROM {$kounselia_audit_table} ORDER BY action" );
 
 $kounselia_action_labels = array(
-    'view_transcript'       => 'Viewed transcript',
-    'view_member'           => 'Viewed member profile',
-    'add_safety_keyword'    => 'Added safety keyword',
-    'remove_safety_keyword' => 'Removed safety keyword',
+    'view_transcript'            => 'Viewed transcript',
+    'view_member'                => 'Viewed member profile',
+    'add_safety_keyword'         => 'Added safety keyword',
+    'remove_safety_keyword'      => 'Removed safety keyword',
+    'bulk_import_safety_keywords'=> 'Bulk-imported safety keywords',
+    'reset_safety_keywords'      => 'Reset safety keywords to defaults',
+    'acknowledge_safety_escalation' => 'Acknowledged a safety escalation',
+    'created_staff'              => 'Created a staff account',
+    'edited_staff'               => 'Edited a staff account',
+    'deleted_staff'              => 'Removed a staff account',
+    'sent_broadcast'             => 'Sent an email broadcast',
+    'edited_counselor'           => 'Edited an AI counselor',
+    'banned_user'                => 'Banned a member',
+    'unbanned_user'              => 'Unbanned a member',
+    'upgraded_user'              => 'Upgraded a member to Pro',
+    'downgraded_user'            => 'Downgraded a member to Free',
+    'soft_deleted_user'          => 'Moved a member to Trash',
+    'restored_user'              => 'Restored a member from Trash',
+    'purged_user'                => 'Permanently deleted a member',
+    'bulk_ban_users'             => 'Bulk-banned members',
+    'bulk_unban_users'           => 'Bulk-unbanned members',
+    'bulk_upgrade_users'         => 'Bulk-upgraded members to Pro',
+    'bulk_downgrade_users'       => 'Bulk-downgraded members to Free',
+    'bulk_delete_users'          => 'Bulk-moved members to Trash',
+    'bulk_restore_users'         => 'Bulk-restored members from Trash',
+    'enabled_2fa'                => 'Enabled two-factor authentication',
+    'disabled_2fa'               => 'Disabled two-factor authentication',
+    'admin_login'                => 'Signed in',
+    'revoked_session'            => 'Signed out one session',
+    'revoked_own_sessions'       => 'Signed out their other sessions',
+    'revoked_all_sessions'       => 'Forced a full sign-out on an account',
+    'update_settings'            => 'Updated Gemini API keys',
+    'test_gemini_key'            => 'Ran an AI connection test',
+    'flush_tts_cache'            => 'Purged the voice (TTS) cache',
+    'reset_rate_limits'          => 'Reset rate limits',
+    'force_db_schema_sync'       => 'Re-synced the database schema',
+    'update_safety_alert_emails' => 'Updated safety alert recipients',
+    'update_platform_settings'   => 'Updated platform configuration',
 );
 ?>
 <!DOCTYPE html>
@@ -49,7 +103,31 @@ $kounselia_action_labels = array(
 
 <div class="admin-body">
   <h1 class="admin-title">Audit Log</h1>
-  <div class="admin-subtitle"><?php echo esc_html( number_format_i18n( $kounselia_total ) ); ?> recorded actions · every transcript view is logged here</div>
+  <div class="admin-subtitle"><?php echo esc_html( number_format_i18n( $kounselia_total ) ); ?> recorded actions</div>
+
+  <form method="get" class="filters" style="margin-bottom:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+    <select name="admin" onchange="this.form.submit()" style="padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;">
+      <option value="">All admins</option>
+      <?php foreach ( $kounselia_admin_ids as $kounselia_aid ) :
+        $kounselia_au = get_userdata( $kounselia_aid );
+      ?>
+        <option value="<?php echo (int) $kounselia_aid; ?>" <?php selected( $kounselia_filter_admin, (int) $kounselia_aid ); ?>>
+          <?php echo esc_html( $kounselia_au ? $kounselia_au->display_name : 'Admin #' . (int) $kounselia_aid ); ?>
+        </option>
+      <?php endforeach; ?>
+    </select>
+    <select name="action_filter" onchange="this.form.submit()" style="padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;">
+      <option value="">All actions</option>
+      <?php foreach ( $kounselia_distinct_actions as $kounselia_a ) : ?>
+        <option value="<?php echo esc_attr( $kounselia_a ); ?>" <?php selected( $kounselia_filter_action, $kounselia_a ); ?>>
+          <?php echo esc_html( isset( $kounselia_action_labels[ $kounselia_a ] ) ? $kounselia_action_labels[ $kounselia_a ] : $kounselia_a ); ?>
+        </option>
+      <?php endforeach; ?>
+    </select>
+    <?php if ( $kounselia_filter_admin || $kounselia_filter_action ) : ?>
+      <a href="/portal/admin/pages/audit-log.php" style="font-size:12.5px;color:var(--text3);">Clear filters</a>
+    <?php endif; ?>
+  </form>
 
   <div class="panel">
     <?php if ( empty( $kounselia_rows ) ) : ?>
@@ -89,14 +167,19 @@ $kounselia_action_labels = array(
         </tbody>
       </table>
 
+      <?php
+      $kounselia_qs_base = array();
+      if ( $kounselia_filter_admin ) { $kounselia_qs_base['admin'] = $kounselia_filter_admin; }
+      if ( $kounselia_filter_action ) { $kounselia_qs_base['action_filter'] = $kounselia_filter_action; }
+      ?>
       <div class="pagination">
         <?php if ( $kounselia_page > 1 ) : ?>
-          <a href="/portal/admin/pages/audit-log.php?paged=<?php echo (int) ( $kounselia_page - 1 ); ?>">← Prev</a>
+          <a href="/portal/admin/pages/audit-log.php?<?php echo esc_attr( http_build_query( array_merge( $kounselia_qs_base, array( 'paged' => $kounselia_page - 1 ) ) ) ); ?>">← Prev</a>
         <?php endif; ?>
         <span class="current"><?php echo (int) $kounselia_page; ?></span>
         <span>of <?php echo (int) $kounselia_total_pages; ?></span>
         <?php if ( $kounselia_page < $kounselia_total_pages ) : ?>
-          <a href="/portal/admin/pages/audit-log.php?paged=<?php echo (int) ( $kounselia_page + 1 ); ?>">Next →</a>
+          <a href="/portal/admin/pages/audit-log.php?<?php echo esc_attr( http_build_query( array_merge( $kounselia_qs_base, array( 'paged' => $kounselia_page + 1 ) ) ) ); ?>">Next →</a>
         <?php endif; ?>
       </div>
     <?php endif; ?>
