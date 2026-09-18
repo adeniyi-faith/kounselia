@@ -44,6 +44,10 @@ if ( $pro_application && 'client' !== ( $_GET['as'] ?? '' ) ) {
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_auth' );
 
+$available_plans     = function_exists( 'kounselia_get_plans' ) ? kounselia_get_plans( true ) : array();
+$user_subscription   = function_exists( 'kounselia_get_user_subscription' ) ? kounselia_get_user_subscription( $user->ID ) : null;
+$subscription_active = $user_subscription && strtotime( $user_subscription->current_period_end ) > current_time( 'timestamp' );
+
 $imported_memory     = get_user_meta( $user->ID, 'kounselia_imported_memory', true );
 $memory_imported_at  = get_user_meta( $user->ID, 'kounselia_memory_imported_at', true );
 
@@ -381,6 +385,15 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .generate-insight-btn:hover { border-color:var(--accent); background:var(--surface); color:var(--accent); }
 .generate-insight-btn:disabled { opacity:0.6; cursor:wait; }
 
+.sub-status-card{display:flex;align-items:center;gap:16px;background:var(--sage-light);border:1px solid rgba(46,92,62,0.18);border-radius:var(--r);padding:20px 24px;margin-bottom:20px}
+.sub-status-card.ending{background:var(--gold-light);border-color:rgba(176,125,58,0.25)}
+.sub-status-icon{width:44px;height:44px;border-radius:50%;background:#fff;color:var(--sage);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.sub-status-card.ending .sub-status-icon{color:var(--gold)}
+.sub-status-meta{flex:1;min-width:0}
+.sub-status-meta h4{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:18px;margin-bottom:2px}
+.sub-status-meta p{font-size:13px;color:var(--text2)}
+.sub-cancel-btn{padding:10px 18px;border-radius:50px;border:1.5px solid rgba(0,0,0,0.12);background:#fff;color:var(--text2);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
+.sub-cancel-btn:hover{border-color:var(--text3);color:var(--text)}
 .plans-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 .plan-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:26px}
 .plan-card.pro{border-color:var(--gold);background:linear-gradient(180deg,var(--gold-light) 0%,var(--surface) 30%);position:relative}
@@ -871,30 +884,59 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
   <div class="view-panel" id="view-upgrade">
     <section class="section">
       <div class="section-head"><h2>Your plan</h2></div>
+
+      <?php if ( $user_subscription && $subscription_active ) : ?>
+      <div class="sub-status-card <?php echo 'cancelled' === $user_subscription->status ? 'ending' : ''; ?>">
+        <div class="sub-status-icon"><i class="ti <?php echo 'cancelled' === $user_subscription->status ? 'ti-clock-pause' : 'ti-sparkles'; ?>"></i></div>
+        <div class="sub-status-meta">
+          <h4>You're on <?php echo esc_html( $user_subscription->plan_name ); ?></h4>
+          <?php if ( 'cancelled' === $user_subscription->status ) : ?>
+            <p>Auto-renew is off — your access ends on <?php echo esc_html( date( 'F j, Y', strtotime( $user_subscription->current_period_end ) ) ); ?>.</p>
+          <?php else : ?>
+            <p>Renews on <?php echo esc_html( date( 'F j, Y', strtotime( $user_subscription->current_period_end ) ) ); ?>.</p>
+          <?php endif; ?>
+        </div>
+        <?php if ( 'active' === $user_subscription->status ) : ?>
+          <button class="sub-cancel-btn" id="sub-cancel-btn">Cancel auto-renew</button>
+        <?php endif; ?>
+      </div>
+      <?php endif; ?>
+
       <div class="plans-grid">
         <div class="plan-card">
           <h3>Free</h3>
-          <p class="plan-price">Your current plan</p>
+          <p class="plan-price"><?php echo ( ! $user_subscription || ! $subscription_active ) ? 'Your current plan' : 'Included with every account'; ?></p>
           <ul class="plan-list">
             <li><i class="ti ti-check"></i> Unlimited conversations</li>
             <li><i class="ti ti-check"></i> All counselor personas</li>
             <li><i class="ti ti-check"></i> Sessions saved to your account</li>
             <li><i class="ti ti-check"></i> 5 minute voice calls</li>
           </ul>
-          <button class="btn-plan" disabled>Current plan</button>
+          <button class="btn-plan" disabled><?php echo ( ! $user_subscription || ! $subscription_active ) ? 'Current plan' : 'Free plan'; ?></button>
         </div>
+
+        <?php foreach ( $available_plans as $plan ) :
+          $is_current_plan = $subscription_active && $user_subscription && $user_subscription->plan_id === $plan['id'];
+          $is_cancelled    = $is_current_plan && 'cancelled' === $user_subscription->status;
+        ?>
         <div class="plan-card pro">
-          <span class="plan-badge">Pro</span>
-          <h3>Pro</h3>
-          <p class="plan-price">Pricing coming soon</p>
+          <?php if ( ! empty( $plan['is_popular'] ) ) : ?><span class="plan-badge">Popular</span><?php endif; ?>
+          <h3><?php echo esc_html( $plan['name'] ); ?></h3>
+          <p class="plan-price">₦<?php echo esc_html( number_format( (float) $plan['price_amount'] ) ); ?> / <?php echo 'yearly' === $plan['interval'] ? 'year' : 'month'; ?></p>
           <ul class="plan-list">
-            <li><i class="ti ti-check"></i> Deep session memory across visits</li>
-            <li><i class="ti ti-check"></i> Structured 30 day programs</li>
-            <li><i class="ti ti-check"></i> Priority access to all counselors</li>
-            <li><i class="ti ti-check"></i> 15+ minute voice calls</li>
+            <?php foreach ( (array) $plan['features'] as $feature ) : ?>
+              <li><i class="ti ti-check"></i> <?php echo esc_html( $feature ); ?></li>
+            <?php endforeach; ?>
           </ul>
-          <button class="btn-plan primary" id="upgrade-btn">Notify me when it's ready</button>
+          <?php if ( $is_current_plan && ! $is_cancelled ) : ?>
+            <button class="btn-plan" disabled>Current plan</button>
+          <?php else : ?>
+            <button class="btn-plan primary plan-subscribe-btn" data-plan-id="<?php echo esc_attr( $plan['id'] ); ?>">
+              <?php echo $is_cancelled ? 'Renew now' : 'Subscribe with Paystack'; ?>
+            </button>
+          <?php endif; ?>
         </div>
+        <?php endforeach; ?>
       </div>
     </section>
   </div><!-- /view-upgrade -->
@@ -1192,14 +1234,70 @@ function saveJournal(sourceId,msgId){
   .catch(()=>showInline(msgId,'Could not save, please try again.',false));
 }
 
-const upgBtn = document.getElementById('upgrade-btn');
-if(upgBtn) {
-  upgBtn.addEventListener('click',function(){
-    this.textContent="We'll let you know";
-    this.disabled=true;
-    toast("You're on the list. We'll email you when Pro plans launch.");
+document.querySelectorAll('.plan-subscribe-btn').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    const planId = this.dataset.planId;
+    const originalText = this.textContent;
+    this.disabled = true;
+    this.textContent = 'Starting checkout...';
+    fetch(KOUNSELIA.ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({action:'kounselia_init_subscription_payment',nonce:KOUNSELIA.nonce,plan_id:planId})})
+    .then(r=>r.json())
+    .then(res=>{
+      if(res.success && res.data.authorization_url){
+        window.location.href = res.data.authorization_url;
+      } else {
+        toast((res.data && res.data.message) ? res.data.message : 'Could not start checkout, please try again.', true);
+        this.disabled = false;
+        this.textContent = originalText;
+      }
+    })
+    .catch(()=>{
+      toast('Could not start checkout, please check your connection and try again.', true);
+      this.disabled = false;
+      this.textContent = originalText;
+    });
+  });
+});
+
+const subCancelBtn = document.getElementById('sub-cancel-btn');
+if(subCancelBtn){
+  subCancelBtn.addEventListener('click', function(){
+    if(!confirm('Cancel auto-renew? You will keep access until your current period ends.')) return;
+    this.disabled = true;
+    this.textContent = 'Cancelling...';
+    fetch(KOUNSELIA.ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({action:'kounselia_cancel_subscription',nonce:KOUNSELIA.nonce})})
+    .then(r=>r.json())
+    .then(res=>{
+      if(res.success){
+        toast(res.data.message || 'Subscription cancelled.');
+        setTimeout(()=>window.location.reload(), 900);
+      } else {
+        toast((res.data && res.data.message) ? res.data.message : 'Could not cancel, please try again.', true);
+        this.disabled = false;
+        this.textContent = 'Cancel auto-renew';
+      }
+    })
+    .catch(()=>{
+      toast('Could not cancel, please check your connection and try again.', true);
+      this.disabled = false;
+      this.textContent = 'Cancel auto-renew';
+    });
   });
 }
+
+(function(){
+  const params = new URLSearchParams(window.location.search);
+  const subResult = params.get('sub');
+  if(subResult === 'success'){
+    toast("Payment confirmed — you're all set.");
+    switchTab('upgrade');
+  } else if(subResult === 'failed'){
+    toast('Payment was not completed. Please try again.', true);
+    switchTab('upgrade');
+  }
+})();
 
 let currentMemoryData = null;
 
