@@ -467,6 +467,13 @@ body{font-family:'Outfit',sans-serif;color:var(--text);overflow-x:hidden; -webki
 .pro-card p{font-size:14px;opacity:.85;font-weight:300;line-height:1.65;margin-bottom:20px}
 .pro-card button{background:#fff;color:var(--accent);border:none;padding:12px 24px;border-radius:50px;font-family:'Outfit',sans-serif;font-size:14px;font-weight:500;cursor:pointer; transition: all 0.2s ease;}
 .pro-card button:hover{transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.15);}
+.apply-pro-card{display:flex;align-items:center;gap:14px;margin-top:22px;padding:16px 18px;border-radius:16px;background:var(--accent-light);border:1px solid rgba(30, 58, 95, 0.12);text-decoration:none;transition:all 0.2s ease;}
+.apply-pro-card:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(30, 58, 95, 0.12);}
+.apply-pro-icon{flex:0 0 auto;width:40px;height:40px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.apply-pro-text{flex:1;text-align:left;}
+.apply-pro-text strong{display:block;color:var(--text);font-size:14px;font-weight:600;}
+.apply-pro-text span{display:block;color:var(--text2);font-size:12.5px;margin-top:2px;}
+.apply-pro-card .apply-pro-arrow{flex:0 0 auto;color:var(--accent);font-size:18px;}
 
 /* --- DESKTOP CHAT REFINEMENTS (App-like Column Layout) --- */
 @media (min-width: 768px) {

@@ -165,6 +165,15 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
             ? 'Safety alert recipients cleared — critical alerts will go to every admin/staff account again.'
             : count( $emails ) . ' safety alert recipient' . ( 1 === count( $emails ) ? '' : 's' ) . ' saved.';
 
+    // 11B. Save Paystack Secret Key
+    } elseif ( 'save_paystack_key' === $kounselia_action
+        && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_paystack' ) ) {
+
+        $secret_key = isset( $_POST['paystack_secret_key'] ) ? trim( (string) wp_unslash( $_POST['paystack_secret_key'] ) ) : '';
+        update_option( 'kounselia_paystack_secret_key', sanitize_text_field( $secret_key ) );
+        kounselia_admin_log( 'update_settings', 'settings' );
+        $kounselia_notice = $secret_key ? 'Paystack secret key saved.' : 'Paystack secret key cleared — subscriptions are disabled until a key is set.';
+
     // 11. Save Platform Settings
     } elseif ( 'save_platform_settings' === $kounselia_action
         && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_platform' ) ) {
@@ -198,6 +207,11 @@ global $wpdb;
 $active_tts_transients = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '\_transient\_kounselia\_tts\_%'" );
 $active_rl_transients  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE '\_transient\_kounselia\_rl\_%'" );
 $current_db_version    = get_option( 'kounselia_db_version', 'Unknown' );
+
+$kounselia_paystack_key = get_option( 'kounselia_paystack_secret_key', '' );
+$kounselia_paystack_mode = $kounselia_paystack_key
+    ? ( 0 === strpos( $kounselia_paystack_key, 'sk_live_' ) ? 'Live mode' : 'Test mode' )
+    : 'Not configured';
 
 // Retrieve platform limits for the form
 $opt_guest_session = (int) get_option('kounselia_guest_session_limit', 6);
@@ -375,6 +389,36 @@ $opt_live_model    = get_option('kounselia_live_model', 'gemini-3.1-flash-live-p
         <textarea id="safety_alert_emails" name="safety_alert_emails" class="bulk-input" placeholder="oncall@kounselia.com, clinical-lead@kounselia.com"><?php echo esc_textarea( implode( ",\n", array_filter( explode( ',', $kounselia_safety_alert_emails ) ) ) ); ?></textarea>
       </div>
       <button type="submit" class="login-submit" style="width:auto;padding:10px 20px;">Save Recipients</button>
+    </form>
+  </div>
+
+  <!-- ===============================================================
+       2C. PAYSTACK PAYMENTS
+  ================================================---------------- -->
+  <div class="panel">
+    <div class="panel-title">
+      Paystack Payments
+      <span style="font-weight:400;color:var(--text3);font-size:12px;"><?php echo esc_html( $kounselia_paystack_mode ); ?></span>
+    </div>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px;line-height:1.55;max-width:64ch;">
+      Powers the Pro plan checkout on the member dashboard. Paste your Paystack <strong>secret key</strong> here (starts with <code>sk_test_</code> or <code>sk_live_</code>) — find it under Settings → API Keys &amp; Webhooks in your Paystack dashboard. Manage what plans are for sale, their prices, and their features on the <a href="/portal/admin/pages/plans.php">Plans &amp; Pricing</a> page.
+    </p>
+    <form method="post">
+      <?php wp_nonce_field( 'kounselia_settings_paystack' ); ?>
+      <input type="hidden" name="kounselia_action" value="save_paystack_key">
+      <div class="login-field">
+        <label for="paystack_secret_key">Paystack secret key</label>
+        <input
+          type="password"
+          id="paystack_secret_key"
+          name="paystack_secret_key"
+          autocomplete="off"
+          spellcheck="false"
+          style="width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:6px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;background:var(--bg);color:var(--text1);"
+          value="<?php echo esc_attr( $kounselia_paystack_key ); ?>"
+          placeholder="sk_test_...">
+      </div>
+      <button type="submit" class="login-submit" style="width:auto;padding:11px 22px;">Save Key</button>
     </form>
   </div>
 

@@ -768,7 +768,11 @@ function openModal(type){
       <input type="text" id="r-hp" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
       <button class="modal-btn" onclick="doRegister()">Create free account</button>
       <p class="modal-switch">Already have an account? <a onclick="openModal('login')">Sign in</a></p>
-      <p class="modal-switch">Licensed therapist or counselor? <a href="/apply.php">Apply as a professional</a></p>`;
+      <a class="apply-pro-card" href="/apply.php">
+        <span class="apply-pro-icon"><i class="ti ti-briefcase"></i></span>
+        <span class="apply-pro-text"><strong>Licensed therapist or counselor?</strong><span>Apply as a professional and join our care team</span></span>
+        <span class="apply-pro-arrow"><i class="ti ti-arrow-right"></i></span>
+      </a>`;
   }
 }
 
