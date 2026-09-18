@@ -7,11 +7,19 @@
  * sign in first (there's no guest trial experience here, that lives on
  * index.php).
  *
- * This page renders the SAME chat engine as index.php (counselor data,
- * message screen, voice call, TTS playback) via the shared partial in
+ * This page renders the conversation screen (counselor data, message
+ * screen, voice call, TTS playback) via the shared partial in
  * inc/kounselia-chat-engine.php. It does not duplicate that code, it
  * requires it. If you need to change how a conversation behaves, edit
  * inc/kounselia-chat-engine.php, not this file.
+ *
+ * Unlike index.php, this page opts into the React + TypeScript rebuild
+ * of the chat UI (source in chat-app/, built into
+ * inc/kounselia-chat-engine/assets/react/) by setting
+ * $kounselia_use_react_chat = true before requiring the engine partial.
+ * index.php stays on the original hand-written chat engine for now,
+ * since it also depends on that script's global sign-in/sign-up modal
+ * for its marketing nav, which the rebuild doesn't provide.
  *
  * Unlike index.php, this page has no marketing chrome and no guest
  * trial flow, it's just the conversation. A counselor slug is expected
@@ -104,17 +112,10 @@ $kounselia_nonce        = wp_create_nonce( 'kounselia_auth' );
   to { opacity: 1; }
 }
 
-/* #nav-right is required by the shared chat engine (logout/updateUserUI
-   write to it). On talk.php we don't render a visible nav bar, so we
-   keep a zero-size hidden node purely to satisfy that contract and
-   prevent null-reference JS errors if the user signs out mid-session. */
-#nav-right{display:none}
 </style>
 <?php wp_head(); ?>
 </head>
 <body>
-
-<div id="nav-right"></div>
 
 <div class="talk-loading" id="talk-loading">
   <div class="brand-loader-wrap">
@@ -126,7 +127,17 @@ $kounselia_nonce        = wp_create_nonce( 'kounselia_auth' );
   </div>
 </div>
 
-<?php require __DIR__ . '/inc/kounselia-chat-engine.php'; ?>
+<script>
+// The chat bundle below would otherwise mount itself and render the
+// default greeting the instant it loads. We need a chance first to
+// swap in a personalized "Smart Check-in" greeting (fetched below),
+// so hold it off until this page explicitly calls kounseliaMountChat().
+window.__kounseliaDeferMount = true;
+</script>
+<?php
+$kounselia_use_react_chat = true;
+require __DIR__ . '/inc/kounselia-chat-engine.php';
+?>
 
 <script>
 document.addEventListener('DOMContentLoaded',async function(){
@@ -156,9 +167,10 @@ document.addEventListener('DOMContentLoaded',async function(){
       }catch(e){ /* fall back silently to the normal greeting */ }
     }
 
-    // Start the chat interface rendering logic under the hood immediately
-    startChat(slug);
-    
+    // Now that any greeting override above is in place, let the chat
+    // bundle mount and read window.C for real.
+    window.kounseliaMountChat();
+
     // Intentionally delay removing the spinner for 1.5 seconds.
     // This allows the beautiful branded animation to play out and creates a
     // psychological sense of "establishing a real connection" for the user.
@@ -177,17 +189,6 @@ document.addEventListener('DOMContentLoaded',async function(){
     return;
   }
 });
-
-// On talk.php, after logout the reload in the base engine would hit the
-// auth gate and show a blank redirect. Override logout() here to send
-// the user straight to the homepage instead.
-function logout(){
-  fetch(KOUNSELIA.ajaxUrl,{
-    method:'POST',
-    headers:{'Content-Type':'application/x-www-form-urlencoded'},
-    body:new URLSearchParams({action:'kounselia_logout',nonce:KOUNSELIA.nonce})
-  }).finally(()=>{ window.location.href='/index.php'; });
-}
 </script>
 <?php wp_footer(); ?>
 </body>
