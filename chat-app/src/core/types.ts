@@ -49,5 +49,7 @@ declare global {
   interface Window {
     KOUNSELIA: KounseliaConfig;
     C: CounselorMap;
+    kounseliaMountChat?: () => void;
+    __kounseliaDeferMount?: boolean;
   }
 }
