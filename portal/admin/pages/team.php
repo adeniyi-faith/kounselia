@@ -161,6 +161,7 @@ table.admin-table tbody tr:hover td { background: #FAFAF8; }
           <td data-label="Actions" style="text-align:right;">
              <?php if( $u->ID !== get_current_user_id() ): ?>
                 <button class="action-btn" onclick='openEditModal(<?php echo (int) $u->ID; ?>, <?php echo wp_json_encode($is_super ? "super_admin" : "kounselia_staff"); ?>, <?php echo wp_json_encode($perms_arr); ?>)'>Edit</button>
+                <button class="action-btn" onclick="forceLogout(<?php echo (int) $u->ID; ?>)" title="Sign this person out of every device immediately">Force logout</button>
                 <button class="action-btn danger" onclick="removeStaff(<?php echo (int) $u->ID; ?>)">Remove</button>
              <?php else: ?>
                 <span style="font-size:12px; color:var(--text3);">You</span>
@@ -375,6 +376,21 @@ function saveStaff() {
         btn.innerHTML = originalText;
         showToast('A server error occurred. Check browser console.');
     });
+}
+
+function forceLogout(userId) {
+    if(!confirm("Sign this team member out of every device right now? They'll need to log in again.")) return;
+
+    fetch(ADMIN_AJAX_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'kounselia_admin_revoke_session', nonce: ADMIN_NONCE, user_id: userId, all: '1' })
+    })
+    .then(res => res.json())
+    .then(data => {
+        showToast((data.data && data.data.message) || 'Signed out.');
+    })
+    .catch(() => showToast('A server error occurred.'));
 }
 
 function removeStaff(userId) {

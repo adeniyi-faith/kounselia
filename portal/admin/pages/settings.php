@@ -523,7 +523,179 @@ $opt_live_model    = get_option('kounselia_live_model', 'gemini-3.1-flash-live-p
     </div>
   </div>
 
+  <!-- ===============================================================
+       5. YOUR ACCOUNT SECURITY (2FA + active sessions)
+  ================================================---------------- -->
+  <?php
+  $kounselia_me_id       = get_current_user_id();
+  $kounselia_2fa_on      = kounselia_2fa_is_enabled( $kounselia_me_id );
+  ?>
+  <div class="panel">
+    <div class="panel-title">
+      Your Account Security
+      <span style="font-weight:400;color:var(--text3);font-size:12px;">two-factor authentication &amp; active sessions — this account only</span>
+    </div>
+
+    <div class="maint-row">
+      <div class="maint-info">
+        <h4>Two-Factor Authentication</h4>
+        <p id="tfa-status-text"><?php echo $kounselia_2fa_on ? 'Enabled — a code from your authenticator app is required to sign in.' : 'Off — anyone with your password alone can sign in. Turning this on is strongly recommended.'; ?></p>
+      </div>
+      <?php if ( $kounselia_2fa_on ) : ?>
+        <button class="login-submit" style="width:auto;padding:9px 18px;background:var(--rose,#8B3A52);font-size:12.5px;" onclick="tfaOpenDisable()">Turn off 2FA</button>
+      <?php else : ?>
+        <button class="login-submit" style="width:auto;padding:9px 18px;font-size:12.5px;" onclick="tfaStartSetup()">Set up 2FA</button>
+      <?php endif; ?>
+    </div>
+
+    <div class="maint-row">
+      <div class="maint-info">
+        <h4>Active Sessions</h4>
+        <p>Every device currently signed in to this admin account.</p>
+      </div>
+      <button class="login-submit" style="width:auto;padding:9px 18px;background:#475569;font-size:12.5px;" onclick="revokeAllSessions()">Sign out all other sessions</button>
+    </div>
+    <div id="sessions-list" style="margin-top:4px;"></div>
+  </div>
+
 </div>
+
+<!-- 2FA setup modal -->
+<div id="tfa-setup-modal" style="display:none;position:fixed;inset:0;background:rgba(24,22,15,0.4);z-index:200;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);max-width:420px;width:92%;border-radius:12px;padding:28px;">
+    <h3 style="font-family:'Cormorant Garamond',serif;font-size:22px;margin-bottom:14px;">Set up two-factor authentication</h3>
+    <div id="tfa-step-qr">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.5;">Scan this with Google Authenticator, 1Password, or any TOTP app — or enter the secret manually.</p>
+      <div id="tfa-secret-box" style="font-family:monospace;font-size:13px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:14px;word-break:break-all;"></div>
+      <label style="display:block;font-size:12.5px;font-weight:600;margin-bottom:6px;">Enter the 6-digit code to confirm</label>
+      <input type="text" id="tfa-confirm-code" inputmode="numeric" maxlength="6" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:16px;letter-spacing:2px;margin-bottom:14px;">
+      <div id="tfa-setup-error" style="color:var(--rose,#8B3A52);font-size:12.5px;margin-bottom:10px;"></div>
+      <div style="display:flex;gap:10px;">
+        <button class="login-submit" style="width:auto;padding:9px 18px;font-size:12.5px;" onclick="tfaConfirmSetup()">Confirm &amp; enable</button>
+        <button class="login-submit" style="width:auto;padding:9px 18px;background:var(--surface2);color:var(--text);font-size:12.5px;" onclick="tfaCloseModal()">Cancel</button>
+      </div>
+    </div>
+    <div id="tfa-step-codes" style="display:none;">
+      <p style="font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.5;">2FA is on. Save these one-time backup codes somewhere safe — each works once if you ever lose access to your authenticator app.</p>
+      <div id="tfa-backup-codes" style="font-family:monospace;font-size:13px;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:14px;display:grid;grid-template-columns:1fr 1fr;gap:6px;"></div>
+      <button class="login-submit" style="width:auto;padding:9px 18px;font-size:12.5px;" onclick="tfaCloseModal(true)">Done</button>
+    </div>
+  </div>
+</div>
+
+<!-- 2FA disable modal -->
+<div id="tfa-disable-modal" style="display:none;position:fixed;inset:0;background:rgba(24,22,15,0.4);z-index:200;align-items:center;justify-content:center;">
+  <div style="background:var(--surface);max-width:380px;width:92%;border-radius:12px;padding:28px;">
+    <h3 style="font-family:'Cormorant Garamond',serif;font-size:22px;margin-bottom:14px;">Turn off two-factor authentication</h3>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Enter a current code from your authenticator app, or a backup code, to confirm.</p>
+    <input type="text" id="tfa-disable-code" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:6px;font-size:16px;margin-bottom:12px;">
+    <div id="tfa-disable-error" style="color:var(--rose,#8B3A52);font-size:12.5px;margin-bottom:10px;"></div>
+    <div style="display:flex;gap:10px;">
+      <button class="login-submit" style="width:auto;padding:9px 18px;background:var(--rose,#8B3A52);font-size:12.5px;" onclick="tfaConfirmDisable()">Turn off</button>
+      <button class="login-submit" style="width:auto;padding:9px 18px;background:var(--surface2);color:var(--text);font-size:12.5px;" onclick="document.getElementById('tfa-disable-modal').style.display='none'">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const ADMIN_AJAX_URL = "<?php echo esc_js( set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' ) ); ?>";
+const ADMIN_NONCE    = "<?php echo esc_js( wp_create_nonce( 'kounselia_admin_nonce' ) ); ?>";
+
+function tfaStartSetup() {
+    document.getElementById('tfa-setup-error').textContent = '';
+    document.getElementById('tfa-step-qr').style.display = 'block';
+    document.getElementById('tfa-step-codes').style.display = 'none';
+    document.getElementById('tfa-setup-modal').style.display = 'flex';
+    document.getElementById('tfa-secret-box').textContent = 'Loading…';
+
+    fetch(ADMIN_AJAX_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'kounselia_admin_2fa_setup_init', nonce: ADMIN_NONCE })
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            document.getElementById('tfa-secret-box').innerHTML = 'Secret key: <strong>' + data.data.secret + '</strong>';
+        } else {
+            document.getElementById('tfa-setup-error').textContent = data.data.message || 'Could not start setup.';
+        }
+    });
+}
+
+function tfaConfirmSetup() {
+    const code = document.getElementById('tfa-confirm-code').value.trim();
+    fetch(ADMIN_AJAX_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'kounselia_admin_2fa_setup_confirm', nonce: ADMIN_NONCE, code: code })
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            document.getElementById('tfa-step-qr').style.display = 'none';
+            document.getElementById('tfa-step-codes').style.display = 'block';
+            document.getElementById('tfa-backup-codes').innerHTML = data.data.backup_codes.map(c => `<span>${c}</span>`).join('');
+        } else {
+            document.getElementById('tfa-setup-error').textContent = data.data.message || 'Incorrect code.';
+        }
+    });
+}
+
+function tfaCloseModal(reload) {
+    document.getElementById('tfa-setup-modal').style.display = 'none';
+    if (reload) window.location.reload();
+}
+
+function tfaOpenDisable() {
+    document.getElementById('tfa-disable-error').textContent = '';
+    document.getElementById('tfa-disable-code').value = '';
+    document.getElementById('tfa-disable-modal').style.display = 'flex';
+}
+
+function tfaConfirmDisable() {
+    const code = document.getElementById('tfa-disable-code').value.trim();
+    fetch(ADMIN_AJAX_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'kounselia_admin_2fa_disable', nonce: ADMIN_NONCE, code: code })
+    }).then(r => r.json()).then(data => {
+        if (data.success) {
+            window.location.reload();
+        } else {
+            document.getElementById('tfa-disable-error').textContent = data.data.message || 'Incorrect code.';
+        }
+    });
+}
+
+function loadSessions() {
+    fetch(ADMIN_AJAX_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'kounselia_admin_list_sessions', nonce: ADMIN_NONCE })
+    }).then(r => r.json()).then(data => {
+        if (!data.success) return;
+        const list = document.getElementById('sessions-list');
+        list.innerHTML = data.data.sessions.map(s => `
+            <div class="maint-row">
+              <div class="maint-info">
+                <h4 style="font-size:13.5px;">${s.ip}${s.is_current ? ' <span style="color:var(--sage);font-weight:600;">(this device)</span>' : ''}</h4>
+                <p>Signed in ${s.login} · expires ${s.expiration}</p>
+              </div>
+              ${s.is_current ? '' : `<button class="login-submit" style="width:auto;padding:7px 14px;background:var(--surface2);color:var(--text);font-size:12px;" onclick="revokeSession('${s.token}')">Sign out</button>`}
+            </div>`).join('') || '<div class="empty-state">No other active sessions.</div>';
+    });
+}
+
+function revokeSession(token) {
+    fetch(ADMIN_AJAX_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'kounselia_admin_revoke_session', nonce: ADMIN_NONCE, token: token })
+    }).then(r => r.json()).then(() => loadSessions());
+}
+
+function revokeAllSessions() {
+    if (!confirm('Sign out every other device currently logged into your admin account?')) return;
+    fetch(ADMIN_AJAX_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'kounselia_admin_revoke_session', nonce: ADMIN_NONCE, all: '1' })
+    }).then(r => r.json()).then(() => loadSessions());
+}
+
+loadSessions();
+</script>
 
 <script>
 (function(){
