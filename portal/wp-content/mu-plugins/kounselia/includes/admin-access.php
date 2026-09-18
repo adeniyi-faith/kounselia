@@ -365,20 +365,24 @@ function kounselia_ajax_admin_get_member() {
 }
 add_action( 'wp_ajax_kounselia_admin_get_member', 'kounselia_ajax_admin_get_member' );
 
-function kounselia_ajax_admin_update_member() {
-    check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
-    if ( ! kounselia_user_is_admin() ) kounselia_send_pure_json_error( array('message' => 'Unauthorized'), 403 );
-
-    $user_id = (int) $_POST['user_id'];
-    $action  = sanitize_text_field( $_POST['do_action'] ); 
-
-    if ( ! get_userdata( $user_id ) ) kounselia_send_pure_json_error( array('message' => 'User not found.'), 404 );
+/**
+ * The actual per-user mutation logic for ban/unban/upgrade/downgrade/
+ * soft-delete/restore/purge, shared by the single-user AJAX handler below
+ * and the bulk-action handler so the two never drift apart.
+ *
+ * Returns array( 'ok' => bool, 'message' => string ).
+ */
+function kounselia_admin_apply_member_action( $user_id, $action ) {
     global $wpdb;
+
+    if ( ! get_userdata( $user_id ) ) {
+        return array( 'ok' => false, 'message' => 'User not found.' );
+    }
 
     switch ( $action ) {
         case 'ban':
             update_user_meta( $user_id, 'kounselia_banned', 1 );
-            
+
             $last_ip = get_user_meta( $user_id, 'kounselia_last_ip', true );
             if ( $last_ip ) {
                 $banned_ips = get_option( 'kounselia_banned_ips', array() );
@@ -388,12 +392,11 @@ function kounselia_ajax_admin_update_member() {
                 }
             }
             kounselia_admin_log( 'banned_user', 'user', $user_id );
-            $msg = "User and their IP address have been banned.";
-            break;
-            
+            return array( 'ok' => true, 'message' => 'User and their IP address have been banned.' );
+
         case 'unban':
             delete_user_meta( $user_id, 'kounselia_banned' );
-            
+
             $last_ip = get_user_meta( $user_id, 'kounselia_last_ip', true );
             if ( $last_ip ) {
                 $banned_ips = get_option( 'kounselia_banned_ips', array() );
@@ -401,34 +404,207 @@ function kounselia_ajax_admin_update_member() {
                 update_option( 'kounselia_banned_ips', $banned_ips );
             }
             kounselia_admin_log( 'unbanned_user', 'user', $user_id );
-            $msg = "User access and IP restored.";
-            break;
-            
+            return array( 'ok' => true, 'message' => 'User access and IP restored.' );
+
         case 'upgrade':
             update_user_meta( $user_id, 'kounselia_plan', 'pro' );
             kounselia_admin_log( 'upgraded_user', 'user', $user_id );
-            $msg = "User upgraded to Pro.";
-            break;
-            
+            return array( 'ok' => true, 'message' => 'User upgraded to Pro.' );
+
         case 'downgrade':
             update_user_meta( $user_id, 'kounselia_plan', 'free' );
             kounselia_admin_log( 'downgraded_user', 'user', $user_id );
-            $msg = "User downgraded to Free.";
-            break;
-            
+            return array( 'ok' => true, 'message' => 'User downgraded to Free.' );
+
         case 'delete':
+            // Soft delete: the account is locked out and hidden from the
+            // Members list immediately, but nothing is actually erased —
+            // an admin can restore it from the Trash tab. Only "Purge"
+            // below removes data for good.
+            if ( get_user_meta( $user_id, 'kounselia_deleted_at', true ) ) {
+                return array( 'ok' => false, 'message' => 'That user is already in the trash.' );
+            }
+            $was_already_banned = (bool) get_user_meta( $user_id, 'kounselia_banned', true );
+            update_user_meta( $user_id, 'kounselia_deleted_at', current_time( 'mysql' ) );
+            update_user_meta( $user_id, 'kounselia_deleted_by', get_current_user_id() );
+            if ( ! $was_already_banned ) {
+                update_user_meta( $user_id, 'kounselia_banned', 1 );
+                update_user_meta( $user_id, 'kounselia_banned_by_delete', 1 );
+            }
+            kounselia_admin_log( 'soft_deleted_user', 'user', $user_id );
+            return array( 'ok' => true, 'message' => 'User moved to Trash. Restore any time, or purge to erase permanently.' );
+
+        case 'restore':
+            if ( ! get_user_meta( $user_id, 'kounselia_deleted_at', true ) ) {
+                return array( 'ok' => false, 'message' => 'That user is not in the trash.' );
+            }
+            delete_user_meta( $user_id, 'kounselia_deleted_at' );
+            delete_user_meta( $user_id, 'kounselia_deleted_by' );
+            if ( get_user_meta( $user_id, 'kounselia_banned_by_delete', true ) ) {
+                delete_user_meta( $user_id, 'kounselia_banned' );
+                delete_user_meta( $user_id, 'kounselia_banned_by_delete' );
+            }
+            kounselia_admin_log( 'restored_user', 'user', $user_id );
+            return array( 'ok' => true, 'message' => 'User restored — access and data are back.' );
+
+        case 'purge':
+            // The only irreversible path left: permanently erases the
+            // account and its conversation history. Only reachable from
+            // the Trash tab, on a user that was soft-deleted first.
+            if ( ! get_user_meta( $user_id, 'kounselia_deleted_at', true ) ) {
+                return array( 'ok' => false, 'message' => 'Move the user to Trash first before purging.' );
+            }
             require_once ABSPATH . 'wp-admin/includes/user.php';
             $wpdb->query( $wpdb->prepare( "DELETE m FROM {$wpdb->prefix}kounselia_messages m INNER JOIN {$wpdb->prefix}kounselia_sessions s ON m.session_id = s.id WHERE s.user_id = %d", $user_id ) );
             $wpdb->query( $wpdb->prepare( "DELETE FROM {$wpdb->prefix}kounselia_sessions WHERE user_id = %d", $user_id ) );
             wp_delete_user( $user_id );
-            kounselia_admin_log( 'deleted_user', 'user', $user_id );
-            $msg = "User account and all data permanently deleted.";
-            break;
-            
+            kounselia_admin_log( 'purged_user', 'user', $user_id );
+            return array( 'ok' => true, 'message' => 'User account and all data permanently deleted.' );
+
         default:
-            kounselia_send_pure_json_error( array('message' => 'Invalid action.') );
+            return array( 'ok' => false, 'message' => 'Invalid action.' );
+    }
+}
+
+/* -------------------------------------------------------------------------
+ * ADMIN: ACTIVE SESSION MANAGEMENT
+ *
+ * Every admin/staff login is a WordPress session token (WP_Session_Tokens).
+ * This surfaces them so an admin can see where their own account is
+ * signed in and sign out a device they don't recognize, and so a Super
+ * Admin can force a staff member's session(s) to end immediately (e.g.
+ * a lost laptop) without having to reset their password.
+ * ---------------------------------------------------------------------- */
+
+function kounselia_admin_list_sessions( $user_id ) {
+    $manager  = WP_Session_Tokens::get_instance( $user_id );
+    $sessions = $manager->get_all();
+    $current  = wp_get_session_token();
+
+    $out = array();
+    foreach ( $sessions as $token_hash => $data ) {
+        $out[] = array(
+            'token'      => $token_hash,
+            'ip'         => isset( $data['ip'] ) ? $data['ip'] : '—',
+            'login'      => isset( $data['login'] ) ? date_i18n( 'M j, Y g:ia', $data['login'] ) : '—',
+            'expiration' => isset( $data['expiration'] ) ? date_i18n( 'M j, Y g:ia', $data['expiration'] ) : '—',
+            'is_current' => ( $user_id === get_current_user_id() && $token_hash === $current ),
+        );
+    }
+    return $out;
+}
+
+function kounselia_ajax_admin_list_sessions() {
+    check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
+    if ( ! kounselia_user_is_admin() ) kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
+
+    $target_id = isset( $_POST['user_id'] ) ? (int) $_POST['user_id'] : get_current_user_id();
+
+    // Staff may only ever look at their own sessions; only a Super Admin
+    // can inspect someone else's.
+    if ( $target_id !== get_current_user_id() && ! current_user_can( 'administrator' ) ) {
+        kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
+    }
+    if ( ! get_userdata( $target_id ) ) {
+        kounselia_send_pure_json_error( array( 'message' => 'User not found.' ), 404 );
     }
 
-    kounselia_send_pure_json_success( array( 'message' => $msg ) );
+    kounselia_send_pure_json_success( array( 'sessions' => kounselia_admin_list_sessions( $target_id ) ) );
+}
+add_action( 'wp_ajax_kounselia_admin_list_sessions', 'kounselia_ajax_admin_list_sessions' );
+
+function kounselia_ajax_admin_revoke_session() {
+    check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
+    if ( ! kounselia_user_is_admin() ) kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
+
+    $target_id = isset( $_POST['user_id'] ) ? (int) $_POST['user_id'] : get_current_user_id();
+    $token     = isset( $_POST['token'] ) ? sanitize_text_field( wp_unslash( $_POST['token'] ) ) : '';
+    $all       = isset( $_POST['all'] ) && '1' === $_POST['all'];
+
+    if ( $target_id !== get_current_user_id() && ! current_user_can( 'administrator' ) ) {
+        kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
+    }
+    if ( ! get_userdata( $target_id ) ) {
+        kounselia_send_pure_json_error( array( 'message' => 'User not found.' ), 404 );
+    }
+
+    $manager = WP_Session_Tokens::get_instance( $target_id );
+
+    if ( $all ) {
+        if ( $target_id === get_current_user_id() ) {
+            // "Sign out all other sessions" must never end the very
+            // session that's asking for it.
+            $manager->destroy_others( wp_get_session_token() );
+            kounselia_admin_log( 'revoked_own_sessions', 'user', $target_id );
+            kounselia_send_pure_json_success( array( 'message' => 'Every other session on your account was signed out.' ) );
+        }
+        $manager->destroy_all();
+        kounselia_admin_log( 'revoked_all_sessions', 'user', $target_id );
+        kounselia_send_pure_json_success( array( 'message' => 'All sessions on that account were signed out.' ) );
+    }
+
+    if ( ! $token ) {
+        kounselia_send_pure_json_error( array( 'message' => 'No session specified.' ), 400 );
+    }
+
+    $manager->destroy( $token );
+    kounselia_admin_log( 'revoked_session', 'user', $target_id );
+    kounselia_send_pure_json_success( array( 'message' => 'Session signed out.' ) );
+}
+add_action( 'wp_ajax_kounselia_admin_revoke_session', 'kounselia_ajax_admin_revoke_session' );
+
+function kounselia_ajax_admin_update_member() {
+    check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
+    if ( ! kounselia_user_is_admin() ) kounselia_send_pure_json_error( array('message' => 'Unauthorized'), 403 );
+
+    $user_id = (int) $_POST['user_id'];
+    $action  = sanitize_text_field( $_POST['do_action'] );
+
+    $result = kounselia_admin_apply_member_action( $user_id, $action );
+
+    if ( ! $result['ok'] ) {
+        kounselia_send_pure_json_error( array( 'message' => $result['message'] ) );
+    }
+    kounselia_send_pure_json_success( array( 'message' => $result['message'] ) );
 }
 add_action( 'wp_ajax_kounselia_admin_update_member', 'kounselia_ajax_admin_update_member' );
+
+/**
+ * Same actions as above, applied to up to 100 members in one request, for
+ * the "select several rows, ban/upgrade/trash them all" bar on the
+ * Members page.
+ */
+function kounselia_ajax_admin_bulk_update_members() {
+    check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
+    if ( ! kounselia_user_is_admin() ) kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
+
+    $action   = isset( $_POST['do_action'] ) ? sanitize_text_field( wp_unslash( $_POST['do_action'] ) ) : '';
+    $ids_raw  = isset( $_POST['user_ids'] ) ? sanitize_text_field( wp_unslash( $_POST['user_ids'] ) ) : '';
+    $user_ids = array_filter( array_map( 'absint', explode( ',', $ids_raw ) ) );
+    $user_ids = array_slice( array_unique( $user_ids ), 0, 100 );
+
+    if ( empty( $user_ids ) ) {
+        kounselia_send_pure_json_error( array( 'message' => 'No members selected.' ), 400 );
+    }
+    // Purge is deliberately excluded from bulk actions — it's irreversible
+    // and should only ever be a single, deliberate click from the Trash tab.
+    if ( ! in_array( $action, array( 'ban', 'unban', 'upgrade', 'downgrade', 'delete', 'restore' ), true ) ) {
+        kounselia_send_pure_json_error( array( 'message' => 'Invalid bulk action.' ), 400 );
+    }
+
+    $succeeded = 0;
+    $failed    = 0;
+    foreach ( $user_ids as $user_id ) {
+        $result = kounselia_admin_apply_member_action( $user_id, $action );
+        $result['ok'] ? $succeeded++ : $failed++;
+    }
+
+    kounselia_admin_log( 'bulk_' . $action . '_users', 'user', $succeeded );
+
+    $message = "Applied to {$succeeded} member" . ( 1 === $succeeded ? '' : 's' );
+    if ( $failed ) {
+        $message .= ", {$failed} skipped.";
+    }
+    kounselia_send_pure_json_success( array( 'message' => $message, 'succeeded' => $succeeded, 'failed' => $failed ) );
+}
+add_action( 'wp_ajax_kounselia_admin_bulk_update_members', 'kounselia_ajax_admin_bulk_update_members' );

@@ -65,3 +65,4 @@ require_once KOUNSELIA_CORE_DIR . '/includes/memory.php';            // 18. Stru
 require_once KOUNSELIA_CORE_DIR . '/includes/check-ins.php';         // 18B. Smart Check-ins: dated events extracted from memory synthesis
 require_once KOUNSELIA_CORE_DIR . '/includes/professionals.php';     // 18C. Professional marketplace: applications, verification, private docs
 require_once KOUNSELIA_CORE_DIR . '/includes/admin-access.php';      // 19. Admin capability, staff role, audit log
+require_once KOUNSELIA_CORE_DIR . '/includes/admin-2fa.php';         // 19B. Admin two-factor authentication (TOTP)
