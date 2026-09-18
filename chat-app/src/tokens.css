@@ -1,0 +1,44 @@
+/*
+ * Design tokens copied from inc/kounselia-styles.php's :root block.
+ * In production these are already on the page (every Kounselia page
+ * loads that shared stylesheet), so this file is only imported for
+ * local development (`npm run dev`) and is NOT part of the production
+ * build — see vite.config.ts, whose only entry is main.tsx.
+ */
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#F8F6F2;
+  --surface:#FFFFFF;
+  --surface2:#F2EFE9;
+  --surface3:#EDEAE3;
+  --text:#18160F;
+  --text2:#5B574D;
+  --text3:#A8A49A;
+  --border:#E8E4DB;
+  --accent:#1E3A5F;
+  --accent2:#284B7A;
+  --accent-light:#E8EEF6;
+  --gold:#B07D3A;
+  --gold-light:#FBF5EA;
+  --rose:#8B3A52;
+  --rose-light:#F7EBF0;
+  --sage:#2E5C3E;
+  --sage-light:#EAF2EC;
+  --teal:#1E5C5C;
+  --teal-light:#E6F2F2;
+  --plum:#4A3070;
+  --plum-light:#EEE9F8;
+  --sienna:#7A3D1E;
+  --sienna-light:#F5EBE5;
+  --navy:#162B4A;
+  --navy-light:#E6EBF2;
+  --r:24px;
+  --r-sm:16px;
+  --shadow-sm: 0 4px 12px rgba(24, 22, 15, 0.03);
+  --shadow-md: 0 8px 24px rgba(24, 22, 15, 0.06);
+  --shadow-hover: 0 16px 32px rgba(24, 22, 15, 0.08);
+  --shadow-btn: 0 4px 14px rgba(30, 58, 95, 0.25);
+}
+html,body{height:100%;background:var(--bg)}
+body{font-family:'Outfit',sans-serif;color:var(--text);overflow-x:hidden;-webkit-font-smoothing:antialiased}
+.screen{position:fixed;inset:0;background:var(--bg);overflow:hidden;display:flex;flex-direction:column}
