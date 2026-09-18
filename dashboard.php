@@ -1,6 +1,5 @@
 <?php
 /**
- * STREAMING_CHUNK:Filtering dashboard logic to dynamically loop active database counselors...
  * Kounselia member dashboard.
  */
 define( 'WP_USE_THEMES', false );
@@ -31,6 +30,16 @@ $recent_moods  = function_exists( 'kounselia_get_recent_moods' ) ? kounselia_get
 $today_journal = function_exists( 'kounselia_get_today_journal' ) ? kounselia_get_today_journal( $user->ID ) : '';
 $next_checkin  = function_exists( 'kounselia_get_next_checkin' ) ? kounselia_get_next_checkin( $user->ID ) : null;
 $pro_application = function_exists( 'kounselia_get_professional_application' ) ? kounselia_get_professional_application( $user->ID ) : null;
+
+// Professionals get their own dashboard by default — this page is for
+// people seeking support, not for managing a practice. A professional
+// who wants to use Kounselia as a client too can switch over explicitly
+// (see the "Switch to client view" link on pro-dashboard.php), which
+// lands here with ?as=client and skips this redirect.
+if ( $pro_application && 'client' !== ( $_GET['as'] ?? '' ) ) {
+    wp_safe_redirect( '/pro-dashboard.php' );
+    exit;
+}
 
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_auth' );
@@ -570,16 +579,16 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         echo 'verified' === $pro_application->status ? 'ti-check' : ( 'rejected' === $pro_application->status ? 'ti-x' : 'ti-clock' );
       ?>"></i></div>
       <div class="rec-meta">
-        <h3>Your professional application</h3>
+        <h3>You're viewing your client dashboard</h3>
         <?php if ( 'pending' === $pro_application->status ) : ?>
-          <p class="reason">Under review. We'll email you once there's a decision — your professional profile is ready to manage in the meantime.</p>
+          <p class="reason">Your professional application is under review — we'll email you once there's a decision.</p>
         <?php elseif ( 'verified' === $pro_application->status ) : ?>
-          <p class="reason">Verified. Your professional profile and rate are ready to manage.</p>
+          <p class="reason">Your professional profile is verified and live for clients.</p>
         <?php else : ?>
-          <p class="reason">Not approved yet<?php echo $pro_application->rejection_reason ? ' — ' . esc_html( $pro_application->rejection_reason ) : ''; ?>. You can update your documents and reapply.</p>
+          <p class="reason">Your professional application wasn't approved<?php echo $pro_application->rejection_reason ? ' — ' . esc_html( $pro_application->rejection_reason ) : ''; ?>. You can update your documents and reapply.</p>
         <?php endif; ?>
       </div>
-      <a class="btn-rec" href="/pro-dashboard.php">Go there</a>
+      <a class="btn-rec" href="/pro-dashboard.php"><i class="ti ti-switch-horizontal" style="margin-right:6px;"></i>Back to professional dashboard</a>
     </section>
     <?php endif; ?>
 
