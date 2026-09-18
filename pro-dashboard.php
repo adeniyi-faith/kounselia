@@ -177,6 +177,10 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
   .mob-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:none;border:none;color:var(--text3);font-size:10.5px;font-family:inherit;cursor:pointer}
   .mob-tab i{font-size:19px}
   .mob-tab.active{color:var(--accent)}
+
+  .welcome{padding:28px 22px}
+  .welcome h1{font-size:26px}
+  .welcome-actions .btn-w{width:100%;justify-content:center}
 }
 </style>
 </head>
@@ -239,7 +243,6 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         : 'Get your profile ready while your application is reviewed. It stays private until you\'re verified.'; ?></p>
       <div class="welcome-actions">
         <button class="btn-w primary" onclick="switchTab('profile')"><i class="ti ti-user-edit"></i> Edit profile &amp; rate</button>
-        <a class="btn-w ghost" href="/dashboard.php?as=client"><i class="ti ti-switch-horizontal"></i> Switch to client view</a>
       </div>
     </section>
 
