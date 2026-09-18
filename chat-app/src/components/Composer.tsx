@@ -1,16 +1,24 @@
 import { useRef, useState } from 'react';
+import { useDictation } from '../hooks/useDictation';
+import type { KounseliaConfig } from '../core/types';
 
 interface Props {
+  config: KounseliaConfig;
   disabled: boolean;
   onSend: (text: string) => void;
 }
 
 // The text box plus the round button beside it. The button shows a
-// microphone when the box is empty and a send arrow once you start
-// typing — voice dictation itself is wired up in a follow-up pass.
-export function Composer({ disabled, onSend }: Props) {
+// microphone when the box is empty, a send arrow once you start typing,
+// and switches into recording / transcribing state when you tap the mic.
+export function Composer({ config, disabled, onSend }: Props) {
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const dictation = useDictation(config, (text) => {
+    setValue((prev) => (prev.trim() ? `${prev.trim()} ${text}` : text));
+    textareaRef.current?.focus();
+  });
 
   const autoResize = () => {
     const el = textareaRef.current;
@@ -22,12 +30,37 @@ export function Composer({ disabled, onSend }: Props) {
   const handleSend = () => {
     const trimmed = value.trim();
     if (!trimmed || disabled) return;
+    if (dictation.state === 'recording') dictation.abort();
     onSend(trimmed);
     setValue('');
     requestAnimationFrame(autoResize);
   };
 
   const hasText = value.trim().length > 0;
+
+  const handleFabClick = () => {
+    if (dictation.state === 'transcribing') return;
+    if (dictation.state === 'recording') {
+      dictation.toggle();
+      return;
+    }
+    if (hasText) {
+      handleSend();
+    } else {
+      dictation.toggle();
+    }
+  };
+
+  const fabIcon =
+    dictation.state === 'transcribing'
+      ? 'ti-loader-2 fab-icon-spin'
+      : dictation.state === 'recording'
+        ? 'ti-player-stop-filled'
+        : hasText
+          ? 'ti-send'
+          : 'ti-microphone';
+
+  const fabBackground = dictation.state === 'recording' ? 'var(--rose)' : hasText ? undefined : '#00A884';
 
   return (
     <div className="upgraded-input-area">
@@ -56,12 +89,16 @@ export function Composer({ disabled, onSend }: Props) {
       </div>
       <button
         className={`dynamic-fab${hasText ? ' is-typing' : ''}`}
-        onClick={hasText ? handleSend : undefined}
+        onClick={handleFabClick}
         disabled={disabled}
         aria-label="Voice or Send"
-        style={{ background: hasText ? undefined : '#00A884' }}
+        style={{
+          background: fabBackground,
+          animation: dictation.state === 'recording' ? 'micPulse 1.2s ease-in-out infinite' : undefined,
+          opacity: dictation.state === 'transcribing' ? 0.7 : 1,
+        }}
       >
-        <i className={`ti ${hasText ? 'ti-send' : 'ti-microphone'}`} />
+        <i className={`ti ${fabIcon}`} />
       </button>
     </div>
   );
