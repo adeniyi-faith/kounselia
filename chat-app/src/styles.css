@@ -1,3 +1,6 @@
+  @keyframes fabIconSpin { 100% { transform: rotate(360deg); } }
+  .fab-icon-spin { animation: fabIconSpin 1s linear infinite !important; }
+
   /* 1. Semantic Container Tinting for AI */
   #chat .msg.ai .msg-bubble {
     background: #F0F4F8; /* Soft distinct blue-gray */
