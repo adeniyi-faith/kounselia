@@ -36,9 +36,25 @@ $reflection = $reflection_json ? json_decode( $reflection_json, true ) : [];
 // 2. Fetch Latest Activity
 global $wpdb;
 $last_activity = $wpdb->get_var( $wpdb->prepare(
-    "SELECT created_at FROM {$wpdb->prefix}kounselia_messages 
-     WHERE session_id IN (SELECT id FROM {$wpdb->prefix}kounselia_sessions WHERE user_id = %d) 
+    "SELECT created_at FROM {$wpdb->prefix}kounselia_messages
+     WHERE session_id IN (SELECT id FROM {$wpdb->prefix}kounselia_sessions WHERE user_id = %d)
      ORDER BY created_at DESC LIMIT 1",
+    $user_id
+) );
+
+// 2B. Mood check-ins, journal entries, and upcoming check-ins — these had
+// no admin view anywhere before; shown read-only here, with a wipe
+// control per data type in the Data Controls panel below.
+$mood_logs = $wpdb->get_results( $wpdb->prepare(
+    "SELECT mood, log_date FROM {$wpdb->prefix}kounselia_mood_logs WHERE user_id = %d ORDER BY log_date DESC LIMIT 30",
+    $user_id
+) );
+$journal_entries = $wpdb->get_results( $wpdb->prepare(
+    "SELECT content, entry_date FROM {$wpdb->prefix}kounselia_journal_entries WHERE user_id = %d ORDER BY entry_date DESC LIMIT 20",
+    $user_id
+) );
+$upcoming_checkins = $wpdb->get_results( $wpdb->prepare(
+    "SELECT event_text, event_date, status FROM {$wpdb->prefix}kounselia_memory_upcoming_events WHERE user_id = %d ORDER BY event_date DESC LIMIT 10",
     $user_id
 ) );
 
@@ -419,7 +435,96 @@ $kounselia_admin_active = 'members';
         </div>
 
     <?php endif; ?>
+
+    <!-- Wellness Activity: mood check-ins, journal entries, upcoming check-ins -->
+    <div class="intel-grid" style="margin-top: 20px;">
+        <div class="intel-col">
+            <div class="panel">
+                <span class="section-label">Mood Check-ins (last 30)</span>
+                <?php if ( empty( $mood_logs ) ) : ?>
+                    <p style="font-size: 13.5px; color: var(--text3);">No mood check-ins logged yet.</p>
+                <?php else : ?>
+                    <ul class="data-list">
+                        <?php foreach ( $mood_logs as $m ) : ?>
+                            <li style="display:flex;justify-content:space-between;"><span><?php echo esc_html( ucfirst( $m->mood ) ); ?></span><span style="color:var(--text3);"><?php echo esc_html( date_i18n( 'M j, Y', strtotime( $m->log_date ) ) ); ?></span></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="intel-col">
+            <div class="panel">
+                <span class="section-label">Journal Entries (last 20)</span>
+                <?php if ( empty( $journal_entries ) ) : ?>
+                    <p style="font-size: 13.5px; color: var(--text3);">No journal entries yet.</p>
+                <?php else : ?>
+                    <ul class="data-list">
+                        <?php foreach ( $journal_entries as $j ) : ?>
+                            <li>
+                                <div style="color:var(--text3);font-size:11.5px;margin-bottom:2px;"><?php echo esc_html( date_i18n( 'M j, Y', strtotime( $j->entry_date ) ) ); ?></div>
+                                <?php echo esc_html( mb_strlen( $j->content ) > 220 ? mb_substr( $j->content, 0, 220 ) . '…' : $j->content ); ?>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="intel-col">
+            <?php if ( ! empty( $upcoming_checkins ) ) : ?>
+            <div class="panel">
+                <span class="section-label">Smart Check-ins</span>
+                <ul class="data-list">
+                    <?php foreach ( $upcoming_checkins as $c ) : ?>
+                        <li style="display:flex;justify-content:space-between;">
+                            <span><?php echo esc_html( $c->event_text ); ?> <span class="tag" style="margin-left:6px;"><?php echo esc_html( $c->status ); ?></span></span>
+                            <span style="color:var(--text3);"><?php echo esc_html( date_i18n( 'M j', strtotime( $c->event_date ) ) ); ?></span>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            </div>
+            <?php endif; ?>
+
+            <div class="panel" style="border-color:#F3D9E0;background:var(--rose-light);">
+                <span class="section-label" style="color:var(--rose);border-color:#F3D9E0;">Data Controls</span>
+                <p style="font-size:12.5px;color:var(--text2);margin-bottom:14px;line-height:1.5;">Permanently erase one category of this member's data — for a deletion request, or to clear something incorrect. Each wipe is recorded in the Audit Log. This does not affect their account, plan, or conversation transcripts.</p>
+                <div style="display:flex;flex-direction:column;gap:8px;">
+                    <button class="btn-action ban" style="width:100%;" onclick="wipeMemberData('memory')">Wipe Memory Profile</button>
+                    <button class="btn-action ban" style="width:100%;" onclick="wipeMemberData('mood')">Delete Mood History</button>
+                    <button class="btn-action ban" style="width:100%;" onclick="wipeMemberData('journal')">Delete Journal Entries</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
+<div id="toast-container" style="position:fixed;bottom:24px;right:24px;z-index:999;"></div>
+
+<script>
+const ADMIN_AJAX_URL = "<?php echo esc_js( set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' ) ); ?>";
+const ADMIN_NONCE    = "<?php echo esc_js( wp_create_nonce( 'kounselia_admin_nonce' ) ); ?>";
+const MEMBER_ID       = <?php echo (int) $user_id; ?>;
+
+function wipeMemberData(target) {
+    const labels = { memory: 'this member\'s entire memory profile', mood: 'this member\'s mood check-in history', journal: 'this member\'s journal entries' };
+    if (!confirm(`DANGER: Permanently delete ${labels[target]}? This cannot be undone.`)) return;
+
+    fetch(ADMIN_AJAX_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'kounselia_admin_wipe_member_data', nonce: ADMIN_NONCE, user_id: MEMBER_ID, target: target })
+    })
+    .then(res => res.json())
+    .then(data => {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.style.cssText = 'background:var(--text);color:#fff;padding:14px 20px;border-radius:8px;font-size:14px;margin-top:10px;';
+        toast.textContent = (data.data && data.data.message) || (data.success ? 'Done.' : 'Action failed.');
+        container.appendChild(toast);
+        if (data.success) setTimeout(() => window.location.reload(), 1200);
+    });
+}
+</script>
 </body>
 </html>

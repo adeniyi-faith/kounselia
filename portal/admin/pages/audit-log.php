@@ -85,6 +85,9 @@ $kounselia_action_labels = array(
     'force_db_schema_sync'       => 'Re-synced the database schema',
     'update_safety_alert_emails' => 'Updated safety alert recipients',
     'update_platform_settings'   => 'Updated platform configuration',
+    'wiped_member_memory'        => 'Wiped a member\'s memory profile',
+    'wiped_member_mood_logs'     => 'Deleted a member\'s mood check-in history',
+    'wiped_member_journal'       => 'Deleted a member\'s journal entries',
 );
 ?>
 <!DOCTYPE html>
