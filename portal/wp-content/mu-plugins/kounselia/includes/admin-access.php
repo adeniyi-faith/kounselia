@@ -467,6 +467,58 @@ function kounselia_admin_apply_member_action( $user_id, $action ) {
 }
 
 /* -------------------------------------------------------------------------
+ * ADMIN: MOOD LOGS, JOURNAL, AND MEMORY — DATA CONTROLS
+ *
+ * These tables (kounselia_mood_logs, kounselia_journal_entries, and the
+ * normalized memory tables behind kounselia_memory_delete_profile) had no
+ * admin-facing view or deletion path at all — a member could wipe their
+ * own memory from the front end, but staff had no equivalent for a data
+ * deletion request, and no way to see mood/journal history for safety
+ * context. member-profile.php now reads them directly for display; this
+ * is the deletion side, each path logged so a wipe is always traceable.
+ * ---------------------------------------------------------------------- */
+
+function kounselia_ajax_admin_wipe_member_data() {
+    check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
+    if ( ! kounselia_user_is_admin() ) kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
+
+    $user_id = isset( $_POST['user_id'] ) ? (int) $_POST['user_id'] : 0;
+    $target  = isset( $_POST['target'] ) ? sanitize_key( $_POST['target'] ) : '';
+
+    if ( ! get_userdata( $user_id ) ) {
+        kounselia_send_pure_json_error( array( 'message' => 'User not found.' ), 404 );
+    }
+
+    global $wpdb;
+
+    switch ( $target ) {
+        case 'memory':
+            if ( ! function_exists( 'kounselia_memory_delete_profile' ) ) {
+                kounselia_send_pure_json_error( array( 'message' => 'Memory engine not loaded.' ), 500 );
+            }
+            kounselia_memory_delete_profile( $user_id );
+            delete_user_meta( $user_id, 'kounselia_latest_reflection' );
+            delete_user_meta( $user_id, 'kounselia_reflection_date' );
+            kounselia_admin_log( 'wiped_member_memory', 'user', $user_id );
+            kounselia_send_pure_json_success( array( 'message' => "Memory profile wiped." ) );
+
+        case 'mood':
+            $wpdb->delete( $wpdb->prefix . 'kounselia_mood_logs', array( 'user_id' => $user_id ) );
+            kounselia_admin_log( 'wiped_member_mood_logs', 'user', $user_id );
+            kounselia_send_pure_json_success( array( 'message' => 'Mood check-in history deleted.' ) );
+
+        case 'journal':
+            $wpdb->delete( $wpdb->prefix . 'kounselia_journal_entries', array( 'user_id' => $user_id ) );
+            kounselia_admin_log( 'wiped_member_journal', 'user', $user_id );
+            kounselia_send_pure_json_success( array( 'message' => 'Journal entries deleted.' ) );
+
+        default:
+            kounselia_send_pure_json_error( array( 'message' => 'Invalid target.' ), 400 );
+    }
+}
+add_action( 'wp_ajax_kounselia_admin_wipe_member_data', 'kounselia_ajax_admin_wipe_member_data' );
+
+/* -------------------------------------------------------------------------
  * ADMIN: ACTIVE SESSION MANAGEMENT
  *
  * Every admin/staff login is a WordPress session token (WP_Session_Tokens).
