@@ -186,8 +186,9 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .pro-msg.error{display:block;background:var(--rose-light);color:var(--rose)}
 .pro-msg.notice{display:block;background:var(--sage-light);color:var(--sage)}
 
-.form-field select,.form-field input[type="time"]{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;font-family:inherit;font-size:14.5px;color:var(--text);background:var(--bg);outline:none}
-.form-field select:focus,.form-field input[type="time"]:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 4px var(--accent-light)}
+.form-field select,.form-field input[type="time"],.avail-row input[type="time"]{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;font-family:inherit;font-size:14.5px;color:var(--text);background:var(--bg);outline:none}
+.form-field select:focus,.form-field input[type="time"]:focus,.avail-row input[type="time"]:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 4px var(--accent-light)}
+.form-field input[type="file"]{width:100%;padding:10px 14px;border:1.5px dashed var(--border);border-radius:12px;font-family:inherit;font-size:13px;color:var(--text2);background:var(--bg)}
 
 .doc-list{display:grid;gap:10px}
 .doc-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:var(--bg);border:1px solid var(--border);font-size:13.5px}
