@@ -99,7 +99,7 @@ $nonce    = wp_create_nonce( 'kounselia_auth' );
         <?php if ( ! $is_logged_in ) : ?>
           <h3>Your account</h3>
           <div class="section-note">You'll use this to sign in and manage your profile.</div>
-          <div class="form-field"><label>Full name</label><input type="text" name="name" id="ap-name" placeholder="Dr. Jane Okafor" autocomplete="name"></div>
+          <div class="form-field"><label>Full name</label><input type="text" name="name" id="ap-name" placeholder="Jane Okafor" autocomplete="name"></div>
           <div class="form-field"><label>Email address</label><input type="email" name="email" id="ap-email" placeholder="you@example.com" autocomplete="email"></div>
           <div class="form-field"><label>Password</label><input type="password" name="password" id="ap-password" placeholder="Create a password" autocomplete="new-password"></div>
         <?php endif; ?>
