@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.13.0'; // Bumped version: Paystack subscriptions (kounselia_subscriptions, kounselia_payments)
+    $current_version   = '1.14.0'; // Bumped version: booking calendar (kounselia_professional_availability, kounselia_bookings)
 
     if ( $installed_version === $current_version ) {
         return;
@@ -345,6 +345,45 @@ function kounselia_install_tables() {
         KEY user_id (user_id)
     ) {$charset_collate};";
 
+    // A professional's recurring weekly availability, e.g. "Mondays
+    // 9am-1pm." Booking slots (see bookings.php) are generated on the
+    // fly by expanding these rules across upcoming dates — there is no
+    // stored slot row until a client actually books one.
+    $sql_professional_availability = "CREATE TABLE {$prefix}kounselia_professional_availability (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        professional_id BIGINT UNSIGNED NOT NULL,
+        day_of_week TINYINT UNSIGNED NOT NULL,
+        start_time TIME NOT NULL,
+        end_time TIME NOT NULL,
+        created_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        KEY professional_id (professional_id)
+    ) {$charset_collate};";
+
+    // A confirmed session between a client and a professional, booked
+    // directly against an open availability slot. cancelled_by records
+    // whichever side cancelled (client or professional) for support
+    // purposes; there is no "pending" status because booking an open
+    // slot confirms it immediately.
+    $sql_bookings = "CREATE TABLE {$prefix}kounselia_bookings (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        professional_id BIGINT UNSIGNED NOT NULL,
+        client_user_id BIGINT UNSIGNED NOT NULL,
+        scheduled_start DATETIME NOT NULL,
+        scheduled_end DATETIME NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'confirmed',
+        client_note VARCHAR(500) NULL,
+        cancelled_by BIGINT UNSIGNED NULL,
+        cancel_reason VARCHAR(500) NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        KEY professional_id (professional_id),
+        KEY client_user_id (client_user_id),
+        KEY scheduled_start (scheduled_start),
+        KEY status (status)
+    ) {$charset_collate};";
+
     dbDelta( $sql_sessions );
     dbDelta( $sql_messages );
     dbDelta( $sql_guest_limits );
@@ -362,6 +401,8 @@ function kounselia_install_tables() {
     dbDelta( $sql_memory_upcoming_events );
     dbDelta( $sql_professionals );
     dbDelta( $sql_professional_documents );
+    dbDelta( $sql_professional_availability );
+    dbDelta( $sql_bookings );
     dbDelta( $sql_subscriptions );
     dbDelta( $sql_payments );
 
