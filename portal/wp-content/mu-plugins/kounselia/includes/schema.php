@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.17.0'; // Bumped version: safety scanning + admin oversight for booking messages (kounselia_booking_messages flags, kounselia_safety_escalations generalized)
+    $current_version   = '1.18.0'; // Bumped version: reviews, reschedule, recurring series, reminders, notification center
 
     if ( $installed_version === $current_version ) {
         return;
@@ -389,13 +389,16 @@ function kounselia_install_tables() {
         cancelled_by BIGINT UNSIGNED NULL,
         cancel_reason VARCHAR(500) NULL,
         room_token VARCHAR(64) NULL,
+        series_id BIGINT UNSIGNED NULL,
+        reminder_sent_at DATETIME NULL,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
         PRIMARY KEY  (id),
         KEY professional_id (professional_id),
         KEY client_user_id (client_user_id),
         KEY scheduled_start (scheduled_start),
-        KEY status (status)
+        KEY status (status),
+        KEY series_id (series_id)
     ) {$charset_collate};";
 
     // A private text thread attached to one booking — the client and the
@@ -488,6 +491,87 @@ function kounselia_install_tables() {
         KEY status (status)
     ) {$charset_collate};";
 
+    // A client's rating of one completed session. One per booking (a
+    // session that never happened, or hasn't happened yet, can't be
+    // reviewed) — this is what lets a client judge who to book, which
+    // nothing on a professional's card could show before.
+    $sql_reviews = "CREATE TABLE {$prefix}kounselia_professional_reviews (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        booking_id BIGINT UNSIGNED NOT NULL,
+        professional_id BIGINT UNSIGNED NOT NULL,
+        client_user_id BIGINT UNSIGNED NOT NULL,
+        rating TINYINT UNSIGNED NOT NULL,
+        comment TEXT NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY booking_id (booking_id),
+        KEY professional_id (professional_id)
+    ) {$charset_collate};";
+
+    // A standing "book this professional every week" arrangement. Each
+    // actual session is still its own row in kounselia_bookings (linked
+    // back here via series_id) — this table is just the recurring rule
+    // plus the saved Paystack card authorization used to auto-charge
+    // each upcoming occurrence without sending the client through
+    // checkout again. status flips to 'payment_failed' the moment an
+    // auto-charge doesn't go through, rather than silently retrying (and
+    // possibly failing) forever — see kounselia_process_recurring_series().
+    $sql_booking_series = "CREATE TABLE {$prefix}kounselia_booking_series (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        professional_id BIGINT UNSIGNED NOT NULL,
+        client_user_id BIGINT UNSIGNED NOT NULL,
+        day_of_week TINYINT UNSIGNED NOT NULL,
+        start_time TIME NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'active',
+        paystack_authorization_code VARCHAR(100) NULL,
+        paystack_email VARCHAR(191) NULL,
+        cancel_reason VARCHAR(500) NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        KEY professional_id (professional_id),
+        KEY client_user_id (client_user_id),
+        KEY status (status)
+    ) {$charset_collate};";
+
+    // A generic in-app notification record — reminders, cancellations,
+    // new bookings, all of it. Email is sent from the same call site
+    // that inserts this row (see kounselia_notify_user() in
+    // notifications.php); this row is what a bell icon reads today and
+    // what a future mobile app's push notification is built from too,
+    // so "notification history" isn't email-only trivia.
+    $sql_notifications = "CREATE TABLE {$prefix}kounselia_notifications (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        type VARCHAR(32) NOT NULL,
+        title VARCHAR(191) NOT NULL,
+        body TEXT NULL,
+        url VARCHAR(255) NULL,
+        created_at DATETIME NOT NULL,
+        read_at DATETIME NULL,
+        PRIMARY KEY  (id),
+        KEY user_id (user_id),
+        KEY read_at (read_at)
+    ) {$charset_collate};";
+
+    // A device's push-notification token, registered by a mobile app.
+    // Nothing in this codebase sends a real push yet (there is no app to
+    // register a device) — kounselia_send_push_to_user() reads this
+    // table and no-ops if it's empty or no push provider key is
+    // configured, so this exists now purely so the day the app ships,
+    // wiring it up is "add a provider key," not "add a device registry."
+    $sql_push_tokens = "CREATE TABLE {$prefix}kounselia_push_tokens (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        platform VARCHAR(16) NOT NULL,
+        token VARCHAR(255) NOT NULL,
+        created_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY user_token (user_id, token(191)),
+        KEY user_id (user_id)
+    ) {$charset_collate};";
+
     dbDelta( $sql_sessions );
     dbDelta( $sql_messages );
     dbDelta( $sql_guest_limits );
@@ -513,6 +597,10 @@ function kounselia_install_tables() {
     dbDelta( $sql_booking_payments );
     dbDelta( $sql_payout_accounts );
     dbDelta( $sql_payouts );
+    dbDelta( $sql_reviews );
+    dbDelta( $sql_booking_series );
+    dbDelta( $sql_notifications );
+    dbDelta( $sql_push_tokens );
 
     if ( function_exists( 'kounselia_ensure_professional_docs_dir' ) ) {
         kounselia_ensure_professional_docs_dir();
