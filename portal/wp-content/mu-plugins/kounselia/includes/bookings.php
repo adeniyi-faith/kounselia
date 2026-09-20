@@ -1,14 +1,19 @@
 <?php
 /**
  * Kounselia Core — booking calendar: a professional's recurring weekly
- * availability, expanded into concrete open slots, and the confirmed
- * sessions clients book against them.
+ * availability, expanded into concrete open slots, and the sessions
+ * clients book against them.
  *
- * There is no "pending" booking state: a slot is only ever offered if it's
- * inside the professional's own availability window and not already taken,
- * so booking it confirms it immediately. Cancelling (by either side) just
- * frees the slot back up — it goes on generating from the same weekly
- * rules, nothing to re-approve.
+ * A slot is only ever offered if it's inside the professional's own
+ * availability window and not already taken. Booking one creates it as
+ * 'pending_payment' — reserved, so nobody else can grab it — and holds
+ * that reservation only long enough to complete checkout (see
+ * kounselia_booking_reservation_seconds() and booking-payments.php,
+ * which flips it to 'confirmed' once Paystack confirms the charge). An
+ * abandoned checkout just lets the reservation expire on its own; no
+ * cron job needed, since the slot generator simply stops counting a
+ * stale pending_payment row as blocking. Cancelling a confirmed booking
+ * (by either side) frees the slot back up the same way.
  *
  * Part of the kounselia-core mu-plugin. Loaded by ../../kounselia-core.php,
  * never included directly.
@@ -40,6 +45,14 @@ function kounselia_booking_lead_seconds() {
  */
 function kounselia_booking_horizon_days() {
     return 21;
+}
+
+/**
+ * How long a 'pending_payment' reservation blocks its slot before it's
+ * treated as abandoned and the slot opens back up for someone else.
+ */
+function kounselia_booking_reservation_seconds() {
+    return 15 * MINUTE_IN_SECONDS;
 }
 
 /* -------------------------------------------------------------------------
@@ -101,10 +114,14 @@ function kounselia_save_availability_rules( $professional_id, $rules ) {
 
 function kounselia_get_booked_slot_starts( $professional_id ) {
     global $wpdb;
+    $reservation_cutoff = date( 'Y-m-d H:i:s', current_time( 'timestamp' ) - kounselia_booking_reservation_seconds() );
     $rows = $wpdb->get_col( $wpdb->prepare(
-        "SELECT scheduled_start FROM {$wpdb->prefix}kounselia_bookings WHERE professional_id = %d AND status = 'confirmed' AND scheduled_start >= %s",
+        "SELECT scheduled_start FROM {$wpdb->prefix}kounselia_bookings
+         WHERE professional_id = %d AND scheduled_start >= %s
+         AND ( status = 'confirmed' OR ( status = 'pending_payment' AND created_at >= %s ) )",
         $professional_id,
-        current_time( 'mysql' )
+        current_time( 'mysql' ),
+        $reservation_cutoff
     ) );
     return array_flip( $rows );
 }
@@ -216,12 +233,17 @@ function kounselia_create_booking( $professional_id, $client_user_id, $scheduled
     }
 
     // Last-moment race check: two people clicking the same slot in the
-    // same instant. Not a hard DB constraint, but closes the gap enough
-    // for real-world traffic on a booking flow like this one.
+    // same instant, or someone else's still-live reservation on it. Not
+    // a hard DB constraint, but closes the gap enough for real-world
+    // traffic on a booking flow like this one.
+    $reservation_cutoff = date( 'Y-m-d H:i:s', current_time( 'timestamp' ) - kounselia_booking_reservation_seconds() );
     $already_taken = (int) $wpdb->get_var( $wpdb->prepare(
-        "SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_bookings WHERE professional_id = %d AND scheduled_start = %s AND status = 'confirmed'",
+        "SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_bookings
+         WHERE professional_id = %d AND scheduled_start = %s
+         AND ( status = 'confirmed' OR ( status = 'pending_payment' AND created_at >= %s ) )",
         $professional_id,
-        $normalized_start
+        $normalized_start,
+        $reservation_cutoff
     ) );
     if ( $already_taken > 0 ) {
         return new WP_Error( 'invalid_slot', 'That time was just booked by someone else. Please pick another slot.' );
@@ -230,22 +252,34 @@ function kounselia_create_booking( $professional_id, $client_user_id, $scheduled
     $end_ts = $start_ts + ( kounselia_session_length_minutes() * 60 );
     $now    = current_time( 'mysql' );
 
+    // Reserved, not yet confirmed — kounselia_complete_booking_payment()
+    // (booking-payments.php) flips this to 'confirmed' once Paystack
+    // verifies the charge. Nothing here notifies anyone yet; a
+    // reservation nobody paid for shouldn't look like a real booking to
+    // either side.
     $wpdb->insert( $wpdb->prefix . 'kounselia_bookings', array(
         'professional_id' => $professional_id,
         'client_user_id'  => $client_user_id,
         'scheduled_start' => $normalized_start,
         'scheduled_end'   => date( 'Y-m-d H:i:s', $end_ts ),
-        'status'          => 'confirmed',
+        'status'          => 'pending_payment',
         'client_note'     => $note ? substr( $note, 0, 500 ) : null,
         'room_token'      => wp_generate_password( 40, false ),
         'created_at'      => $now,
         'updated_at'      => $now,
     ) );
 
-    $booking_id = (int) $wpdb->insert_id;
-    kounselia_notify_booking_created( $booking_id );
+    return (int) $wpdb->insert_id;
+}
 
-    return $booking_id;
+/**
+ * Drop a reservation that never made it to payment — e.g. Paystack
+ * checkout couldn't even be started. Only ever touches a row still in
+ * 'pending_payment', so it can't accidentally delete a real booking.
+ */
+function kounselia_delete_unpaid_booking( $booking_id ) {
+    global $wpdb;
+    $wpdb->delete( $wpdb->prefix . 'kounselia_bookings', array( 'id' => $booking_id, 'status' => 'pending_payment' ) );
 }
 
 function kounselia_get_professional_bookings( $professional_id, $upcoming_only = true ) {
@@ -351,6 +385,14 @@ function kounselia_cancel_booking( $booking_id, $acting_user_id, $reason = '' ) 
         'cancel_reason' => $reason ? sanitize_textarea_field( $reason ) : null,
         'updated_at'    => current_time( 'mysql' ),
     ), array( 'id' => $booking_id ) );
+
+    // A cancelled session shouldn't quietly stay "earned" for the
+    // professional or "spent" for the client — if it was paid for,
+    // refund it (unless that money has already been folded into a
+    // payout, which needs a human, not an automatic reversal).
+    if ( function_exists( 'kounselia_refund_booking_payment' ) ) {
+        kounselia_refund_booking_payment( $booking_id );
+    }
 
     kounselia_notify_booking_cancelled( $booking_id, $acting_user_id );
 
@@ -504,12 +546,25 @@ function kounselia_ajax_create_booking() {
         wp_send_json_error( array( 'message' => 'Please choose a time.' ), 400 );
     }
 
-    $result = kounselia_create_booking( $professional_id, get_current_user_id(), $scheduled_start, $note );
-    if ( is_wp_error( $result ) ) {
-        wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+    $booking_id = kounselia_create_booking( $professional_id, get_current_user_id(), $scheduled_start, $note );
+    if ( is_wp_error( $booking_id ) ) {
+        wp_send_json_error( array( 'message' => $booking_id->get_error_message() ), 400 );
     }
 
-    wp_send_json_success( array( 'message' => 'Session booked.', 'booking_id' => $result ) );
+    if ( ! function_exists( 'kounselia_init_booking_payment' ) ) {
+        kounselia_delete_unpaid_booking( $booking_id );
+        wp_send_json_error( array( 'message' => 'Payments are not available right now.' ), 500 );
+    }
+
+    $checkout = kounselia_init_booking_payment( $booking_id );
+    if ( is_wp_error( $checkout ) ) {
+        // Don't leave a dead reservation holding the slot hostage just
+        // because checkout itself couldn't be started.
+        kounselia_delete_unpaid_booking( $booking_id );
+        wp_send_json_error( array( 'message' => $checkout->get_error_message() ), 502 );
+    }
+
+    wp_send_json_success( array( 'authorization_url' => $checkout, 'booking_id' => $booking_id ) );
 }
 add_action( 'wp_ajax_kounselia_create_booking', 'kounselia_ajax_create_booking' );
 
