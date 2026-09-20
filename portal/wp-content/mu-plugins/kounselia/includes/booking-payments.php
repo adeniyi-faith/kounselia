@@ -199,6 +199,9 @@ function kounselia_complete_booking_payment( $reference ) {
         if ( function_exists( 'kounselia_notify_booking_created' ) ) {
             kounselia_notify_booking_created( (int) $payment->booking_id );
         }
+        if ( function_exists( 'kounselia_maybe_save_series_authorization' ) ) {
+            kounselia_maybe_save_series_authorization( (int) $payment->booking_id, $result['data'] );
+        }
     }
 
     return array( 'success' => true, 'message' => 'Payment confirmed.', 'booking_id' => (int) $payment->booking_id );

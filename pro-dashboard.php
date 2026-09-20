@@ -52,6 +52,8 @@ $initial      = mb_strtoupper( mb_substr( $display_name, 0, 1 ) );
 $documents          = function_exists( 'kounselia_get_professional_documents' ) ? kounselia_get_professional_documents( $application->id ) : array();
 $availability_rules = function_exists( 'kounselia_get_availability_rules' ) ? kounselia_get_availability_rules( $application->id ) : array();
 $upcoming_bookings  = function_exists( 'kounselia_get_professional_bookings' ) ? kounselia_get_professional_bookings( $application->id ) : array();
+$rating_summary     = function_exists( 'kounselia_get_professional_rating_summary' ) ? kounselia_get_professional_rating_summary( $application->id ) : array( 'average' => 0, 'count' => 0 );
+$reviews            = function_exists( 'kounselia_get_professional_reviews' ) ? kounselia_get_professional_reviews( $application->id ) : array();
 $doc_type_labels    = array( 'license' => 'License / credential', 'id' => 'Government ID', 'certificate' => 'Certificate', 'other' => 'Other document' );
 $day_labels         = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday' );
 
@@ -96,6 +98,18 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .switch-link i{font-size:17px}
 .side-foot{display:flex;flex-direction:column;gap:14px}
 .side-user{display:flex;align-items:center;gap:10px;padding:10px;border-radius:14px;background:var(--surface2)}
+.notif-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--rose)}
+.notif-item{display:block;padding:14px 16px;border-radius:12px;background:var(--bg);border:1px solid var(--border);text-decoration:none;color:inherit}
+.notif-item .notif-title{font-size:13.5px;font-weight:600;color:var(--text)}
+.notif-item .notif-body{font-size:12.5px;color:var(--text2);margin-top:3px}
+.notif-item .notif-time{font-size:11px;color:var(--text3);margin-top:6px}
+.reschedule-day{margin-bottom:14px}
+.reschedule-day-label{font-size:12.5px;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.03em}
+.reschedule-slot-row{display:flex;flex-wrap:wrap;gap:8px}
+.reschedule-slot-btn{padding:9px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;cursor:pointer;transition:all .15s ease}
+.reschedule-slot-btn.selected{border-color:var(--accent);background:var(--accent-light);color:var(--accent)}
+.reschedule-confirm{width:100%;margin-top:14px;padding:12px;border:none;border-radius:12px;background:var(--accent);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+.reschedule-confirm:disabled{opacity:.5;cursor:not-allowed}
 .side-av{width:36px;height:36px;border-radius:50%;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;overflow:hidden;flex-shrink:0}
 .side-av img{width:100%;height:100%;object-fit:cover}
 .side-user-meta{overflow:hidden}
@@ -198,6 +212,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .booking-icon{width:38px;height:38px;border-radius:11px;background:var(--sage-light);color:var(--sage);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
 .booking-meta{flex:1;min-width:0}
 .booking-when{font-weight:600;font-size:14.5px;color:var(--text)}
+.weekly-tag{display:inline-block;margin-left:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--accent);background:var(--accent-light);border-radius:999px;padding:2px 8px;vertical-align:middle}
 .booking-with{font-size:13px;color:var(--text2);margin-top:2px}
 .booking-note{font-size:12.5px;color:var(--text3);margin-top:4px;font-style:italic}
 .booking-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0}
@@ -256,10 +271,11 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 
   <aside class="sidebar">
     <div>
-      <div class="logo">
+      <div class="logo" style="display:flex;align-items:center;justify-content:space-between">
         <a href="/pro-dashboard.php" class="logo-link" style="display:inline-block;outline:none;">
           <img src="https://kounselia.com/img/Kounselia_Logo_IconMark_MidnightNavy.png" alt="Kounselia" class="site-logo" fetchpriority="high">
         </a>
+        <button id="notif-bell-desktop" onclick="openNotifications()" aria-label="Notifications" style="position:relative;background:none;border:none;cursor:pointer;color:var(--text2);padding:6px"><i class="ti ti-bell" style="font-size:19px"></i><span class="notif-dot" id="notif-dot-desktop" style="display:none"></span></button>
       </div>
       <nav class="side-nav">
         <button class="nav-link js-nav active" id="desk-tab-overview" onclick="switchTab('overview')"><i class="ti ti-layout-dashboard"></i><span>Overview</span></button>
@@ -288,6 +304,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <img src="https://kounselia.com/img/Kounselia_Logo_IconMark_MidnightNavy.png" alt="Kounselia" style="max-height:24px;width:auto;object-fit:contain;" fetchpriority="high">
     </a>
     <div class="mobile-topbar-right">
+      <button class="mobile-signout" id="notif-bell" onclick="openNotifications()" aria-label="Notifications" style="position:relative"><i class="ti ti-bell"></i><span class="notif-dot" id="notif-dot" style="display:none"></span></button>
       <a class="mobile-signout" href="/dashboard.php?as=client" aria-label="Switch to client view"><i class="ti ti-switch-horizontal"></i></a>
       <button class="mobile-av" id="mobile-av"><?php echo $avatar_url ? '<img src="' . esc_url( $avatar_url ) . '" alt="">' : esc_html( $initial ); ?></button>
       <button class="mobile-signout" onclick="signOut()" aria-label="Sign out"><i class="ti ti-logout"></i></button>
@@ -302,6 +319,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <div class="welcome-orb"></div>
       <div class="welcome-eyebrow">Your practice
         <?php if ( $is_verified ) : ?><span class="verified-pill"><i class="ti ti-check" style="font-size:11px;"></i> Verified</span><?php endif; ?>
+        <?php if ( $rating_summary['count'] > 0 ) : ?><span class="verified-pill">★ <?php echo esc_html( number_format( $rating_summary['average'], 1 ) ); ?> (<?php echo (int) $rating_summary['count']; ?>)</span><?php endif; ?>
       </div>
       <h1>Welcome back, <em id="welcome-first-name"><?php echo esc_html( $first_name ); ?></em>.</h1>
       <p><?php echo $is_verified
@@ -425,6 +443,33 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         </form>
       </div>
     </div>
+
+    <div class="section" style="margin-top:32px">
+      <div class="section-head">
+        <h2>Client reviews</h2>
+        <span class="section-sub"><?php echo $rating_summary['count'] > 0 ? '★ ' . esc_html( number_format( $rating_summary['average'], 1 ) ) . ' average across ' . (int) $rating_summary['count'] . ' review' . ( 1 === $rating_summary['count'] ? '' : 's' ) : 'No reviews yet'; ?></span>
+      </div>
+      <?php if ( empty( $reviews ) ) : ?>
+        <div class="coming-soon">
+          <div class="coming-soon-icon"><i class="ti ti-star"></i></div>
+          <h3>No reviews yet</h3>
+          <p>Clients can rate a session once it's happened. Reviews will show up here, and your average rating appears on your public profile.</p>
+        </div>
+      <?php else : ?>
+        <div class="doc-list">
+          <?php foreach ( $reviews as $review ) : ?>
+          <div class="doc-row" style="align-items:flex-start">
+            <i class="ti ti-star" style="color:var(--gold)"></i>
+            <div class="doc-meta">
+              <div class="doc-name"><?php echo str_repeat( '★', (int) $review->rating ) . str_repeat( '☆', 5 - (int) $review->rating ); ?> — <?php echo esc_html( $review->client_name ?: 'A client' ); ?></div>
+              <?php if ( $review->comment ) : ?><div class="doc-type" style="white-space:normal"><?php echo esc_html( $review->comment ); ?></div><?php endif; ?>
+              <div class="doc-type"><?php echo esc_html( date_i18n( 'M j, Y', strtotime( $review->created_at ) ) ); ?></div>
+            </div>
+          </div>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </div>
   </div>
 
   <!-- BOOKINGS -->
@@ -486,7 +531,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="booking-row" data-booking-id="<?php echo (int) $booking->id; ?>">
           <div class="booking-icon"><i class="ti ti-calendar-event"></i></div>
           <div class="booking-meta">
-            <div class="booking-when"><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?></div>
+            <div class="booking-when"><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?><?php if ( $booking->series_id ) : ?><span class="weekly-tag">Weekly</span><?php endif; ?></div>
             <div class="booking-with"><?php echo esc_html( $booking->client_name ?: $booking->client_email ); ?></div>
             <?php if ( $booking->client_note ) : ?><div class="booking-note"><?php echo esc_html( $booking->client_note ); ?></div><?php endif; ?>
           </div>
@@ -495,7 +540,11 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
               <a class="booking-join" href="/video-call.php?booking_id=<?php echo (int) $booking->id; ?>"><i class="ti ti-video"></i> Join</a>
             <?php endif; ?>
             <button type="button" class="booking-message js-booking-chat" data-booking-id="<?php echo (int) $booking->id; ?>" data-other-name="<?php echo esc_attr( $booking->client_name ?: $booking->client_email ); ?>"><i class="ti ti-message-circle"></i> Message</button>
+            <button type="button" class="booking-message js-reschedule" data-booking-id="<?php echo (int) $booking->id; ?>" data-other-name="<?php echo esc_attr( $booking->client_name ?: $booking->client_email ); ?>">Reschedule</button>
             <button type="button" class="booking-cancel" onclick="cancelBooking(<?php echo (int) $booking->id; ?>, this)">Cancel</button>
+            <?php if ( $booking->series_id ) : ?>
+              <button type="button" class="booking-cancel" onclick="cancelSeries(<?php echo (int) $booking->series_id; ?>, this)">Cancel weekly</button>
+            <?php endif; ?>
           </div>
         </div>
         <?php endforeach; ?>
@@ -636,6 +685,36 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     </form>
   </div>
 </div>
+
+<!-- RESCHEDULE MODAL -->
+<div class="chat-overlay" id="reschedule-overlay">
+  <div class="chat-modal" style="height:auto;max-height:80vh">
+    <div class="chat-modal-head">
+      <h3 id="reschedule-modal-name">Reschedule</h3>
+      <button type="button" onclick="closeReschedule()"><i class="ti ti-x"></i></button>
+    </div>
+    <div style="padding:16px 20px;overflow-y:auto" id="reschedule-slots">
+      <p style="color:var(--text3);font-size:13px">Loading available times...</p>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATIONS MODAL -->
+<div class="chat-overlay" id="notif-overlay">
+  <div class="chat-modal" style="height:auto;max-height:80vh">
+    <div class="chat-modal-head">
+      <h3>Notifications</h3>
+      <button type="button" onclick="closeNotifications()"><i class="ti ti-x"></i></button>
+    </div>
+    <div style="padding:16px 20px;overflow-y:auto;display:flex;flex-direction:column;gap:8px" id="notif-list">
+      <p style="color:var(--text3);font-size:13px">Loading...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const KOUNSELIA_PRO_ID = <?php echo (int) $application->id; ?>;
+</script>
 
 <script>
 const KOUNSELIA={ajaxUrl:<?php echo wp_json_encode( $ajax_url ); ?>,nonce:<?php echo wp_json_encode( $nonce ); ?>};
@@ -1059,6 +1138,224 @@ document.getElementById('chat-form').addEventListener('submit', function(e){
   .then(() => loadBookingChat())
   .catch(() => {});
 });
+
+/* ---------------- RESCHEDULE ---------------- */
+
+let rescheduleBookingId = null;
+let rescheduleSelectedSlot = null;
+
+document.querySelectorAll('.js-reschedule').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    openReschedule(parseInt(btn.dataset.bookingId, 10), btn.dataset.otherName);
+  });
+});
+
+function openReschedule(bookingId, otherName){
+  rescheduleBookingId = bookingId;
+  rescheduleSelectedSlot = null;
+  document.getElementById('reschedule-modal-name').textContent = 'Reschedule with ' + otherName;
+  document.getElementById('reschedule-slots').innerHTML = '<p style="color:var(--text3);font-size:13px">Loading available times...</p>';
+  document.getElementById('reschedule-overlay').classList.add('active');
+
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_get_professional_slots', nonce: KOUNSELIA.nonce, professional_id: KOUNSELIA_PRO_ID, reschedule_booking_id: bookingId })
+  })
+  .then(r => r.json())
+  .then(res => {
+    const wrap = document.getElementById('reschedule-slots');
+    if (!res.success) {
+      wrap.innerHTML = '<p style="color:var(--rose);font-size:13px">' + ((res.data && res.data.message) || 'Could not load availability.') + '</p>';
+      return;
+    }
+    const slots = res.data.slots || [];
+    if (!slots.length) {
+      wrap.innerHTML = '<p style="color:var(--text3);font-size:13px">No open times right now.</p>';
+      return;
+    }
+
+    const byDay = {};
+    slots.forEach(function(slot){
+      const d = new Date(slot.replace(' ', 'T'));
+      const dayKey = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+      (byDay[dayKey] = byDay[dayKey] || []).push({ raw: slot, time: d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) });
+    });
+
+    wrap.innerHTML = '';
+    Object.keys(byDay).forEach(function(dayKey){
+      const dayBlock = document.createElement('div');
+      dayBlock.className = 'reschedule-day';
+      const label = document.createElement('div');
+      label.className = 'reschedule-day-label';
+      label.textContent = dayKey;
+      dayBlock.appendChild(label);
+
+      const row = document.createElement('div');
+      row.className = 'reschedule-slot-row';
+      byDay[dayKey].forEach(function(s){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'reschedule-slot-btn';
+        btn.textContent = s.time;
+        btn.onclick = function(){
+          document.querySelectorAll('.reschedule-slot-btn').forEach(function(b){ b.classList.remove('selected'); });
+          btn.classList.add('selected');
+          rescheduleSelectedSlot = s.raw;
+          let confirmBtn = document.getElementById('reschedule-confirm-btn');
+          if (!confirmBtn) {
+            confirmBtn = document.createElement('button');
+            confirmBtn.type = 'button';
+            confirmBtn.id = 'reschedule-confirm-btn';
+            confirmBtn.className = 'reschedule-confirm';
+            confirmBtn.textContent = 'Confirm new time';
+            confirmBtn.onclick = submitReschedule;
+            document.getElementById('reschedule-slots').appendChild(confirmBtn);
+          }
+        };
+        row.appendChild(btn);
+      });
+      dayBlock.appendChild(row);
+      wrap.appendChild(dayBlock);
+    });
+  })
+  .catch(() => {
+    document.getElementById('reschedule-slots').innerHTML = '<p style="color:var(--rose);font-size:13px">Something went wrong. Please try again.</p>';
+  });
+}
+
+function closeReschedule(){
+  document.getElementById('reschedule-overlay').classList.remove('active');
+  rescheduleBookingId = null;
+  rescheduleSelectedSlot = null;
+}
+
+function submitReschedule(){
+  if (!rescheduleBookingId || !rescheduleSelectedSlot) return;
+  const btn = document.getElementById('reschedule-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_reschedule_booking', nonce: KOUNSELIA.nonce, booking_id: rescheduleBookingId, scheduled_start: rescheduleSelectedSlot })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      closeReschedule();
+      setTimeout(() => window.location.reload(), 800);
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Confirm new time';
+      alert((res.data && res.data.message) || 'Could not reschedule that session.');
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = 'Confirm new time';
+    alert('Something went wrong, please check your connection and try again.');
+  });
+}
+
+function cancelSeries(seriesId, btnEl){
+  if (!confirm('Cancel this weekly series? Any already-booked future sessions will be cancelled and refunded.')) return;
+  btnEl.disabled = true;
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_cancel_series', nonce: KOUNSELIA.nonce, series_id: seriesId })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      window.location.reload();
+    } else {
+      btnEl.disabled = false;
+      alert((res.data && res.data.message) || 'Could not cancel that series.');
+    }
+  })
+  .catch(() => { btnEl.disabled = false; alert('Something went wrong, please check your connection and try again.'); });
+}
+
+/* ---------------- NOTIFICATIONS ---------------- */
+
+function checkUnreadNotifications(){
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_get_unread_notification_count', nonce: KOUNSELIA.nonce })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (!res.success) return;
+    const show = res.data.count > 0 ? 'block' : 'none';
+    const dot1 = document.getElementById('notif-dot');
+    const dot2 = document.getElementById('notif-dot-desktop');
+    if (dot1) dot1.style.display = show;
+    if (dot2) dot2.style.display = show;
+  })
+  .catch(() => {});
+}
+checkUnreadNotifications();
+
+function openNotifications(){
+  document.getElementById('notif-overlay').classList.add('active');
+  const wrap = document.getElementById('notif-list');
+  wrap.innerHTML = '<p style="color:var(--text3);font-size:13px">Loading...</p>';
+
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_get_notifications', nonce: KOUNSELIA.nonce })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (!res.success) {
+      wrap.innerHTML = '<p style="color:var(--rose);font-size:13px">Could not load notifications.</p>';
+      return;
+    }
+    const items = res.data.notifications || [];
+    if (!items.length) {
+      wrap.innerHTML = '<p style="color:var(--text3);font-size:13px">Nothing here yet.</p>';
+      return;
+    }
+    wrap.innerHTML = '';
+    items.forEach(function(n){
+      const a = document.createElement('a');
+      a.className = 'notif-item';
+      a.href = n.url || 'javascript:void(0)';
+      const time = new Date(n.created_at.replace(' ', 'T')).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      const titleEl = document.createElement('div');
+      titleEl.className = 'notif-title';
+      titleEl.textContent = n.title;
+      a.appendChild(titleEl);
+      if (n.body) {
+        const bodyEl = document.createElement('div');
+        bodyEl.className = 'notif-body';
+        bodyEl.textContent = n.body;
+        a.appendChild(bodyEl);
+      }
+      const timeEl = document.createElement('div');
+      timeEl.className = 'notif-time';
+      timeEl.textContent = time;
+      a.appendChild(timeEl);
+      wrap.appendChild(a);
+    });
+    const dot1 = document.getElementById('notif-dot');
+    const dot2 = document.getElementById('notif-dot-desktop');
+    if (dot1) dot1.style.display = 'none';
+    if (dot2) dot2.style.display = 'none';
+  })
+  .catch(() => {
+    wrap.innerHTML = '<p style="color:var(--rose);font-size:13px">Something went wrong.</p>';
+  });
+}
+
+function closeNotifications(){
+  document.getElementById('notif-overlay').classList.remove('active');
+}
 </script>
 
 </body>
