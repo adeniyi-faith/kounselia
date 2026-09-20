@@ -1141,7 +1141,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <h2 style="margin:0;font-size:26px" id="book-modal-name">Book a session</h2>
         <button onclick="closeBooking()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text3);padding:4px;"><i class="ti ti-x"></i></button>
       </div>
-      <p style="margin-bottom:20px">Pick an open time below. Sessions are <?php echo (int) ( function_exists( 'kounselia_session_length_minutes' ) ? kounselia_session_length_minutes() : 60 ); ?> minutes.</p>
+      <p style="margin-bottom:20px">Pick an open time below. Sessions are <?php echo (int) ( function_exists( 'kounselia_session_length_minutes' ) ? kounselia_session_length_minutes() : 60 ); ?> minutes. You'll pay securely by card or transfer on the next screen — the slot is only reserved for a few minutes while you do.</p>
 
       <div id="book-slots" style="max-height:280px;overflow-y:auto;margin-bottom:20px">
         <p style="color:var(--text3);font-size:14px" id="book-slots-loading">Loading available times...</p>
@@ -1432,6 +1432,15 @@ if(subCancelBtn){
   } else if(subResult === 'failed'){
     toast('Payment was not completed. Please try again.', true);
     switchTab('upgrade');
+  }
+
+  const bookingResult = params.get('booking');
+  if(bookingResult === 'success'){
+    toast('Payment confirmed — your session is booked.');
+    switchTab('professionals');
+  } else if(bookingResult === 'failed'){
+    toast('Payment was not completed, so that session was not booked. Please try again.', true);
+    switchTab('professionals');
   }
 })();
 
@@ -1835,7 +1844,7 @@ function confirmBooking(){
   if (!bookingProfessionalId || !bookingSelectedSlot) return;
   const btn = document.getElementById('book-confirm-btn');
   btn.disabled = true;
-  btn.textContent = 'Booking...';
+  btn.textContent = 'Taking you to payment...';
 
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
@@ -1850,13 +1859,13 @@ function confirmBooking(){
   })
   .then(r => r.json())
   .then(res => {
-    btn.disabled = false;
-    btn.textContent = 'Confirm booking';
-    if (res.success) {
-      closeBooking();
-      toast('Session booked.', false);
-      setTimeout(() => window.location.reload(), 1200);
+    if (res.success && res.data.authorization_url) {
+      // This slot is now reserved pending payment — leaving the page to
+      // pay on Paystack is the point, not an error state to recover from.
+      window.location.href = res.data.authorization_url;
     } else {
+      btn.disabled = false;
+      btn.textContent = 'Confirm booking';
       toast((res.data && res.data.message) || 'Could not book that slot.', true);
     }
   })
@@ -1868,7 +1877,7 @@ function confirmBooking(){
 }
 
 function cancelMyBooking(bookingId, linkEl){
-  if (!confirm('Cancel this session? The professional will be notified.')) return;
+  if (!confirm("Cancel this session? You'll be refunded, and the professional will be notified.")) return;
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

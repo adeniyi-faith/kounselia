@@ -183,7 +183,8 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
         update_option( 'kounselia_voice_free_minutes', absint( $_POST['voice_free_minutes'] ) );
         update_option( 'kounselia_voice_pro_minutes', absint( $_POST['voice_pro_minutes'] ) );
         update_option( 'kounselia_live_model', sanitize_text_field( wp_unslash( $_POST['live_model'] ) ) );
-        
+        update_option( 'kounselia_booking_commission_percent', max( 0, min( 100, (float) $_POST['booking_commission_percent'] ) ) );
+
         kounselia_admin_log( 'update_platform_settings', 'settings' );
         $kounselia_notice = 'Platform configuration saved successfully.';
     }
@@ -219,6 +220,7 @@ $opt_guest_daily   = (int) get_option('kounselia_guest_daily_cap', 40);
 $opt_voice_free    = (int) get_option('kounselia_voice_free_minutes', 5);
 $opt_voice_pro     = (int) get_option('kounselia_voice_pro_minutes', 15);
 $opt_live_model    = get_option('kounselia_live_model', 'gemini-3.1-flash-live-preview');
+$opt_booking_commission_percent = (float) get_option( 'kounselia_booking_commission_percent', 15 );
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -463,6 +465,11 @@ $opt_live_model    = get_option('kounselia_live_model', 'gemini-3.1-flash-live-p
           <label class="op-label" for="live_model">Live Audio Streaming Model</label>
           <input type="text" id="live_model" name="live_model" class="op-val-input" value="<?php echo esc_attr( $opt_live_model ); ?>">
           <div class="op-desc">Client-to-server persistent WebSocket model for voice therapy.</div>
+        </div>
+        <div class="op-card">
+          <label class="op-label" for="booking_commission_percent">Booking Platform Commission (%)</label>
+          <input type="number" id="booking_commission_percent" name="booking_commission_percent" class="op-val-input" min="0" max="100" step="0.1" value="<?php echo esc_attr( $opt_booking_commission_percent ); ?>">
+          <div class="op-desc">Kounselia's cut of each paid session. The rest is what a professional's payout balance accrues.</div>
         </div>
       </div>
       <div style="margin-top: 20px;">
