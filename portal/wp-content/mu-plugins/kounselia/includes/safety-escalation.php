@@ -13,12 +13,22 @@
  *   1. Classify how acute the matched phrase is (kounselia_safety_critical_markers).
  *   2. Record an open "case" for it in kounselia_safety_escalations.
  *   3. For an acute match, email every admin/staff member immediately,
- *      with a direct link to the transcript — once per session within a
- *      cooldown window, so one distressed conversation doesn't flood
- *      inboxes with a separate email per message.
+ *      with a direct link to the transcript — once per conversation
+ *      within a cooldown window, so one distressed conversation doesn't
+ *      flood inboxes with a separate email per message.
  *   4. Let a staff member acknowledge a case from the admin Safety page,
  *      so there's a visible open/handled state instead of a flag that
  *      never changes.
+ *
+ * Two conversation surfaces feed the same escalations table:
+ *   - the AI counselor chat (kounselia_record_safety_escalation, called
+ *     from kounselia_log_message in chat-helpers.php)
+ *   - a private booking message between a client and a human
+ *     professional (kounselia_record_booking_message_safety_escalation,
+ *     called from kounselia_send_booking_message in bookings.php)
+ * A person in crisis doesn't pick which channel gets watched, so both
+ * land in the same admin Safety page rather than one having a safety
+ * net and the other not.
  *
  * Part of the kounselia-core mu-plugin. Loaded by ../../kounselia-core.php,
  * never included directly.
@@ -97,6 +107,7 @@ function kounselia_record_safety_escalation( $message_id, $session_id, $flag_rea
     $now      = current_time( 'mysql' );
 
     $wpdb->insert( $wpdb->prefix . 'kounselia_safety_escalations', array(
+        'source'      => 'ai_chat',
         'message_id'  => $message_id,
         'session_id'  => $session_id,
         'user_id'     => $session && $session->user_id ? $session->user_id : null,
@@ -109,6 +120,38 @@ function kounselia_record_safety_escalation( $message_id, $session_id, $flag_rea
     $escalation_id = (int) $wpdb->insert_id;
 
     if ( 'critical' === $severity && ! kounselia_safety_session_recently_notified( $session_id ) ) {
+        kounselia_notify_safety_escalation( $escalation_id );
+    }
+
+    return $escalation_id;
+}
+
+/**
+ * Same idea as kounselia_record_safety_escalation(), for a message in a
+ * private booking thread instead of the AI chat. Called right after
+ * kounselia_send_booking_message() (bookings.php) stores a flagged
+ * message. $user_id is whoever sent the flagged message — the person a
+ * concerning phrase actually came from, client or professional.
+ */
+function kounselia_record_booking_message_safety_escalation( $booking_message_id, $booking_id, $flag_reason, $user_id ) {
+    global $wpdb;
+
+    $severity = kounselia_classify_safety_severity( $flag_reason );
+    $now      = current_time( 'mysql' );
+
+    $wpdb->insert( $wpdb->prefix . 'kounselia_safety_escalations', array(
+        'source'             => 'booking_message',
+        'booking_message_id' => $booking_message_id,
+        'booking_id'         => $booking_id,
+        'user_id'            => $user_id ?: null,
+        'severity'           => $severity,
+        'flag_reason'        => $flag_reason,
+        'status'             => 'open',
+        'created_at'         => $now,
+    ) );
+    $escalation_id = (int) $wpdb->insert_id;
+
+    if ( 'critical' === $severity && ! kounselia_safety_booking_recently_notified( $booking_id ) ) {
         kounselia_notify_safety_escalation( $escalation_id );
     }
 
@@ -129,6 +172,25 @@ function kounselia_safety_session_recently_notified( $session_id ) {
          WHERE session_id = %d AND severity = 'critical' AND notified_at IS NOT NULL AND notified_at >= %s
          LIMIT 1",
         $session_id, $cutoff
+    ) );
+
+    return ! empty( $recent );
+}
+
+/**
+ * Same cooldown check as kounselia_safety_session_recently_notified(),
+ * scoped to a booking's message thread instead of an AI chat session.
+ */
+function kounselia_safety_booking_recently_notified( $booking_id ) {
+    global $wpdb;
+
+    $cutoff = gmdate( 'Y-m-d H:i:s', time() - KOUNSELIA_SAFETY_NOTIFY_COOLDOWN );
+
+    $recent = $wpdb->get_var( $wpdb->prepare(
+        "SELECT id FROM {$wpdb->prefix}kounselia_safety_escalations
+         WHERE booking_id = %d AND severity = 'critical' AND notified_at IS NOT NULL AND notified_at >= %s
+         LIMIT 1",
+        $booking_id, $cutoff
     ) );
 
     return ! empty( $recent );
@@ -159,17 +221,17 @@ function kounselia_safety_alert_recipients() {
 
 /**
  * Email the configured recipients with a direct link to the transcript,
- * and mark the case as notified.
+ * and mark the case as notified. Builds the "who said what, where" part
+ * differently depending on which conversation surface the escalation
+ * came from (see kounselia_safety_escalation_context()), but sends the
+ * exact same alert either way — a crisis phrase in a booking message is
+ * not a lesser event than one in the AI chat.
  */
 function kounselia_notify_safety_escalation( $escalation_id ) {
     global $wpdb;
 
     $escalation = $wpdb->get_row( $wpdb->prepare(
-        "SELECT e.*, m.content AS message_content, s.counselor_slug
-         FROM {$wpdb->prefix}kounselia_safety_escalations e
-         INNER JOIN {$wpdb->prefix}kounselia_messages m ON m.id = e.message_id
-         INNER JOIN {$wpdb->prefix}kounselia_sessions s ON s.id = e.session_id
-         WHERE e.id = %d",
+        "SELECT * FROM {$wpdb->prefix}kounselia_safety_escalations WHERE id = %d",
         $escalation_id
     ) );
 
@@ -177,24 +239,19 @@ function kounselia_notify_safety_escalation( $escalation_id ) {
         return false;
     }
 
-    $who = 'a guest';
-    if ( $escalation->user_id ) {
-        $user = get_userdata( $escalation->user_id );
-        $who  = $user ? ( $user->display_name ?: $user->user_email ) : ( 'member #' . $escalation->user_id );
+    $context = kounselia_safety_escalation_context( $escalation );
+    if ( ! $context ) {
+        return false;
     }
 
     $emails = kounselia_safety_alert_recipients();
-
     if ( empty( $emails ) ) {
         return false;
     }
 
-    $site_url    = function_exists( 'home_url' ) ? home_url() : ( 'https://' . $_SERVER['SERVER_NAME'] );
-    $transcript_url = rtrim( $site_url, '/' ) . '/portal/admin/pages/session.php?id=' . (int) $escalation->session_id;
-    $snippet     = wp_trim_words( $escalation->message_content, 40, '…' );
-    $counselor   = function_exists( 'kounselia_admin_counselor_name' ) ? kounselia_admin_counselor_name( $escalation->counselor_slug ) : $escalation->counselor_slug;
+    $snippet = wp_trim_words( $context['content'], 40, '…' );
 
-    $content = '<p>A message from <strong>' . esc_html( $who ) . '</strong>, talking with <strong>' . esc_html( $counselor ) . '</strong>, matched language associated with an acute safety risk ("' . esc_html( $escalation->flag_reason ) . '").</p>'
+    $content = '<p>A message from <strong>' . esc_html( $context['who'] ) . '</strong>, ' . $context['where_html'] . ', matched language associated with an acute safety risk ("' . esc_html( $escalation->flag_reason ) . '").</p>'
         . '<p style="background:#F8F6F2;border-radius:12px;padding:16px 18px;font-style:italic;">' . esc_html( $snippet ) . '</p>'
         . '<p>This needs a look now, not at the next routine check of the Safety page.</p>';
 
@@ -205,7 +262,7 @@ function kounselia_notify_safety_escalation( $escalation_id ) {
             'Immediate review needed',
             $content,
             'View the conversation',
-            $transcript_url
+            $context['transcript_url']
         );
     }
 
@@ -216,6 +273,73 @@ function kounselia_notify_safety_escalation( $escalation_id ) {
     );
 
     return true;
+}
+
+/**
+ * Resolves an escalation row into the display/email details specific to
+ * its source: who said it, a human-readable "where" (talking with which
+ * counselor, or messaging which professional about which booking), the
+ * flagged text itself, and where an admin can go read the full
+ * conversation. Returns null if the underlying message/booking/session
+ * has since been deleted.
+ */
+function kounselia_safety_escalation_context( $escalation ) {
+    global $wpdb;
+    $site_url = function_exists( 'home_url' ) ? home_url() : ( 'https://' . $_SERVER['SERVER_NAME'] );
+
+    if ( 'booking_message' === $escalation->source ) {
+        $row = $wpdb->get_row( $wpdb->prepare(
+            "SELECT bm.content, p.title AS pro_title, u.display_name AS pro_name
+             FROM {$wpdb->prefix}kounselia_booking_messages bm
+             INNER JOIN {$wpdb->prefix}kounselia_bookings b ON b.id = bm.booking_id
+             INNER JOIN {$wpdb->prefix}kounselia_professionals p ON p.id = b.professional_id
+             INNER JOIN {$wpdb->users} u ON u.ID = p.user_id
+             WHERE bm.id = %d",
+            $escalation->booking_message_id
+        ) );
+        if ( ! $row ) {
+            return null;
+        }
+
+        $who = 'a member';
+        if ( $escalation->user_id ) {
+            $user = get_userdata( $escalation->user_id );
+            $who  = $user ? ( $user->display_name ?: $user->user_email ) : ( 'member #' . $escalation->user_id );
+        }
+
+        return array(
+            'who'             => $who,
+            'where_html'      => 'messaging <strong>' . esc_html( $row->pro_name ) . '</strong> about a booked session',
+            'content'         => $row->content,
+            'transcript_url'  => rtrim( $site_url, '/' ) . '/portal/admin/pages/booking-messages.php?booking_id=' . (int) $escalation->booking_id,
+        );
+    }
+
+    // Default / legacy: the AI counselor chat.
+    $row = $wpdb->get_row( $wpdb->prepare(
+        "SELECT m.content AS message_content, s.counselor_slug
+         FROM {$wpdb->prefix}kounselia_messages m
+         INNER JOIN {$wpdb->prefix}kounselia_sessions s ON s.id = m.session_id
+         WHERE m.id = %d",
+        $escalation->message_id
+    ) );
+    if ( ! $row ) {
+        return null;
+    }
+
+    $who = 'a guest';
+    if ( $escalation->user_id ) {
+        $user = get_userdata( $escalation->user_id );
+        $who  = $user ? ( $user->display_name ?: $user->user_email ) : ( 'member #' . $escalation->user_id );
+    }
+    $counselor = function_exists( 'kounselia_admin_counselor_name' ) ? kounselia_admin_counselor_name( $row->counselor_slug ) : $row->counselor_slug;
+
+    return array(
+        'who'            => $who,
+        'where_html'     => 'talking with <strong>' . esc_html( $counselor ) . '</strong>',
+        'content'        => $row->message_content,
+        'transcript_url' => rtrim( $site_url, '/' ) . '/portal/admin/pages/session.php?id=' . (int) $escalation->session_id,
+    );
 }
 
 /**
