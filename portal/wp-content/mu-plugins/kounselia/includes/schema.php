@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.15.0'; // Bumped version: booking messages + video room token (kounselia_booking_messages, kounselia_bookings.room_token)
+    $current_version   = '1.16.0'; // Bumped version: booking payments + professional payouts (kounselia_booking_payments, kounselia_professional_payout_accounts, kounselia_payouts)
 
     if ( $installed_version === $current_version ) {
         return;
@@ -401,6 +401,77 @@ function kounselia_install_tables() {
         KEY booking_id (booking_id)
     ) {$charset_collate};";
 
+    // What a client paid for one booking, and how that payment splits
+    // between Kounselia's commission and what the professional is owed.
+    // One row per booking (booking_id is unique) — a booking is either
+    // unpaid (no row yet), paid (row with status 'success'), or the
+    // payment failed/was abandoned (status 'failed', slot freed back up).
+    // payout_id stays NULL until that professional_amount is folded into
+    // a payout batch, which is what "available balance" checks against.
+    $sql_booking_payments = "CREATE TABLE {$prefix}kounselia_booking_payments (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        booking_id BIGINT UNSIGNED NOT NULL,
+        client_user_id BIGINT UNSIGNED NOT NULL,
+        professional_id BIGINT UNSIGNED NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        currency VARCHAR(8) NOT NULL DEFAULT 'NGN',
+        platform_fee_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        professional_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        reference VARCHAR(100) NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        payout_id BIGINT UNSIGNED NULL,
+        gateway_response TEXT NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY booking_id (booking_id),
+        UNIQUE KEY reference (reference),
+        KEY professional_id (professional_id),
+        KEY payout_id (payout_id)
+    ) {$charset_collate};";
+
+    // A professional's verified bank account, resolved against Paystack's
+    // own account-name lookup before it's ever saved (so a payout can
+    // never be typo'd to the wrong account) and mirrored to a Paystack
+    // "transfer recipient" — the recipient_code Paystack requires on
+    // every transfer.
+    $sql_payout_accounts = "CREATE TABLE {$prefix}kounselia_professional_payout_accounts (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        professional_id BIGINT UNSIGNED NOT NULL,
+        bank_code VARCHAR(16) NOT NULL,
+        bank_name VARCHAR(191) NOT NULL,
+        account_number VARCHAR(20) NOT NULL,
+        account_name VARCHAR(191) NOT NULL,
+        paystack_recipient_code VARCHAR(100) NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY professional_id (professional_id)
+    ) {$charset_collate};";
+
+    // One payout run to one professional's verified account. Holds
+    // whichever booking_payments rows were rolled up into it (see
+    // payout_id on kounselia_booking_payments) at the moment it was
+    // requested, so the amount transferred always matches a specific,
+    // auditable set of sessions instead of a balance that can drift.
+    $sql_payouts = "CREATE TABLE {$prefix}kounselia_payouts (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        professional_id BIGINT UNSIGNED NOT NULL,
+        amount DECIMAL(10,2) NOT NULL,
+        currency VARCHAR(8) NOT NULL DEFAULT 'NGN',
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        paystack_transfer_code VARCHAR(100) NULL,
+        paystack_reference VARCHAR(100) NULL,
+        failure_reason VARCHAR(500) NULL,
+        gateway_response TEXT NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        completed_at DATETIME NULL,
+        PRIMARY KEY  (id),
+        KEY professional_id (professional_id),
+        KEY status (status)
+    ) {$charset_collate};";
+
     dbDelta( $sql_sessions );
     dbDelta( $sql_messages );
     dbDelta( $sql_guest_limits );
@@ -423,6 +494,9 @@ function kounselia_install_tables() {
     dbDelta( $sql_booking_messages );
     dbDelta( $sql_subscriptions );
     dbDelta( $sql_payments );
+    dbDelta( $sql_booking_payments );
+    dbDelta( $sql_payout_accounts );
+    dbDelta( $sql_payouts );
 
     if ( function_exists( 'kounselia_ensure_professional_docs_dir' ) ) {
         kounselia_ensure_professional_docs_dir();
