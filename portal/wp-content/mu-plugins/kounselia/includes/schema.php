@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.16.0'; // Bumped version: booking payments + professional payouts (kounselia_booking_payments, kounselia_professional_payout_accounts, kounselia_payouts)
+    $current_version   = '1.17.0'; // Bumped version: safety scanning + admin oversight for booking messages (kounselia_booking_messages flags, kounselia_safety_escalations generalized)
 
     if ( $installed_version === $current_version ) {
         return;
@@ -217,10 +217,21 @@ function kounselia_install_tables() {
      * whether it's been acted on, and by whom — so an acute-risk message
      * triggers an immediate alert instead of sitting in a queue.
      */
+    // source distinguishes which conversation surface this came from —
+    // the AI counselor chat ('ai_chat', the original case this table was
+    // built for: message_id/session_id set, booking_id/booking_message_id
+    // NULL) or a private human-to-human booking thread ('booking_message':
+    // booking_id/booking_message_id set, message_id/session_id NULL).
+    // One table, and one admin Safety page, for every place someone could
+    // say something that needs a human's attention — never two places
+    // staff has to remember to check.
     $sql_safety_escalations = "CREATE TABLE {$prefix}kounselia_safety_escalations (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-        message_id BIGINT UNSIGNED NOT NULL,
-        session_id BIGINT UNSIGNED NOT NULL,
+        source VARCHAR(16) NOT NULL DEFAULT 'ai_chat',
+        message_id BIGINT UNSIGNED NULL,
+        session_id BIGINT UNSIGNED NULL,
+        booking_id BIGINT UNSIGNED NULL,
+        booking_message_id BIGINT UNSIGNED NULL,
         user_id BIGINT UNSIGNED NULL,
         guest_token VARCHAR(64) NULL,
         severity VARCHAR(10) NOT NULL DEFAULT 'elevated',
@@ -232,8 +243,10 @@ function kounselia_install_tables() {
         created_at DATETIME NOT NULL,
         PRIMARY KEY  (id),
         KEY session_id (session_id),
+        KEY booking_id (booking_id),
         KEY status (status),
-        KEY severity (severity)
+        KEY severity (severity),
+        KEY source (source)
     ) {$charset_collate};";
 
     /*
@@ -397,8 +410,11 @@ function kounselia_install_tables() {
         content TEXT NOT NULL,
         created_at DATETIME NOT NULL,
         read_at DATETIME NULL,
+        flagged_safety TINYINT(1) UNSIGNED NOT NULL DEFAULT 0,
+        flag_reason VARCHAR(255) NULL,
         PRIMARY KEY  (id),
-        KEY booking_id (booking_id)
+        KEY booking_id (booking_id),
+        KEY flagged_safety (flagged_safety)
     ) {$charset_collate};";
 
     // What a client paid for one booking, and how that payment splits
