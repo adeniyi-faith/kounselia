@@ -31,6 +31,9 @@ $today_journal = function_exists( 'kounselia_get_today_journal' ) ? kounselia_ge
 $next_checkin  = function_exists( 'kounselia_get_next_checkin' ) ? kounselia_get_next_checkin( $user->ID ) : null;
 $pro_application = function_exists( 'kounselia_get_professional_application' ) ? kounselia_get_professional_application( $user->ID ) : null;
 
+$verified_professionals = function_exists( 'kounselia_get_verified_professionals' ) ? kounselia_get_verified_professionals() : array();
+$my_bookings            = function_exists( 'kounselia_get_client_bookings' ) ? kounselia_get_client_bookings( $user->ID ) : array();
+
 // Professionals get their own dashboard by default — this page is for
 // people seeking support, not for managing a practice. A professional
 // who wants to use Kounselia as a client too can switch over explicitly
@@ -546,6 +549,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <nav class="side-nav">
         <button class="nav-link js-nav active" id="desk-tab-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span>Home</span></button>
         <button class="nav-link js-nav" id="desk-tab-sessions" onclick="switchTab('sessions')"><i class="ti ti-history"></i><span>Sessions</span></button>
+        <button class="nav-link js-nav" id="desk-tab-professionals" onclick="switchTab('professionals')"><i class="ti ti-calendar-event"></i><span>Book a professional</span></button>
         <button class="nav-link js-nav" id="desk-tab-memory" onclick="switchTab('memory')"><i class="ti ti-brain"></i><span>Memory Profile</span></button>
         <button class="nav-link js-nav" id="desk-tab-settings" onclick="switchTab('settings')"><i class="ti ti-settings"></i><span>Settings</span></button>
         <button class="nav-link js-nav" id="desk-tab-upgrade" onclick="switchTab('upgrade')"><i class="ti ti-sparkles"></i><span>Upgrade</span></button>
@@ -754,6 +758,63 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     </section>
   </div><!-- /view-sessions -->
 
+  <!-- PROFESSIONALS / BOOKINGS PANEL -->
+  <div class="view-panel" id="view-professionals">
+    <section class="section">
+      <div class="section-head">
+        <h2>Your upcoming sessions</h2>
+      </div>
+      <?php if ( empty( $my_bookings ) ) : ?>
+        <div class="empty-state">
+          <i class="ti ti-calendar-event"></i>
+          <p>No sessions booked yet. Find a licensed professional below and pick a time that works for you.</p>
+        </div>
+      <?php else : ?>
+        <div id="my-booking-list">
+        <?php foreach ( $my_bookings as $booking ) : ?>
+        <div class="session-row" data-booking-id="<?php echo (int) $booking->id; ?>">
+          <div class="session-av ic-gold"><i class="ti ti-calendar-event"></i></div>
+          <div class="session-meta">
+            <h4><?php echo esc_html( $booking->pro_name ); ?><?php echo $booking->pro_title ? ' · ' . esc_html( $booking->pro_title ) : ''; ?></h4>
+            <p><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?></p>
+          </div>
+          <a class="session-link" href="javascript:void(0)" onclick="cancelMyBooking(<?php echo (int) $booking->id; ?>, this)">Cancel</a>
+        </div>
+        <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>Find a professional</h2>
+        <span class="section-sub">Licensed and verified by Kounselia</span>
+      </div>
+      <?php if ( empty( $verified_professionals ) ) : ?>
+        <div class="empty-state">
+          <i class="ti ti-users"></i>
+          <p>No verified professionals are available to book just yet. Check back soon.</p>
+        </div>
+      <?php else : ?>
+        <div class="counselor-grid">
+          <?php foreach ( $verified_professionals as $pro ) :
+              $pro_avatar = function_exists( 'kounselia_get_avatar_url' ) ? kounselia_get_avatar_url( $pro->user_id, 'thumbnail' ) : false;
+              $pro_initial = mb_strtoupper( mb_substr( $pro->display_name, 0, 1 ) );
+          ?>
+          <a class="counselor-tile js-book-pro" href="javascript:void(0)" data-pro-id="<?php echo (int) $pro->id; ?>" data-pro-name="<?php echo esc_attr( $pro->display_name . ( $pro->title ? ' · ' . $pro->title : '' ) ); ?>">
+            <div class="tile-av ic-blue" style="overflow:hidden">
+              <?php echo $pro_avatar ? '<img src="' . esc_url( $pro_avatar ) . '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : esc_html( $pro_initial ); ?>
+            </div>
+            <div class="tile-name"><?php echo esc_html( $pro->display_name ); ?></div>
+            <div class="tile-spec"><?php echo esc_html( $pro->title ); ?><?php echo $pro->specialty ? ' · ' . esc_html( $pro->specialty ) : ''; ?></div>
+            <div class="tile-spec" style="margin-top:4px;font-weight:600;color:var(--accent)"><?php echo $pro->rate_amount ? '₦' . esc_html( number_format( (float) $pro->rate_amount ) ) . ' / session' : ''; ?></div>
+          </a>
+          <?php endforeach; ?>
+        </div>
+      <?php endif; ?>
+    </section>
+  </div><!-- /view-professionals -->
+
   <!-- TALK PANEL (Mobile Only) -->
   <div class="view-panel" id="view-talk">
     <section class="section">
@@ -953,6 +1014,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     <button class="mob-tab active" id="mob-tab-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span>Home</span></button>
     <button class="mob-tab" id="mob-tab-sessions" onclick="switchTab('sessions')"><i class="ti ti-history"></i><span>Sessions</span></button>
     <button class="tabbar-fab" onclick="switchTab('talk')" aria-label="Talk to someone"><i class="ti ti-message-2-plus"></i></button>
+    <button class="mob-tab" id="mob-tab-professionals" onclick="switchTab('professionals')"><i class="ti ti-calendar-event"></i><span>Book</span></button>
     <button class="mob-tab" id="mob-tab-settings" onclick="switchTab('settings')"><i class="ti ti-settings"></i><span>Settings</span></button>
     <button class="mob-tab" id="mob-tab-upgrade" onclick="switchTab('upgrade')"><i class="ti ti-sparkles"></i><span>Upgrade</span></button>
   </nav>
@@ -1039,6 +1101,33 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <div class="intake-actions">
         <button class="intake-btn ghost" onclick="closeMemoryEdit()">Cancel</button>
         <button class="intake-btn" id="btn-save-memory-edit" onclick="saveMemoryEdit()">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- BOOK A SESSION MODAL -->
+<div class="intake-overlay" id="book-overlay">
+  <div class="intake-modal" style="max-width:560px">
+    <div class="intake-step active">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+        <h2 style="margin:0;font-size:26px" id="book-modal-name">Book a session</h2>
+        <button onclick="closeBooking()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text3);padding:4px;"><i class="ti ti-x"></i></button>
+      </div>
+      <p style="margin-bottom:20px">Pick an open time below. Sessions are <?php echo (int) ( function_exists( 'kounselia_session_length_minutes' ) ? kounselia_session_length_minutes() : 60 ); ?> minutes.</p>
+
+      <div id="book-slots" style="max-height:280px;overflow-y:auto;margin-bottom:20px">
+        <p style="color:var(--text3);font-size:14px" id="book-slots-loading">Loading available times...</p>
+      </div>
+
+      <div class="form-field" id="book-note-field" style="display:none;margin:0 0 20px">
+        <label>A short note for them (optional)</label>
+        <textarea id="book-note" style="width:100%;min-height:70px;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;font-family:inherit;font-size:14.5px;background:var(--bg);color:var(--text);resize:vertical;outline:none"></textarea>
+      </div>
+
+      <div class="intake-actions">
+        <button class="intake-btn ghost" onclick="closeBooking()">Cancel</button>
+        <button class="intake-btn" id="book-confirm-btn" onclick="confirmBooking()" style="display:none">Confirm booking</button>
       </div>
     </div>
   </div>
@@ -1611,6 +1700,149 @@ function finishIntake() {
     btn.disabled = false;
     toast('Something went wrong. Please try again.', true);
   });
+}
+
+/* ---------------- BOOK A PROFESSIONAL ---------------- */
+
+let bookingProfessionalId = null;
+let bookingSelectedSlot = null;
+
+document.querySelectorAll('.js-book-pro').forEach(function(tile){
+  tile.addEventListener('click', function(){
+    openBooking(parseInt(tile.dataset.proId, 10), tile.dataset.proName);
+  });
+});
+
+function openBooking(professionalId, name){
+  bookingProfessionalId = professionalId;
+  bookingSelectedSlot = null;
+  document.getElementById('book-modal-name').textContent = name;
+  document.getElementById('book-note').value = '';
+  document.getElementById('book-note-field').style.display = 'none';
+  document.getElementById('book-confirm-btn').style.display = 'none';
+  document.getElementById('book-slots').innerHTML = '<p style="color:var(--text3);font-size:14px">Loading available times...</p>';
+  document.getElementById('book-overlay').classList.add('active');
+
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_get_professional_slots', nonce: KOUNSELIA.nonce, professional_id: professionalId })
+  })
+  .then(r => r.json())
+  .then(res => {
+    const wrap = document.getElementById('book-slots');
+    if (!res.success) {
+      wrap.innerHTML = '<p style="color:var(--rose);font-size:14px">' + ((res.data && res.data.message) || 'Could not load availability.') + '</p>';
+      return;
+    }
+    const slots = res.data.slots || [];
+    if (!slots.length) {
+      wrap.innerHTML = '<p style="color:var(--text3);font-size:14px">This professional has no open times right now. Please check back soon.</p>';
+      return;
+    }
+
+    const byDay = {};
+    slots.forEach(function(slot){
+      const d = new Date(slot.replace(' ', 'T'));
+      const dayKey = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
+      (byDay[dayKey] = byDay[dayKey] || []).push({ raw: slot, time: d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) });
+    });
+
+    wrap.innerHTML = '';
+    Object.keys(byDay).forEach(function(dayKey){
+      const dayBlock = document.createElement('div');
+      dayBlock.style.marginBottom = '14px';
+      const label = document.createElement('div');
+      label.style.cssText = 'font-size:12.5px;font-weight:600;color:var(--text3);margin-bottom:8px;text-transform:uppercase;letter-spacing:.03em';
+      label.textContent = dayKey;
+      dayBlock.appendChild(label);
+
+      const row = document.createElement('div');
+      row.style.cssText = 'display:flex;flex-wrap:wrap;gap:8px';
+      byDay[dayKey].forEach(function(s){
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = s.time;
+        btn.dataset.slot = s.raw;
+        btn.style.cssText = 'padding:9px 14px;border-radius:10px;border:1.5px solid var(--border);background:var(--bg);color:var(--text);font-family:inherit;font-size:13px;cursor:pointer;transition:all .15s ease';
+        btn.onclick = function(){
+          document.querySelectorAll('#book-slots button').forEach(function(b){ b.style.borderColor = 'var(--border)'; b.style.background = 'var(--bg)'; b.style.color = 'var(--text)'; });
+          btn.style.borderColor = 'var(--accent)'; btn.style.background = 'var(--accent-light)'; btn.style.color = 'var(--accent)';
+          bookingSelectedSlot = s.raw;
+          document.getElementById('book-note-field').style.display = 'block';
+          document.getElementById('book-confirm-btn').style.display = 'inline-flex';
+        };
+        row.appendChild(btn);
+      });
+      dayBlock.appendChild(row);
+      wrap.appendChild(dayBlock);
+    });
+  })
+  .catch(() => {
+    document.getElementById('book-slots').innerHTML = '<p style="color:var(--rose);font-size:14px">Something went wrong. Please try again.</p>';
+  });
+}
+
+function closeBooking(){
+  document.getElementById('book-overlay').classList.remove('active');
+  bookingProfessionalId = null;
+  bookingSelectedSlot = null;
+}
+
+function confirmBooking(){
+  if (!bookingProfessionalId || !bookingSelectedSlot) return;
+  const btn = document.getElementById('book-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Booking...';
+
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      action: 'kounselia_create_booking',
+      nonce: KOUNSELIA.nonce,
+      professional_id: bookingProfessionalId,
+      scheduled_start: bookingSelectedSlot,
+      note: document.getElementById('book-note').value
+    })
+  })
+  .then(r => r.json())
+  .then(res => {
+    btn.disabled = false;
+    btn.textContent = 'Confirm booking';
+    if (res.success) {
+      closeBooking();
+      toast('Session booked.', false);
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      toast((res.data && res.data.message) || 'Could not book that slot.', true);
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = 'Confirm booking';
+    toast('Something went wrong. Please try again.', true);
+  });
+}
+
+function cancelMyBooking(bookingId, linkEl){
+  if (!confirm('Cancel this session? The professional will be notified.')) return;
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_cancel_booking', nonce: KOUNSELIA.nonce, booking_id: bookingId })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      const row = document.querySelector('#my-booking-list [data-booking-id="' + bookingId + '"]');
+      if (row) row.remove();
+      toast('Booking cancelled.', false);
+    } else {
+      toast((res.data && res.data.message) || 'Could not cancel that booking.', true);
+    }
+  })
+  .catch(() => toast('Something went wrong. Please try again.', true));
 }
 </script>
 </body>
