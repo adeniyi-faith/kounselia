@@ -194,8 +194,30 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .booking-when{font-weight:600;font-size:14.5px;color:var(--text)}
 .booking-with{font-size:13px;color:var(--text2);margin-top:2px}
 .booking-note{font-size:12.5px;color:var(--text3);margin-top:4px;font-style:italic}
-.booking-cancel{border:1px solid var(--border);background:none;color:var(--text2);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer;flex-shrink:0;font-family:inherit}
+.booking-actions{display:flex;flex-direction:column;gap:6px;flex-shrink:0}
+.booking-join,.booking-message,.booking-cancel{border:1px solid var(--border);background:none;color:var(--text2);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;justify-content:center;white-space:nowrap}
+.booking-join{border-color:var(--sage);color:var(--sage)}
+.booking-join:hover{background:var(--sage-light)}
+.booking-message:hover{border-color:var(--accent);color:var(--accent)}
 .booking-cancel:hover{border-color:var(--rose);color:var(--rose)}
+@media (max-width:480px){.booking-row{flex-wrap:wrap}.booking-actions{flex-direction:row;flex-basis:100%;margin-top:10px}.booking-join,.booking-message,.booking-cancel{flex:1}}
+
+.chat-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center;z-index:9999}
+.chat-overlay.active{display:flex}
+.chat-modal{background:var(--surface);width:100%;max-width:480px;border-radius:20px 20px 0 0;display:flex;flex-direction:column;max-height:80vh}
+@media (min-width:640px){.chat-overlay{align-items:center}.chat-modal{border-radius:20px;height:600px}}
+.chat-modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+.chat-modal-head h3{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:500}
+.chat-modal-head button{background:none;border:none;font-size:20px;color:var(--text3);cursor:pointer;padding:4px}
+.chat-messages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.chat-bubble{max-width:78%;padding:10px 14px;border-radius:14px;font-size:13.5px;line-height:1.5}
+.chat-bubble.mine{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.chat-bubble.theirs{align-self:flex-start;background:var(--surface2);color:var(--text);border-bottom-left-radius:4px}
+.chat-bubble-time{font-size:10.5px;opacity:.65;margin-top:4px}
+.chat-input-row{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0}
+.chat-input-row input{flex:1;padding:11px 14px;border:1.5px solid var(--border);border-radius:24px;font-family:inherit;font-size:14px;background:var(--bg);outline:none}
+.chat-input-row input:focus{border-color:var(--accent)}
+.chat-input-row button{width:40px;height:40px;border-radius:50%;border:none;background:var(--accent);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
 .coming-soon{background:var(--surface);border:1px dashed var(--border);border-radius:20px;padding:56px 32px;text-align:center}
 .coming-soon-icon{width:56px;height:56px;border-radius:16px;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 18px}
@@ -454,6 +476,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <?php else : ?>
       <div class="booking-list" id="pro-booking-list">
         <?php foreach ( $upcoming_bookings as $booking ) : ?>
+        <?php $can_join = kounselia_booking_is_joinable( $booking ); ?>
         <div class="booking-row" data-booking-id="<?php echo (int) $booking->id; ?>">
           <div class="booking-icon"><i class="ti ti-calendar-event"></i></div>
           <div class="booking-meta">
@@ -461,7 +484,13 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
             <div class="booking-with"><?php echo esc_html( $booking->client_name ?: $booking->client_email ); ?></div>
             <?php if ( $booking->client_note ) : ?><div class="booking-note"><?php echo esc_html( $booking->client_note ); ?></div><?php endif; ?>
           </div>
-          <button type="button" class="booking-cancel" onclick="cancelBooking(<?php echo (int) $booking->id; ?>, this)">Cancel</button>
+          <div class="booking-actions">
+            <?php if ( $can_join ) : ?>
+              <a class="booking-join" href="/video-call.php?booking_id=<?php echo (int) $booking->id; ?>"><i class="ti ti-video"></i> Join</a>
+            <?php endif; ?>
+            <button type="button" class="booking-message js-booking-chat" data-booking-id="<?php echo (int) $booking->id; ?>" data-other-name="<?php echo esc_attr( $booking->client_name ?: $booking->client_email ); ?>"><i class="ti ti-message-circle"></i> Message</button>
+            <button type="button" class="booking-cancel" onclick="cancelBooking(<?php echo (int) $booking->id; ?>, this)">Cancel</button>
+          </div>
         </div>
         <?php endforeach; ?>
       </div>
@@ -492,6 +521,21 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     <button class="mob-tab" id="mob-tab-earnings" onclick="switchTab('earnings')"><i class="ti ti-cash"></i>Earnings</button>
   </nav>
 
+</div>
+
+<!-- BOOKING CHAT MODAL -->
+<div class="chat-overlay" id="chat-overlay">
+  <div class="chat-modal">
+    <div class="chat-modal-head">
+      <h3 id="chat-modal-name">Conversation</h3>
+      <button type="button" onclick="closeBookingChat()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <form id="chat-form" class="chat-input-row">
+      <input type="text" id="chat-input" placeholder="Write a message..." autocomplete="off">
+      <button type="submit"><i class="ti ti-send"></i></button>
+    </form>
+  </div>
 </div>
 
 <script>
@@ -750,6 +794,84 @@ function cancelBooking(bookingId, btnEl){
     alert('Something went wrong, please check your connection and try again.');
   });
 }
+
+/* ---------------- BOOKING CHAT ---------------- */
+
+let chatBookingId = null;
+let chatPollTimer = null;
+
+document.querySelectorAll('.js-booking-chat').forEach(function(btn){
+  btn.addEventListener('click', function(){
+    openBookingChat(parseInt(btn.dataset.bookingId, 10), btn.dataset.otherName);
+  });
+});
+
+function openBookingChat(bookingId, otherName){
+  chatBookingId = bookingId;
+  document.getElementById('chat-modal-name').textContent = otherName;
+  document.getElementById('chat-messages').innerHTML = '<p style="text-align:center;color:var(--text3);font-size:13px">Loading...</p>';
+  document.getElementById('chat-overlay').classList.add('active');
+  loadBookingChat();
+  clearInterval(chatPollTimer);
+  chatPollTimer = setInterval(loadBookingChat, 4000);
+}
+
+function closeBookingChat(){
+  document.getElementById('chat-overlay').classList.remove('active');
+  clearInterval(chatPollTimer);
+  chatPollTimer = null;
+  chatBookingId = null;
+}
+
+function loadBookingChat(){
+  if (!chatBookingId) return;
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_get_booking_messages', nonce: KOUNSELIA.nonce, booking_id: chatBookingId })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (!res.success) return;
+    const wrap = document.getElementById('chat-messages');
+    const wasAtBottom = (wrap.scrollTop + wrap.clientHeight) >= (wrap.scrollHeight - 20);
+    wrap.innerHTML = '';
+    if (!res.data.messages.length) {
+      wrap.innerHTML = '<p style="text-align:center;color:var(--text3);font-size:13px">No messages yet. Say hello.</p>';
+    } else {
+      res.data.messages.forEach(function(m){
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble ' + (m.is_mine ? 'mine' : 'theirs');
+        const text = document.createElement('div');
+        text.textContent = m.content;
+        bubble.appendChild(text);
+        const time = document.createElement('div');
+        time.className = 'chat-bubble-time';
+        time.textContent = new Date(m.created_at.replace(' ', 'T')).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        bubble.appendChild(time);
+        wrap.appendChild(bubble);
+      });
+    }
+    if (wasAtBottom) wrap.scrollTop = wrap.scrollHeight;
+  })
+  .catch(() => {});
+}
+
+document.getElementById('chat-form').addEventListener('submit', function(e){
+  e.preventDefault();
+  const input = document.getElementById('chat-input');
+  const content = input.value.trim();
+  if (!content || !chatBookingId) return;
+  input.value = '';
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_send_booking_message', nonce: KOUNSELIA.nonce, booking_id: chatBookingId, content })
+  })
+  .then(r => r.json())
+  .then(() => loadBookingChat())
+  .catch(() => {});
+});
 </script>
 
 </body>
