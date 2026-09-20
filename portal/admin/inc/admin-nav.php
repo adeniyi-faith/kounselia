@@ -45,6 +45,7 @@ function kounselia_nav_link( $slug, $href, $label ) {
     <?php kounselia_nav_link( 'audit-log', '/portal/admin/pages/audit-log.php', 'Audit Log' ); ?>
     <?php kounselia_nav_link( 'safety', '/portal/admin/pages/safety-flags.php', 'Safety' ); ?>
     <?php kounselia_nav_link( 'professionals', '/portal/admin/pages/professionals.php', 'Professionals' ); ?>
+    <?php kounselia_nav_link( 'bookings', '/portal/admin/pages/bookings.php', 'Bookings' ); ?>
     <?php kounselia_nav_link( 'plans', '/portal/admin/pages/plans.php', 'Plans & Pricing' ); ?>
     <?php kounselia_nav_link( 'members', '/portal/admin/pages/members.php', 'Members CRM' ); ?>
     <?php kounselia_nav_link( 'memory-center', '/portal/admin/pages/memory-center.php', 'Memory Center' ); ?>

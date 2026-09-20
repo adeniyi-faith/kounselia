@@ -365,8 +365,6 @@ function kounselia_booking_is_joinable( $booking ) {
  * rejected before any row is touched.
  */
 function kounselia_cancel_booking( $booking_id, $acting_user_id, $reason = '' ) {
-    global $wpdb;
-
     $booking = kounselia_get_booking_with_parties( $booking_id );
 
     if ( ! $booking ) {
@@ -375,6 +373,36 @@ function kounselia_cancel_booking( $booking_id, $acting_user_id, $reason = '' ) 
     if ( ! kounselia_user_is_booking_party( $booking, $acting_user_id ) ) {
         return new WP_Error( 'forbidden', 'You cannot cancel this booking.' );
     }
+
+    return kounselia_do_cancel_booking( $booking, $acting_user_id, $reason );
+}
+
+/**
+ * Admin-initiated cancellation — for stepping into a dispute ("the
+ * professional never showed up") from the admin Bookings page. Skips
+ * the "are you one of the two people on this booking" check that
+ * kounselia_cancel_booking() enforces for everyone else; the caller
+ * (kounselia_ajax_admin_cancel_booking) is responsible for having
+ * already confirmed the acting user is actually an admin.
+ */
+function kounselia_admin_cancel_booking( $booking_id, $admin_user_id, $reason = '' ) {
+    $booking = kounselia_get_booking_with_parties( $booking_id );
+    if ( ! $booking ) {
+        return new WP_Error( 'not_found', 'Booking not found.' );
+    }
+    return kounselia_do_cancel_booking( $booking, $admin_user_id, $reason );
+}
+
+/**
+ * The actual state change + refund + notification, shared by the
+ * client/professional-facing cancel and the admin override above. Only
+ * a 'confirmed' booking can be cancelled this way — kounselia_admin_cancel_booking()
+ * relies on that to keep it from touching a 'payment_conflict' booking,
+ * which needs a manual refund decision, not an automatic one.
+ */
+function kounselia_do_cancel_booking( $booking, $acting_user_id, $reason = '' ) {
+    global $wpdb;
+
     if ( 'confirmed' !== $booking->status ) {
         return new WP_Error( 'invalid_state', 'This booking is no longer active.' );
     }
@@ -384,17 +412,17 @@ function kounselia_cancel_booking( $booking_id, $acting_user_id, $reason = '' ) 
         'cancelled_by'  => $acting_user_id,
         'cancel_reason' => $reason ? sanitize_textarea_field( $reason ) : null,
         'updated_at'    => current_time( 'mysql' ),
-    ), array( 'id' => $booking_id ) );
+    ), array( 'id' => $booking->id ) );
 
     // A cancelled session shouldn't quietly stay "earned" for the
     // professional or "spent" for the client — if it was paid for,
     // refund it (unless that money has already been folded into a
     // payout, which needs a human, not an automatic reversal).
     if ( function_exists( 'kounselia_refund_booking_payment' ) ) {
-        kounselia_refund_booking_payment( $booking_id );
+        kounselia_refund_booking_payment( $booking->id );
     }
 
-    kounselia_notify_booking_cancelled( $booking_id, $acting_user_id );
+    kounselia_notify_booking_cancelled( $booking->id, $acting_user_id );
 
     return true;
 }
@@ -459,18 +487,31 @@ function kounselia_notify_booking_cancelled( $booking_id, $cancelled_by_user_id 
         return;
     }
 
-    $when              = date_i18n( 'l, F j, Y \a\t g:i A', strtotime( $booking->scheduled_start ) );
-    $cancelled_by_pro  = ( (int) $cancelled_by_user_id === (int) $booking->professional_user_id );
-    $notify_user_id    = $cancelled_by_pro ? $booking->client_user_id : $booking->professional_user_id;
-    $notify_user       = get_userdata( $notify_user_id );
+    $when             = date_i18n( 'l, F j, Y \a\t g:i A', strtotime( $booking->scheduled_start ) );
+    $cancelled_by_pro = ( (int) $cancelled_by_user_id === (int) $booking->professional_user_id );
+    $cancelled_by_client = ( (int) $cancelled_by_user_id === (int) $booking->client_user_id );
 
-    if ( $notify_user ) {
-        kounselia_send_html_email(
-            $notify_user->user_email,
-            'A session was cancelled',
-            'Booking cancelled',
-            '<p>The session scheduled for <strong>' . esc_html( $when ) . '</strong> has been cancelled.</p>'
-        );
+    // Whoever cancelled already knows — notify the other side. If
+    // neither (an admin stepping into a dispute), notify both.
+    $notify_ids = array();
+    if ( $cancelled_by_pro ) {
+        $notify_ids[] = $booking->client_user_id;
+    } elseif ( $cancelled_by_client ) {
+        $notify_ids[] = $booking->professional_user_id;
+    } else {
+        $notify_ids = array( $booking->client_user_id, $booking->professional_user_id );
+    }
+
+    foreach ( $notify_ids as $notify_user_id ) {
+        $notify_user = get_userdata( $notify_user_id );
+        if ( $notify_user ) {
+            kounselia_send_html_email(
+                $notify_user->user_email,
+                'A session was cancelled',
+                'Booking cancelled',
+                '<p>The session scheduled for <strong>' . esc_html( $when ) . '</strong> has been cancelled.</p>'
+            );
+        }
     }
 }
 
@@ -592,6 +633,81 @@ function kounselia_ajax_cancel_booking() {
 add_action( 'wp_ajax_kounselia_cancel_booking', 'kounselia_ajax_cancel_booking' );
 
 /* -------------------------------------------------------------------------
+ * ADMIN OVERSIGHT
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Every booking, most recent first, with enough joined-in context (who's
+ * on it, whether it was paid, whether the message thread has anything
+ * flagged) to render the admin Bookings list without N+1 queries.
+ * $status_filter is a booking status ('confirmed', 'cancelled',
+ * 'payment_conflict', ...) or 'all'.
+ */
+function kounselia_get_all_bookings_admin( $status_filter = 'all', $limit = 50, $offset = 0 ) {
+    global $wpdb;
+
+    $where = '';
+    $args  = array();
+    if ( 'all' !== $status_filter ) {
+        $where  = 'WHERE b.status = %s';
+        $args[] = $status_filter;
+    }
+    $args[] = $limit;
+    $args[] = $offset;
+
+    $sql = "SELECT b.*, u.display_name AS client_name, u.user_email AS client_email,
+                   pu.display_name AS pro_name, p.title AS pro_title,
+                   ( SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_booking_messages bm WHERE bm.booking_id = b.id ) AS message_count,
+                   ( SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_booking_messages bm WHERE bm.booking_id = b.id AND bm.flagged_safety = 1 ) AS flagged_count,
+                   bp.status AS payment_status
+            FROM {$wpdb->prefix}kounselia_bookings b
+            LEFT JOIN {$wpdb->users} u ON u.ID = b.client_user_id
+            INNER JOIN {$wpdb->prefix}kounselia_professionals p ON p.id = b.professional_id
+            LEFT JOIN {$wpdb->users} pu ON pu.ID = p.user_id
+            LEFT JOIN {$wpdb->prefix}kounselia_booking_payments bp ON bp.booking_id = b.id
+            {$where}
+            ORDER BY b.scheduled_start DESC
+            LIMIT %d OFFSET %d";
+
+    return $wpdb->get_results( $wpdb->prepare( $sql, $args ) );
+}
+
+function kounselia_count_all_bookings_admin( $status_filter = 'all' ) {
+    global $wpdb;
+    if ( 'all' === $status_filter ) {
+        return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_bookings" );
+    }
+    return (int) $wpdb->get_var( $wpdb->prepare(
+        "SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_bookings WHERE status = %s",
+        $status_filter
+    ) );
+}
+
+function kounselia_ajax_admin_cancel_booking() {
+    check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
+
+    if ( ! kounselia_user_is_admin() ) {
+        kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
+    }
+
+    $booking_id = isset( $_POST['booking_id'] ) ? absint( $_POST['booking_id'] ) : 0;
+    $reason     = isset( $_POST['reason'] ) ? sanitize_textarea_field( wp_unslash( $_POST['reason'] ) ) : '';
+
+    if ( ! $booking_id ) {
+        kounselia_send_pure_json_error( array( 'message' => 'Invalid request' ), 400 );
+    }
+
+    $result = kounselia_admin_cancel_booking( $booking_id, get_current_user_id(), $reason );
+    if ( is_wp_error( $result ) ) {
+        kounselia_send_pure_json_error( array( 'message' => $result->get_error_message() ), 400 );
+    }
+
+    kounselia_admin_log( 'cancel_booking', 'booking', $booking_id );
+    kounselia_send_pure_json_success( array( 'message' => 'Booking cancelled.' ) );
+}
+add_action( 'wp_ajax_kounselia_admin_cancel_booking', 'kounselia_ajax_admin_cancel_booking' );
+
+/* -------------------------------------------------------------------------
  * BOOKING MESSAGES — a private thread between the two people on one
  * booking. Not the AI counselor chat (kounselia_messages/kounselia_sessions)
  * — this is a person talking to another person about a specific session.
@@ -626,14 +742,35 @@ function kounselia_send_booking_message( $booking_id, $sender_user_id, $content 
         return new WP_Error( 'forbidden', 'You are not part of this booking.' );
     }
 
+    // Same first net the AI chat already runs every message through
+    // (kounselia_message_matches_safety_keywords) — a human professional
+    // hearing something concerning is not a smaller emergency than an AI
+    // counselor hearing it, so this gets the same escalation path.
+    $flagged_safety = 0;
+    $flag_reason    = null;
+    if ( function_exists( 'kounselia_message_matches_safety_keywords' ) ) {
+        $matched = kounselia_message_matches_safety_keywords( $content );
+        if ( $matched ) {
+            $flagged_safety = 1;
+            $flag_reason    = $matched;
+        }
+    }
+
     $wpdb->insert( $wpdb->prefix . 'kounselia_booking_messages', array(
         'booking_id'     => $booking_id,
         'sender_user_id' => $sender_user_id,
         'content'        => $content,
         'created_at'     => current_time( 'mysql' ),
+        'flagged_safety' => $flagged_safety,
+        'flag_reason'    => $flag_reason,
     ) );
 
     $message_id = (int) $wpdb->insert_id;
+
+    if ( $flagged_safety && function_exists( 'kounselia_record_booking_message_safety_escalation' ) ) {
+        kounselia_record_booking_message_safety_escalation( $message_id, $booking_id, $flag_reason, $sender_user_id );
+    }
+
     kounselia_notify_booking_message( $booking, $sender_user_id, $content );
 
     return $message_id;
