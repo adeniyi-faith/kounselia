@@ -64,32 +64,51 @@ $kounselia_keywords = kounselia_get_safety_keywords();
 sort( $kounselia_keywords );
 
 /* -------------------------------------------------------------------------
- * Flagged messages, most recent first, paginated. Joins in the escalation
- * case for each message: severity (was staff paged immediately?) and
- * whether anyone has acknowledged it yet.
+ * Flagged messages from both conversation surfaces — the AI chat and a
+ * private booking thread — merged into one most-recent-first list. Two
+ * separate queries (their source rows don't share a shape) rather than
+ * a UNION, sorted and paged together in PHP; flagged-message volume is
+ * never large enough for that to matter. Each row carries the
+ * escalation case joined in: severity (was staff paged immediately?)
+ * and whether anyone's acknowledged it yet.
  * -------------------------------------------------------------------- */
 $kounselia_escalations_table = $wpdb->prefix . 'kounselia_safety_escalations';
+$kounselia_booking_msgs_table = $wpdb->prefix . 'kounselia_booking_messages';
 
 $kounselia_page     = isset( $_GET['paged'] ) ? max( 1, (int) $_GET['paged'] ) : 1;
 $kounselia_per_page = 20;
 $kounselia_offset   = ( $kounselia_page - 1 ) * $kounselia_per_page;
 
-$kounselia_total = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$kounselia_messages_table} WHERE flagged_safety = 1" );
-$kounselia_total_pages = max( 1, (int) ceil( $kounselia_total / $kounselia_per_page ) );
-
-$kounselia_flagged = $wpdb->get_results( $wpdb->prepare(
-    "SELECT m.id AS message_id, m.session_id, m.content, m.flag_reason, m.created_at,
+$kounselia_ai_flagged = $wpdb->get_results(
+    "SELECT 'ai_chat' AS source, m.id AS message_id, m.session_id, NULL AS booking_id, m.content, m.flag_reason, m.created_at,
             s.user_id, s.guest_token, s.counselor_slug,
             e.id AS escalation_id, e.severity, e.status, e.acknowledged_by, e.acknowledged_at
      FROM {$kounselia_messages_table} m
      INNER JOIN {$kounselia_sessions_table} s ON m.session_id = s.id
-     LEFT JOIN {$kounselia_escalations_table} e ON e.message_id = m.id
-     WHERE m.flagged_safety = 1
-     ORDER BY m.created_at DESC
-     LIMIT %d OFFSET %d",
-    $kounselia_per_page,
-    $kounselia_offset
-) );
+     LEFT JOIN {$kounselia_escalations_table} e ON e.message_id = m.id AND e.source = 'ai_chat'
+     WHERE m.flagged_safety = 1"
+);
+
+$kounselia_booking_flagged = $wpdb->get_results(
+    "SELECT 'booking_message' AS source, bm.id AS message_id, NULL AS session_id, bm.booking_id, bm.content, bm.flag_reason, bm.created_at,
+            bm.sender_user_id AS user_id, NULL AS guest_token, NULL AS counselor_slug, pu.display_name AS pro_name,
+            e.id AS escalation_id, e.severity, e.status, e.acknowledged_by, e.acknowledged_at
+     FROM {$kounselia_booking_msgs_table} bm
+     INNER JOIN {$wpdb->prefix}kounselia_bookings b ON b.id = bm.booking_id
+     INNER JOIN {$wpdb->prefix}kounselia_professionals p ON p.id = b.professional_id
+     LEFT JOIN {$wpdb->users} pu ON pu.ID = p.user_id
+     LEFT JOIN {$kounselia_escalations_table} e ON e.booking_message_id = bm.id AND e.source = 'booking_message'
+     WHERE bm.flagged_safety = 1"
+);
+
+$kounselia_all_flagged = array_merge( $kounselia_ai_flagged, $kounselia_booking_flagged );
+usort( $kounselia_all_flagged, function( $a, $b ) {
+    return strtotime( $b->created_at ) <=> strtotime( $a->created_at );
+} );
+
+$kounselia_total = count( $kounselia_all_flagged );
+$kounselia_total_pages = max( 1, (int) ceil( $kounselia_total / $kounselia_per_page ) );
+$kounselia_flagged = array_slice( $kounselia_all_flagged, $kounselia_offset, $kounselia_per_page );
 
 $kounselia_open_critical = (int) $wpdb->get_var(
     "SELECT COUNT(*) FROM {$kounselia_escalations_table} WHERE severity = 'critical' AND status = 'open'"
@@ -151,7 +170,7 @@ $kounselia_nonce = wp_create_nonce( 'kounselia_safety_keywords' );
   <?php endif; ?>
 
   <div class="note">
-    Keyword matching catches obvious phrasing quickly, but it can miss things worded differently and can occasionally flag something harmless. A <span class="sev-badge sev-critical">Critical</span> match pages every admin/staff member by email the moment it happens; an <span class="sev-badge sev-elevated">Elevated</span> match is queued here for review without an alert. Treat both as "worth a look," and keep an eye on new conversations directly from time to time too.
+    This covers every place someone could say something concerning — the AI counselor chat, and a private message thread with a human professional. Keyword matching catches obvious phrasing quickly, but it can miss things worded differently and can occasionally flag something harmless. A <span class="sev-badge sev-critical">Critical</span> match pages every admin/staff member by email the moment it happens; an <span class="sev-badge sev-elevated">Elevated</span> match is queued here for review without an alert. Treat both as "worth a look," and keep an eye on new conversations directly from time to time too.
   </div>
 
   <div class="panel">
@@ -189,15 +208,21 @@ $kounselia_nonce = wp_create_nonce( 'kounselia_safety_keywords' );
       <div class="empty-state">No flagged messages yet.</div>
     <?php else : ?>
       <table class="admin-table">
-        <thead><tr><th>Who</th><th>Counselor</th><th>Severity</th><th>Matched</th><th>Message</th><th>Status</th><th>When</th><th></th></tr></thead>
+        <thead><tr><th>Who</th><th>Where</th><th>Severity</th><th>Matched</th><th>Message</th><th>Status</th><th>When</th><th></th></tr></thead>
         <tbody>
-        <?php foreach ( $kounselia_flagged as $row ) : ?>
+        <?php foreach ( $kounselia_flagged as $row ) :
+          $is_booking_row = ( 'booking_message' === $row->source );
+        ?>
           <tr>
             <td data-label="Who">
               <span class="cell-who"><?php echo esc_html( kounselia_admin_session_who( $row ) ); ?>
               <span class="badge <?php echo $row->user_id ? 'member' : 'guest'; ?>"><?php echo $row->user_id ? 'Member' : 'Guest'; ?></span></span>
             </td>
-            <td data-label="Counselor"><?php echo esc_html( kounselia_admin_counselor_name( $row->counselor_slug ) ); ?></td>
+            <td data-label="Where"><?php
+              echo $is_booking_row
+                ? 'Messaging ' . esc_html( $row->pro_name ?: 'a professional' )
+                : esc_html( kounselia_admin_counselor_name( $row->counselor_slug ) );
+            ?></td>
             <td data-label="Severity">
               <?php if ( $row->severity ) : ?>
                 <span class="sev-badge sev-<?php echo esc_attr( $row->severity ); ?>"><?php echo esc_html( ucfirst( $row->severity ) ); ?></span>
@@ -230,7 +255,11 @@ $kounselia_nonce = wp_create_nonce( 'kounselia_safety_keywords' );
               <?php endif; ?>
             </td>
             <td data-label="When"><?php echo esc_html( kounselia_admin_time_label( $row->created_at ) ); ?></td>
-            <td data-label=""><a href="/portal/admin/pages/session.php?id=<?php echo (int) $row->session_id; ?>">View transcript →</a></td>
+            <td data-label=""><?php if ( $is_booking_row ) : ?>
+              <a href="/portal/admin/pages/booking-messages.php?booking_id=<?php echo (int) $row->booking_id; ?>">View conversation →</a>
+            <?php else : ?>
+              <a href="/portal/admin/pages/session.php?id=<?php echo (int) $row->session_id; ?>">View transcript →</a>
+            <?php endif; ?></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
