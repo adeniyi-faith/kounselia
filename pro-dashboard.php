@@ -166,8 +166,9 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .coming-soon p{color:var(--text2);font-size:14px;max-width:380px;margin:0 auto;line-height:1.6}
 
 @media (max-width:900px){
+  .shell{flex-direction:column}
   .sidebar{display:none}
-  .main{padding:24px 18px calc(var(--tabbar-h) + 24px)}
+  .main{padding:24px 18px calc(var(--tabbar-h) + 24px);max-width:100%}
   .mobile-topbar{display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:20;height:var(--topbar-h);padding:0 18px;background:var(--surface);border-bottom:1px solid var(--border)}
   .mobile-topbar-right{display:flex;align-items:center;gap:10px}
   .mobile-av{width:32px;height:32px;border-radius:50%;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px;border:none;cursor:pointer;overflow:hidden}
