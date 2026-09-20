@@ -33,6 +33,7 @@ $pro_application = function_exists( 'kounselia_get_professional_application' ) ?
 
 $verified_professionals = function_exists( 'kounselia_get_verified_professionals' ) ? kounselia_get_verified_professionals() : array();
 $my_bookings            = function_exists( 'kounselia_get_client_bookings' ) ? kounselia_get_client_bookings( $user->ID ) : array();
+$past_bookings          = function_exists( 'kounselia_get_client_past_bookings' ) ? kounselia_get_client_past_bookings( $user->ID ) : array();
 
 // Professionals get their own dashboard by default — this page is for
 // people seeking support, not for managing a practice. A professional
@@ -155,6 +156,12 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .side-user-meta{overflow:hidden}
 .side-user-name{font-size:13.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .side-user-plan{font-size:11.5px;color:var(--text3)}
+.notif-dot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--rose)}
+.notif-list{max-height:400px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+.notif-item{display:block;padding:14px 16px;border-radius:12px;background:var(--bg);border:1px solid var(--border);text-decoration:none;color:inherit}
+.notif-item .notif-title{font-size:13.5px;font-weight:600;color:var(--text)}
+.notif-item .notif-body{font-size:12.5px;color:var(--text2);margin-top:3px}
+.notif-item .notif-time{font-size:11px;color:var(--text3);margin-top:6px}
 .signout-btn{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:none;color:var(--text2);font-family:inherit;font-size:13.5px;font-weight:500;cursor:pointer;transition:all .2s ease}
 .signout-btn:hover{border-color:var(--text3);color:var(--text)}
 
@@ -261,6 +268,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .session-av{width:42px;height:42px;border-radius:13px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
 .session-meta{flex:1;min-width:0}
 .session-meta h4{font-size:14.5px;font-weight:600}
+.weekly-tag{display:inline-block;margin-left:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--accent);background:var(--accent-light);border-radius:999px;padding:2px 8px;vertical-align:middle}
 .session-meta p{font-size:12.5px;color:var(--text3);margin-top:2px}
 .session-link{font-size:13px;color:var(--accent);font-weight:500;text-decoration:none;white-space:nowrap}
 .session-link:hover{text-decoration:underline}
@@ -561,10 +569,11 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 
   <aside class="sidebar">
     <div>
-      <div class="logo">
+      <div class="logo" style="display:flex;align-items:center;justify-content:space-between">
         <a href="/dashboard.php" class="logo-link" style="display:inline-block; outline:none;">
           <img src="https://kounselia.com/img/Kounselia_Logo_IconMark_MidnightNavy.png" alt="Kounselia" class="site-logo" fetchpriority="high">
         </a>
+        <button id="notif-bell-desktop" onclick="openNotifications()" aria-label="Notifications" style="position:relative;background:none;border:none;cursor:pointer;color:var(--text2);padding:6px"><i class="ti ti-bell" style="font-size:19px"></i><span class="notif-dot" id="notif-dot-desktop" style="display:none"></span></button>
       </div>
       <nav class="side-nav">
         <button class="nav-link js-nav active" id="desk-tab-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span>Home</span></button>
@@ -594,6 +603,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <img src="https://kounselia.com/img/Kounselia_Logo_IconMark_MidnightNavy.png" alt="Kounselia" style="max-height:24px; width:auto; object-fit:contain;" fetchpriority="high">
     </a>
     <div class="mobile-topbar-right">
+      <button class="mobile-signout" id="notif-bell" onclick="openNotifications()" aria-label="Notifications" style="position:relative"><i class="ti ti-bell"></i><span class="notif-dot" id="notif-dot" style="display:none"></span></button>
       <button class="mobile-av" id="mobile-av" onclick="switchTab('settings')"><?php echo $avatar_url ? '<img src="' . esc_url( $avatar_url ) . '" alt="">' : esc_html( $initial ); ?></button>
       <button class="mobile-signout" onclick="signOut()" aria-label="Sign out"><i class="ti ti-logout"></i></button>
     </div>
@@ -796,7 +806,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="session-row booking-session-row" data-booking-id="<?php echo (int) $booking->id; ?>">
           <div class="session-av ic-gold"><i class="ti ti-calendar-event"></i></div>
           <div class="session-meta">
-            <h4><?php echo esc_html( $booking->pro_name ); ?><?php echo $booking->pro_title ? ' · ' . esc_html( $booking->pro_title ) : ''; ?></h4>
+            <h4><?php echo esc_html( $booking->pro_name ); ?><?php echo $booking->pro_title ? ' · ' . esc_html( $booking->pro_title ) : ''; ?><?php if ( $booking->series_id ) : ?><span class="weekly-tag">Weekly</span><?php endif; ?></h4>
             <p><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?></p>
           </div>
           <div class="booking-actions">
@@ -804,13 +814,41 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
               <a class="session-link booking-join" href="/video-call.php?booking_id=<?php echo (int) $booking->id; ?>"><i class="ti ti-video"></i> Join</a>
             <?php endif; ?>
             <a class="session-link js-booking-chat" href="javascript:void(0)" data-booking-id="<?php echo (int) $booking->id; ?>" data-other-name="<?php echo esc_attr( $booking->pro_name ); ?>">Message</a>
+            <a class="session-link js-reschedule" href="javascript:void(0)" data-booking-id="<?php echo (int) $booking->id; ?>" data-pro-id="<?php echo (int) $booking->professional_id; ?>" data-other-name="<?php echo esc_attr( $booking->pro_name ); ?>">Reschedule</a>
             <a class="session-link" href="javascript:void(0)" onclick="cancelMyBooking(<?php echo (int) $booking->id; ?>, this)">Cancel</a>
+            <?php if ( $booking->series_id ) : ?>
+              <a class="session-link" href="javascript:void(0)" onclick="cancelMySeries(<?php echo (int) $booking->series_id; ?>, this)" style="color:var(--rose)">Cancel weekly</a>
+            <?php endif; ?>
           </div>
         </div>
         <?php endforeach; ?>
         </div>
       <?php endif; ?>
     </section>
+
+    <?php if ( ! empty( $past_bookings ) ) : ?>
+    <section class="section">
+      <div class="section-head">
+        <h2>Past sessions</h2>
+      </div>
+      <div id="past-booking-list">
+        <?php foreach ( $past_bookings as $booking ) : ?>
+        <div class="session-row" data-booking-id="<?php echo (int) $booking->id; ?>">
+          <div class="session-av ic-blue"><i class="ti ti-check"></i></div>
+          <div class="session-meta">
+            <h4><?php echo esc_html( $booking->pro_name ); ?><?php echo $booking->pro_title ? ' · ' . esc_html( $booking->pro_title ) : ''; ?></h4>
+            <p><?php echo esc_html( date_i18n( 'D, M j, Y', strtotime( $booking->scheduled_start ) ) ); ?></p>
+          </div>
+          <?php if ( $booking->review_id ) : ?>
+            <span class="session-link" style="color:var(--gold)"><?php echo str_repeat( '★', (int) $booking->review_rating ) . str_repeat( '☆', 5 - (int) $booking->review_rating ); ?></span>
+          <?php else : ?>
+            <a class="session-link js-rate-session" href="javascript:void(0)" data-booking-id="<?php echo (int) $booking->id; ?>" data-other-name="<?php echo esc_attr( $booking->pro_name ); ?>">Rate this session</a>
+          <?php endif; ?>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    </section>
+    <?php endif; ?>
 
     <section class="section">
       <div class="section-head">
@@ -827,6 +865,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
           <?php foreach ( $verified_professionals as $pro ) :
               $pro_avatar = function_exists( 'kounselia_get_avatar_url' ) ? kounselia_get_avatar_url( $pro->user_id, 'thumbnail' ) : false;
               $pro_initial = mb_strtoupper( mb_substr( $pro->display_name, 0, 1 ) );
+              $pro_rating  = function_exists( 'kounselia_get_professional_rating_summary' ) ? kounselia_get_professional_rating_summary( $pro->id ) : array( 'average' => 0, 'count' => 0 );
           ?>
           <a class="counselor-tile js-book-pro" href="javascript:void(0)" data-pro-id="<?php echo (int) $pro->id; ?>" data-pro-name="<?php echo esc_attr( $pro->display_name . ( $pro->title ? ' · ' . $pro->title : '' ) ); ?>">
             <div class="tile-av ic-blue" style="overflow:hidden">
@@ -834,6 +873,11 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
             </div>
             <div class="tile-name"><?php echo esc_html( $pro->display_name ); ?></div>
             <div class="tile-spec"><?php echo esc_html( $pro->title ); ?><?php echo $pro->specialty ? ' · ' . esc_html( $pro->specialty ) : ''; ?></div>
+            <?php if ( $pro_rating['count'] > 0 ) : ?>
+              <div class="tile-spec" style="margin-top:4px;color:var(--gold)">★ <?php echo esc_html( number_format( $pro_rating['average'], 1 ) ); ?> <span style="color:var(--text3)">(<?php echo (int) $pro_rating['count']; ?> review<?php echo 1 === $pro_rating['count'] ? '' : 's'; ?>)</span></div>
+            <?php else : ?>
+              <div class="tile-spec" style="margin-top:4px;color:var(--text3)">No reviews yet</div>
+            <?php endif; ?>
             <div class="tile-spec" style="margin-top:4px;font-weight:600;color:var(--accent)"><?php echo $pro->rate_amount ? '₦' . esc_html( number_format( (float) $pro->rate_amount ) ) . ' / session' : ''; ?></div>
           </a>
           <?php endforeach; ?>
@@ -1147,14 +1191,53 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <p style="color:var(--text3);font-size:14px" id="book-slots-loading">Loading available times...</p>
       </div>
 
-      <div class="form-field" id="book-note-field" style="display:none;margin:0 0 20px">
+      <div class="form-field" id="book-note-field" style="display:none;margin:0 0 16px">
         <label>A short note for them (optional)</label>
         <textarea id="book-note" style="width:100%;min-height:70px;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;font-family:inherit;font-size:14.5px;background:var(--bg);color:var(--text);resize:vertical;outline:none"></textarea>
       </div>
 
+      <label id="book-recurring-field" style="display:none;align-items:flex-start;gap:10px;margin-bottom:20px;cursor:pointer;font-size:13.5px;color:var(--text2);line-height:1.5">
+        <input type="checkbox" id="book-recurring" style="margin-top:3px">
+        <span>Make this a weekly session at the same time. You'll be charged automatically each week using this payment method — cancel anytime.</span>
+      </label>
+
       <div class="intake-actions">
         <button class="intake-btn ghost" onclick="closeBooking()">Cancel</button>
         <button class="intake-btn" id="book-confirm-btn" onclick="confirmBooking()" style="display:none">Confirm booking</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATIONS MODAL -->
+<div class="intake-overlay" id="notif-overlay">
+  <div class="intake-modal" style="max-width:480px">
+    <div class="intake-step active">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
+        <h2 style="margin:0;font-size:24px">Notifications</h2>
+        <button onclick="closeNotifications()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text3);padding:4px;"><i class="ti ti-x"></i></button>
+      </div>
+      <div class="notif-list" id="notif-list"><p style="color:var(--text3);font-size:13px">Loading...</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- RATE A SESSION MODAL -->
+<div class="intake-overlay" id="rate-overlay">
+  <div class="intake-modal" style="max-width:460px">
+    <div class="intake-step active">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
+        <h2 style="margin:0;font-size:24px" id="rate-modal-name">Rate this session</h2>
+        <button onclick="closeRateModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text3);padding:4px;"><i class="ti ti-x"></i></button>
+      </div>
+      <div id="rate-stars" style="font-size:32px;letter-spacing:6px;color:var(--border);margin-bottom:16px;cursor:pointer">★★★★★</div>
+      <div class="form-field" style="margin:0 0 20px">
+        <label>A word about your experience (optional)</label>
+        <textarea id="rate-comment" style="width:100%;min-height:70px;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;font-family:inherit;font-size:14.5px;background:var(--bg);color:var(--text);resize:vertical;outline:none"></textarea>
+      </div>
+      <div class="intake-actions">
+        <button class="intake-btn ghost" onclick="closeRateModal()">Cancel</button>
+        <button class="intake-btn" id="rate-submit-btn" onclick="submitReview()">Submit rating</button>
       </div>
     </div>
   </div>
@@ -1757,6 +1840,8 @@ function finishIntake() {
 
 let bookingProfessionalId = null;
 let bookingSelectedSlot = null;
+let bookingMode = 'book'; // 'book' | 'reschedule'
+let rescheduleBookingId = null;
 
 document.querySelectorAll('.js-book-pro').forEach(function(tile){
   tile.addEventListener('click', function(){
@@ -1764,20 +1849,52 @@ document.querySelectorAll('.js-book-pro').forEach(function(tile){
   });
 });
 
+document.querySelectorAll('.js-reschedule').forEach(function(link){
+  link.addEventListener('click', function(){
+    openReschedule(parseInt(link.dataset.bookingId, 10), parseInt(link.dataset.proId, 10), link.dataset.otherName);
+  });
+});
+
 function openBooking(professionalId, name){
+  bookingMode = 'book';
+  rescheduleBookingId = null;
   bookingProfessionalId = professionalId;
   bookingSelectedSlot = null;
   document.getElementById('book-modal-name').textContent = name;
   document.getElementById('book-note').value = '';
   document.getElementById('book-note-field').style.display = 'none';
+  document.getElementById('book-recurring-field').style.display = 'flex';
+  document.getElementById('book-recurring').checked = false;
   document.getElementById('book-confirm-btn').style.display = 'none';
+  document.getElementById('book-confirm-btn').textContent = 'Confirm booking';
   document.getElementById('book-slots').innerHTML = '<p style="color:var(--text3);font-size:14px">Loading available times...</p>';
   document.getElementById('book-overlay').classList.add('active');
+  loadBookingSlots(professionalId, 0);
+}
+
+function openReschedule(bookingId, professionalId, name){
+  bookingMode = 'reschedule';
+  rescheduleBookingId = bookingId;
+  bookingProfessionalId = professionalId;
+  bookingSelectedSlot = null;
+  document.getElementById('book-modal-name').textContent = 'Reschedule with ' + name;
+  document.getElementById('book-note-field').style.display = 'none';
+  document.getElementById('book-recurring-field').style.display = 'none';
+  document.getElementById('book-confirm-btn').style.display = 'none';
+  document.getElementById('book-confirm-btn').textContent = 'Confirm new time';
+  document.getElementById('book-slots').innerHTML = '<p style="color:var(--text3);font-size:14px">Loading available times...</p>';
+  document.getElementById('book-overlay').classList.add('active');
+  loadBookingSlots(professionalId, bookingId);
+}
+
+function loadBookingSlots(professionalId, rescheduleId){
+  const body = { action: 'kounselia_get_professional_slots', nonce: KOUNSELIA.nonce, professional_id: professionalId };
+  if (rescheduleId) body.reschedule_booking_id = rescheduleId;
 
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ action: 'kounselia_get_professional_slots', nonce: KOUNSELIA.nonce, professional_id: professionalId })
+    body: new URLSearchParams(body)
   })
   .then(r => r.json())
   .then(res => {
@@ -1820,7 +1937,7 @@ function openBooking(professionalId, name){
           document.querySelectorAll('#book-slots button').forEach(function(b){ b.style.borderColor = 'var(--border)'; b.style.background = 'var(--bg)'; b.style.color = 'var(--text)'; });
           btn.style.borderColor = 'var(--accent)'; btn.style.background = 'var(--accent-light)'; btn.style.color = 'var(--accent)';
           bookingSelectedSlot = s.raw;
-          document.getElementById('book-note-field').style.display = 'block';
+          if (bookingMode === 'book') document.getElementById('book-note-field').style.display = 'block';
           document.getElementById('book-confirm-btn').style.display = 'inline-flex';
         };
         row.appendChild(btn);
@@ -1838,10 +1955,13 @@ function closeBooking(){
   document.getElementById('book-overlay').classList.remove('active');
   bookingProfessionalId = null;
   bookingSelectedSlot = null;
+  rescheduleBookingId = null;
 }
 
 function confirmBooking(){
   if (!bookingProfessionalId || !bookingSelectedSlot) return;
+  if (bookingMode === 'reschedule') { confirmReschedule(); return; }
+
   const btn = document.getElementById('book-confirm-btn');
   btn.disabled = true;
   btn.textContent = 'Taking you to payment...';
@@ -1854,7 +1974,8 @@ function confirmBooking(){
       nonce: KOUNSELIA.nonce,
       professional_id: bookingProfessionalId,
       scheduled_start: bookingSelectedSlot,
-      note: document.getElementById('book-note').value
+      note: document.getElementById('book-note').value,
+      make_recurring: document.getElementById('book-recurring').checked ? '1' : ''
     })
   })
   .then(r => r.json())
@@ -1872,6 +1993,136 @@ function confirmBooking(){
   .catch(() => {
     btn.disabled = false;
     btn.textContent = 'Confirm booking';
+    toast('Something went wrong. Please try again.', true);
+  });
+}
+
+function confirmReschedule(){
+  const btn = document.getElementById('book-confirm-btn');
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      action: 'kounselia_reschedule_booking',
+      nonce: KOUNSELIA.nonce,
+      booking_id: rescheduleBookingId,
+      scheduled_start: bookingSelectedSlot
+    })
+  })
+  .then(r => r.json())
+  .then(res => {
+    btn.disabled = false;
+    btn.textContent = 'Confirm new time';
+    if (res.success) {
+      closeBooking();
+      toast('Session rescheduled.', false);
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      toast((res.data && res.data.message) || 'Could not reschedule that session.', true);
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = 'Confirm new time';
+    toast('Something went wrong. Please try again.', true);
+  });
+}
+
+function cancelMySeries(seriesId, linkEl){
+  if (!confirm('Cancel your weekly sessions? Any already-booked future sessions will be cancelled and refunded.')) return;
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_cancel_series', nonce: KOUNSELIA.nonce, series_id: seriesId })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      toast('Weekly sessions cancelled.', false);
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      toast((res.data && res.data.message) || 'Could not cancel that series.', true);
+    }
+  })
+  .catch(() => toast('Something went wrong. Please try again.', true));
+}
+
+/* ---------------- RATE A SESSION ---------------- */
+
+let ratingBookingId = null;
+let ratingValue = 0;
+
+document.querySelectorAll('.js-rate-session').forEach(function(link){
+  link.addEventListener('click', function(){
+    openRateModal(parseInt(link.dataset.bookingId, 10), link.dataset.otherName);
+  });
+});
+
+function openRateModal(bookingId, name){
+  ratingBookingId = bookingId;
+  ratingValue = 0;
+  document.getElementById('rate-modal-name').textContent = 'Rate your session with ' + name;
+  document.getElementById('rate-comment').value = '';
+  renderStars();
+  document.getElementById('rate-overlay').classList.add('active');
+}
+
+function closeRateModal(){
+  document.getElementById('rate-overlay').classList.remove('active');
+  ratingBookingId = null;
+}
+
+function renderStars(){
+  const el = document.getElementById('rate-stars');
+  el.innerHTML = '';
+  for (let i = 1; i <= 5; i++) {
+    const span = document.createElement('span');
+    span.textContent = '★';
+    span.style.color = i <= ratingValue ? 'var(--gold)' : 'var(--border)';
+    span.onclick = function(){ ratingValue = i; renderStars(); };
+    el.appendChild(span);
+  }
+}
+renderStars();
+
+function submitReview(){
+  if (!ratingBookingId || !ratingValue) {
+    toast('Please pick a star rating first.', true);
+    return;
+  }
+  const btn = document.getElementById('rate-submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting...';
+
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      action: 'kounselia_submit_review',
+      nonce: KOUNSELIA.nonce,
+      booking_id: ratingBookingId,
+      rating: ratingValue,
+      comment: document.getElementById('rate-comment').value
+    })
+  })
+  .then(r => r.json())
+  .then(res => {
+    btn.disabled = false;
+    btn.textContent = 'Submit rating';
+    if (res.success) {
+      closeRateModal();
+      toast('Thanks for the feedback.', false);
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      toast((res.data && res.data.message) || 'Could not submit that rating.', true);
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = 'Submit rating';
     toast('Something went wrong. Please try again.', true);
   });
 }
@@ -1973,6 +2224,71 @@ document.getElementById('chat-form').addEventListener('submit', function(e){
   .then(() => loadBookingChat())
   .catch(() => {});
 });
+
+/* ---------------- NOTIFICATIONS ---------------- */
+
+function checkUnreadNotifications(){
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_get_unread_notification_count', nonce: KOUNSELIA.nonce })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (!res.success) return;
+    const show = res.data.count > 0 ? 'block' : 'none';
+    const dot1 = document.getElementById('notif-dot');
+    const dot2 = document.getElementById('notif-dot-desktop');
+    if (dot1) dot1.style.display = show;
+    if (dot2) dot2.style.display = show;
+  })
+  .catch(() => {});
+}
+checkUnreadNotifications();
+
+function openNotifications(){
+  document.getElementById('notif-overlay').classList.add('active');
+  document.getElementById('notif-list').innerHTML = '<p style="color:var(--text3);font-size:13px">Loading...</p>';
+
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_get_notifications', nonce: KOUNSELIA.nonce })
+  })
+  .then(r => r.json())
+  .then(res => {
+    const wrap = document.getElementById('notif-list');
+    if (!res.success) {
+      wrap.innerHTML = '<p style="color:var(--rose);font-size:13px">Could not load notifications.</p>';
+      return;
+    }
+    const items = res.data.notifications || [];
+    if (!items.length) {
+      wrap.innerHTML = '<p style="color:var(--text3);font-size:13px">Nothing here yet.</p>';
+      return;
+    }
+    wrap.innerHTML = '';
+    items.forEach(function(n){
+      const a = document.createElement('a');
+      a.className = 'notif-item';
+      a.href = n.url || 'javascript:void(0)';
+      const time = new Date(n.created_at.replace(' ', 'T')).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      a.innerHTML = '<div class="notif-title">' + escHTML(n.title) + '</div>' + (n.body ? '<div class="notif-body">' + escHTML(n.body) + '</div>' : '') + '<div class="notif-time">' + time + '</div>';
+      wrap.appendChild(a);
+    });
+    const dot1 = document.getElementById('notif-dot');
+    const dot2 = document.getElementById('notif-dot-desktop');
+    if (dot1) dot1.style.display = 'none';
+    if (dot2) dot2.style.display = 'none';
+  })
+  .catch(() => {
+    document.getElementById('notif-list').innerHTML = '<p style="color:var(--rose);font-size:13px">Something went wrong.</p>';
+  });
+}
+
+function closeNotifications(){
+  document.getElementById('notif-overlay').classList.remove('active');
+}
 </script>
 </body>
 </html>

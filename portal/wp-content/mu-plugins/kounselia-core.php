@@ -50,6 +50,7 @@ require_once KOUNSELIA_CORE_DIR . '/includes/schema.php';            // 1.  Cust
 require_once KOUNSELIA_CORE_DIR . '/includes/security-helpers.php';  // 2.  Nonce / honeypot / rate limit
 require_once KOUNSELIA_CORE_DIR . '/includes/personas.php';          // 2B. Counselor personas & default prompts
 require_once KOUNSELIA_CORE_DIR . '/includes/emails.php';            // NEW: Branded HTML Email Engine
+require_once KOUNSELIA_CORE_DIR . '/includes/notifications.php';     // NEW: In-app/email/push notification dispatch + device tokens
 require_once KOUNSELIA_CORE_DIR . '/includes/auth.php';              // 3-5. Login, register, logout
 require_once KOUNSELIA_CORE_DIR . '/includes/dashboard.php';         // 6.  Dashboard helpers
 require_once KOUNSELIA_CORE_DIR . '/includes/account.php';           // 7-9. Avatar, profile, password
@@ -67,5 +68,8 @@ require_once KOUNSELIA_CORE_DIR . '/includes/professionals.php';     // 18C. Pro
 require_once KOUNSELIA_CORE_DIR . '/includes/bookings.php';          // 18E. Booking calendar: availability + confirmed sessions
 require_once KOUNSELIA_CORE_DIR . '/includes/payments.php';          // 18D. Paystack subscriptions: plans, checkout, cancellation
 require_once KOUNSELIA_CORE_DIR . '/includes/booking-payments.php';  // 18F. Booking checkout + professional payouts
+require_once KOUNSELIA_CORE_DIR . '/includes/booking-series.php';    // 18G. Recurring weekly sessions
+require_once KOUNSELIA_CORE_DIR . '/includes/booking-reminders.php'; // 18H. "Starts soon" reminders (WP-Cron)
+require_once KOUNSELIA_CORE_DIR . '/includes/reviews.php';           // 18I. Session ratings & reviews
 require_once KOUNSELIA_CORE_DIR . '/includes/admin-access.php';      // 19. Admin capability, staff role, audit log
 require_once KOUNSELIA_CORE_DIR . '/includes/admin-2fa.php';         // 19B. Admin two-factor authentication (TOTP)
