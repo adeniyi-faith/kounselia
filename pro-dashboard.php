@@ -55,6 +55,12 @@ $upcoming_bookings  = function_exists( 'kounselia_get_professional_bookings' ) ?
 $doc_type_labels    = array( 'license' => 'License / credential', 'id' => 'Government ID', 'certificate' => 'Certificate', 'other' => 'Other document' );
 $day_labels         = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday' );
 
+$balance         = function_exists( 'kounselia_get_professional_balance' ) ? kounselia_get_professional_balance( $application->id ) : array( 'available' => 0, 'total_earned' => 0, 'paid_out' => 0 );
+$payout_account  = function_exists( 'kounselia_get_payout_account' ) ? kounselia_get_payout_account( $application->id ) : null;
+$payout_history  = function_exists( 'kounselia_get_payout_history' ) ? kounselia_get_payout_history( $application->id ) : array();
+$payout_banks    = function_exists( 'kounselia_paystack_list_banks' ) ? kounselia_paystack_list_banks() : array();
+$payout_status_labels = array( 'pending' => 'Processing', 'success' => 'Paid', 'failed' => 'Failed' );
+
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_auth' );
 ?>
@@ -341,7 +347,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="capability-row unlocked"><i class="ti ti-user-edit"></i> Edit your profile &amp; rate<span class="tag">Available</span></div>
         <div class="capability-row unlocked"><i class="ti ti-heart-handshake"></i> Use Kounselia as a client too<span class="tag">Available</span></div>
         <div class="capability-row <?php echo $is_verified ? 'unlocked' : 'locked'; ?>"><i class="ti ti-calendar-event"></i> Receive client bookings<span class="tag"><?php echo $is_verified ? 'Available' : 'Locked until verified'; ?></span></div>
-        <div class="capability-row <?php echo $is_verified ? 'unlocked' : 'locked'; ?>"><i class="ti ti-cash"></i> Earnings &amp; payouts<span class="tag"><?php echo $is_verified ? 'Coming soon' : 'Locked until verified'; ?></span></div>
+        <div class="capability-row <?php echo $is_verified ? 'unlocked' : 'locked'; ?>"><i class="ti ti-cash"></i> Earnings &amp; payouts<span class="tag"><?php echo $is_verified ? 'Available' : 'Locked until verified'; ?></span></div>
       </div>
     </div>
   </div>
@@ -504,11 +510,104 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <h2>Earnings</h2>
       <span class="section-sub">Payouts and session history</span>
     </div>
-    <div class="coming-soon">
-      <div class="coming-soon-icon"><i class="ti ti-cash"></i></div>
-      <h3>Earnings &amp; payouts are coming soon</h3>
-      <p>Once bookings launch, you'll be able to track what you've earned and manage payouts from this tab.</p>
+
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="stat-icon" style="background:var(--sage-light);color:var(--sage);"><i class="ti ti-wallet"></i></div>
+        <div class="stat-num">₦<?php echo esc_html( number_format( $balance['available'] ) ); ?></div>
+        <div class="stat-label">Available to pay out</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:var(--accent-light);color:var(--accent);"><i class="ti ti-cash"></i></div>
+        <div class="stat-num">₦<?php echo esc_html( number_format( $balance['total_earned'] ) ); ?></div>
+        <div class="stat-label">Total earned</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon" style="background:var(--gold-light);color:var(--gold);"><i class="ti ti-check"></i></div>
+        <div class="stat-num">₦<?php echo esc_html( number_format( $balance['paid_out'] ) ); ?></div>
+        <div class="stat-label">Paid out so far</div>
+      </div>
     </div>
+
+    <div class="readonly-note">Kounselia's commission is <?php echo esc_html( rtrim( rtrim( number_format( kounselia_booking_commission_percent(), 1 ), '0' ), '.' ) ); ?>% of each session — the rest is yours. A session only counts here once the client's payment has gone through.</div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2 style="font-size:19px">Payout account</h2>
+        <span class="section-sub">Where your money goes when you request a payout</span>
+      </div>
+      <div class="pro-card">
+        <?php if ( $payout_account ) : ?>
+          <div class="doc-row" style="margin-bottom:20px">
+            <i class="ti ti-building-bank"></i>
+            <div class="doc-meta">
+              <div class="doc-name"><?php echo esc_html( $payout_account->account_name ); ?></div>
+              <div class="doc-type"><?php echo esc_html( $payout_account->bank_name ); ?> — ••••<?php echo esc_html( substr( $payout_account->account_number, -4 ) ); ?></div>
+            </div>
+          </div>
+          <div class="section-sub" style="margin-bottom:14px">Add a different account below to replace this one.</div>
+        <?php endif; ?>
+
+        <form id="payout-account-form">
+          <div class="form-row">
+            <div class="form-field">
+              <label>Bank</label>
+              <select name="bank_code" id="payout-bank">
+                <option value="">Select your bank</option>
+                <?php foreach ( $payout_banks as $bank ) : ?>
+                  <option value="<?php echo esc_attr( $bank['code'] ); ?>"><?php echo esc_html( $bank['name'] ); ?></option>
+                <?php endforeach; ?>
+              </select>
+              <?php if ( empty( $payout_banks ) ) : ?><div class="section-sub" style="margin-top:6px">Bank list unavailable right now — payments may not be configured yet.</div><?php endif; ?>
+            </div>
+            <div class="form-field">
+              <label>Account number</label>
+              <input type="text" name="account_number" id="payout-account-number" inputmode="numeric" maxlength="10" placeholder="0123456789">
+            </div>
+          </div>
+          <button type="submit" class="pro-submit" id="payout-account-save-btn">Verify &amp; save account</button>
+          <div class="pro-msg" id="payout-account-msg"></div>
+        </form>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2 style="font-size:19px">Request a payout</h2>
+        <span class="section-sub">Sends your entire available balance</span>
+      </div>
+      <div class="pro-card">
+        <button type="button" class="pro-submit" id="request-payout-btn" onclick="requestPayout()" <?php echo ( $balance['available'] <= 0 || ! $payout_account ) ? 'disabled' : ''; ?>>
+          Request payout of ₦<?php echo esc_html( number_format( $balance['available'] ) ); ?>
+        </button>
+        <?php if ( ! $payout_account ) : ?>
+          <div class="section-sub" style="margin-top:10px">Add a payout account above first.</div>
+        <?php elseif ( $balance['available'] <= 0 ) : ?>
+          <div class="section-sub" style="margin-top:10px">Nothing to pay out yet — this fills up as clients pay for booked sessions.</div>
+        <?php endif; ?>
+        <div class="pro-msg" id="payout-request-msg"></div>
+      </div>
+    </div>
+
+    <?php if ( ! empty( $payout_history ) ) : ?>
+    <div class="section">
+      <div class="section-head">
+        <h2 style="font-size:19px">Payout history</h2>
+      </div>
+      <div class="booking-list">
+        <?php foreach ( $payout_history as $payout ) : ?>
+        <div class="booking-row">
+          <div class="booking-icon"><i class="ti ti-cash"></i></div>
+          <div class="booking-meta">
+            <div class="booking-when">₦<?php echo esc_html( number_format( (float) $payout->amount ) ); ?></div>
+            <div class="booking-with"><?php echo esc_html( date_i18n( 'D, M j, Y', strtotime( $payout->created_at ) ) ); ?> — <?php echo esc_html( $payout_status_labels[ $payout->status ] ?? ucfirst( $payout->status ) ); ?></div>
+            <?php if ( 'failed' === $payout->status && $payout->failure_reason ) : ?><div class="booking-note"><?php echo esc_html( $payout->failure_reason ); ?></div><?php endif; ?>
+          </div>
+        </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+    <?php endif; ?>
   </div>
 
   </main>
@@ -769,7 +868,7 @@ function saveAvailability(){
 /* ---------------- BOOKINGS ---------------- */
 
 function cancelBooking(bookingId, btnEl){
-  if (!confirm('Cancel this session? The client will be notified.')) return;
+  if (!confirm("Cancel this session? The client will be refunded and notified.")) return;
   btnEl.disabled = true;
   btnEl.textContent = 'Cancelling...';
   fetch(KOUNSELIA.ajaxUrl, {
@@ -792,6 +891,94 @@ function cancelBooking(bookingId, btnEl){
     btnEl.disabled = false;
     btnEl.textContent = 'Cancel';
     alert('Something went wrong, please check your connection and try again.');
+  });
+}
+
+/* ---------------- PAYOUTS ---------------- */
+
+const payoutAccountForm = document.getElementById('payout-account-form');
+if (payoutAccountForm) {
+  payoutAccountForm.addEventListener('submit', function(e){
+    e.preventDefault();
+    const btn = document.getElementById('payout-account-save-btn');
+    const msg = document.getElementById('payout-account-msg');
+    const bankSelect = document.getElementById('payout-bank');
+    msg.className = 'pro-msg';
+    msg.textContent = '';
+
+    const bankCode = bankSelect.value;
+    const bankName = bankSelect.options[bankSelect.selectedIndex] ? bankSelect.options[bankSelect.selectedIndex].text : '';
+    const accountNumber = document.getElementById('payout-account-number').value.trim();
+
+    if (!bankCode || accountNumber.length < 10) {
+      msg.classList.add('error');
+      msg.textContent = 'Please choose a bank and enter a valid 10-digit account number.';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Verifying...';
+
+    fetch(KOUNSELIA.ajaxUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ action: 'kounselia_save_payout_account', nonce: KOUNSELIA.nonce, bank_code: bankCode, bank_name: bankName, account_number: accountNumber })
+    })
+    .then(r => r.json())
+    .then(res => {
+      btn.disabled = false;
+      btn.textContent = 'Verify & save account';
+      if (res.success) {
+        msg.classList.add('notice');
+        msg.textContent = 'Saved — verified as ' + res.data.account_name + '.';
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        msg.classList.add('error');
+        msg.textContent = (res.data && res.data.message) ? res.data.message : 'Could not verify that account.';
+      }
+    })
+    .catch(() => {
+      btn.disabled = false;
+      btn.textContent = 'Verify & save account';
+      msg.classList.add('error');
+      msg.textContent = 'Something went wrong, please check your connection and try again.';
+    });
+  });
+}
+
+function requestPayout(){
+  if (!confirm('Request a payout of your full available balance?')) return;
+  const btn = document.getElementById('request-payout-btn');
+  const originalLabel = btn.textContent;
+  const msg = document.getElementById('payout-request-msg');
+  msg.className = 'pro-msg';
+  msg.textContent = '';
+  btn.disabled = true;
+  btn.textContent = 'Requesting...';
+
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_request_payout', nonce: KOUNSELIA.nonce })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      msg.classList.add('notice');
+      msg.textContent = 'Payout requested.';
+      setTimeout(() => window.location.reload(), 1500);
+    } else {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+      msg.classList.add('error');
+      msg.textContent = (res.data && res.data.message) ? res.data.message : 'Could not request a payout right now.';
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+    msg.classList.add('error');
+    msg.textContent = 'Something went wrong, please check your connection and try again.';
   });
 }
 
