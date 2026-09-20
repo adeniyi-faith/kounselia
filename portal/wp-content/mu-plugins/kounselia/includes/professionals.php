@@ -510,3 +510,99 @@ function kounselia_ajax_update_professional_profile() {
     wp_send_json_success( array( 'message' => 'Profile updated.' ) );
 }
 add_action( 'wp_ajax_kounselia_update_professional_profile', 'kounselia_ajax_update_professional_profile' );
+
+/* -------------------------------------------------------------------------
+ * ADDITIONAL DOCUMENTS
+ *
+ * The application only ever collected two files (license + optional ID).
+ * A professional often needs to add more later — a certificate, a second
+ * form of ID a reviewer asked for — without re-submitting the whole
+ * application. These just add to the same private document store.
+ * ---------------------------------------------------------------------- */
+
+function kounselia_ajax_upload_professional_document() {
+    kounselia_verify_nonce();
+
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( array( 'message' => 'Please sign in first.' ), 401 );
+    }
+    if ( kounselia_rate_limited( 'upload_professional_document', 10, 3600 ) ) {
+        wp_send_json_error( array( 'message' => 'Too many uploads. Please try again later.' ), 429 );
+    }
+
+    $application = kounselia_get_professional_application( get_current_user_id() );
+    if ( ! $application ) {
+        wp_send_json_error( array( 'message' => 'You do not have a professional application on file.' ), 403 );
+    }
+
+    global $wpdb;
+    $existing_count = (int) $wpdb->get_var( $wpdb->prepare(
+        "SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_professional_documents WHERE professional_id = %d",
+        $application->id
+    ) );
+    if ( $existing_count >= 10 ) {
+        wp_send_json_error( array( 'message' => 'You have reached the maximum of 10 documents. Remove one before adding another.' ), 400 );
+    }
+
+    $allowed_types = array( 'license', 'id', 'certificate', 'other' );
+    $doc_type      = isset( $_POST['doc_type'] ) ? sanitize_key( $_POST['doc_type'] ) : 'other';
+    if ( ! in_array( $doc_type, $allowed_types, true ) ) {
+        $doc_type = 'other';
+    }
+
+    if ( empty( $_FILES['document'] ) ) {
+        wp_send_json_error( array( 'message' => 'Please choose a file to upload.' ), 400 );
+    }
+
+    $doc_id = kounselia_store_professional_document( $application->id, $_FILES['document'], $doc_type );
+    if ( ! $doc_id ) {
+        wp_send_json_error( array( 'message' => 'Could not upload that file. Please use a PDF, JPG, or PNG under 8MB.' ), 400 );
+    }
+
+    $doc = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}kounselia_professional_documents WHERE id = %d", $doc_id ) );
+
+    wp_send_json_success( array(
+        'message'  => 'Document uploaded.',
+        'document' => array(
+            'id'                => $doc_id,
+            'doc_type'          => $doc_type,
+            'original_filename' => $doc->original_filename,
+            'url'               => kounselia_professional_document_url( $doc_id ),
+        ),
+    ) );
+}
+add_action( 'wp_ajax_kounselia_upload_professional_document', 'kounselia_ajax_upload_professional_document' );
+
+function kounselia_ajax_delete_professional_document() {
+    kounselia_verify_nonce();
+
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( array( 'message' => 'Please sign in first.' ), 401 );
+    }
+
+    $application = kounselia_get_professional_application( get_current_user_id() );
+    if ( ! $application ) {
+        wp_send_json_error( array( 'message' => 'You do not have a professional application on file.' ), 403 );
+    }
+
+    $doc_id = isset( $_POST['doc_id'] ) ? absint( $_POST['doc_id'] ) : 0;
+
+    global $wpdb;
+    $doc = $wpdb->get_row( $wpdb->prepare(
+        "SELECT * FROM {$wpdb->prefix}kounselia_professional_documents WHERE id = %d AND professional_id = %d",
+        $doc_id,
+        $application->id
+    ) );
+    if ( ! $doc ) {
+        wp_send_json_error( array( 'message' => 'Document not found.' ), 404 );
+    }
+
+    $path = trailingslashit( kounselia_professional_docs_dir() ) . $doc->stored_filename;
+    if ( file_exists( $path ) ) {
+        @unlink( $path );
+    }
+    $wpdb->delete( $wpdb->prefix . 'kounselia_professional_documents', array( 'id' => $doc_id ) );
+
+    wp_send_json_success( array( 'message' => 'Document removed.' ) );
+}
+add_action( 'wp_ajax_kounselia_delete_professional_document', 'kounselia_ajax_delete_professional_document' );

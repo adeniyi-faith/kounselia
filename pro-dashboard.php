@@ -49,6 +49,12 @@ $first_name   = explode( ' ', trim( $display_name ) )[0];
 $avatar_url   = function_exists( 'kounselia_get_avatar_url' ) ? kounselia_get_avatar_url( $user->ID, 'thumbnail' ) : false;
 $initial      = mb_strtoupper( mb_substr( $display_name, 0, 1 ) );
 
+$documents          = function_exists( 'kounselia_get_professional_documents' ) ? kounselia_get_professional_documents( $application->id ) : array();
+$availability_rules = function_exists( 'kounselia_get_availability_rules' ) ? kounselia_get_availability_rules( $application->id ) : array();
+$upcoming_bookings  = function_exists( 'kounselia_get_professional_bookings' ) ? kounselia_get_professional_bookings( $application->id ) : array();
+$doc_type_labels    = array( 'license' => 'License / credential', 'id' => 'Government ID', 'certificate' => 'Certificate', 'other' => 'Other document' );
+$day_labels         = array( 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday' );
+
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_auth' );
 ?>
@@ -153,12 +159,43 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .rate-prefix{display:flex;align-items:center;gap:8px}
 .rate-prefix span{font-weight:600;color:var(--text2)}
 .readonly-note{font-size:12.5px;color:var(--text3);background:var(--bg2,#F8FAFC);border-radius:10px;padding:10px 12px;margin-bottom:20px}
-.pro-submit{width:100%;margin-top:20px;padding:14px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
-.pro-submit:hover{background:var(--accent2)}
+.pro-card .pro-submit{width:100%;margin-top:20px;padding:14px;border:none;border-radius:14px;background:var(--accent);color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit}
+.pro-card .pro-submit:hover{background:var(--accent2)}
 .pro-submit:disabled{opacity:.6;cursor:not-allowed}
 .pro-msg{margin-top:14px;font-size:13.5px;padding:12px 14px;border-radius:10px;display:none}
 .pro-msg.error{display:block;background:var(--rose-light);color:var(--rose)}
 .pro-msg.notice{display:block;background:var(--sage-light);color:var(--sage)}
+
+.form-field select,.form-field input[type="time"]{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;font-family:inherit;font-size:14.5px;color:var(--text);background:var(--bg);outline:none}
+.form-field select:focus,.form-field input[type="time"]:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 4px var(--accent-light)}
+
+.doc-list{display:grid;gap:10px}
+.doc-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:var(--bg);border:1px solid var(--border);font-size:13.5px}
+.doc-row i.ti-file-text{font-size:18px;color:var(--accent);flex-shrink:0}
+.doc-meta{flex:1;min-width:0}
+.doc-name{font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.doc-type{font-size:12px;color:var(--text3)}
+.doc-view{font-size:12.5px;font-weight:600;color:var(--accent);text-decoration:none;flex-shrink:0}
+.doc-remove{border:none;background:none;color:var(--text3);cursor:pointer;padding:4px;flex-shrink:0}
+.doc-remove:hover{color:var(--rose)}
+
+.avail-grid{display:grid;gap:10px;margin-bottom:20px}
+.avail-row{display:grid;grid-template-columns:150px 1fr auto 1fr;align-items:center;gap:10px}
+@media (max-width:560px){.avail-row{grid-template-columns:1fr;gap:8px}}
+.avail-toggle{display:flex;align-items:center;gap:10px;font-size:14px;font-weight:500;color:var(--text)}
+.avail-toggle input{width:18px;height:18px;accent-color:var(--accent)}
+.avail-to{font-size:12.5px;color:var(--text3);text-align:center}
+.avail-row input[type="time"]:disabled{opacity:.45}
+
+.booking-list{display:grid;gap:10px}
+.booking-row{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:16px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.booking-icon{width:38px;height:38px;border-radius:11px;background:var(--sage-light);color:var(--sage);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.booking-meta{flex:1;min-width:0}
+.booking-when{font-weight:600;font-size:14.5px;color:var(--text)}
+.booking-with{font-size:13px;color:var(--text2);margin-top:2px}
+.booking-note{font-size:12.5px;color:var(--text3);margin-top:4px;font-style:italic}
+.booking-cancel{border:1px solid var(--border);background:none;color:var(--text2);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer;flex-shrink:0;font-family:inherit}
+.booking-cancel:hover{border-color:var(--rose);color:var(--rose)}
 
 .coming-soon{background:var(--surface);border:1px dashed var(--border);border-radius:20px;padding:56px 32px;text-align:center}
 .coming-soon-icon{width:56px;height:56px;border-radius:16px;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 18px}
@@ -209,7 +246,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <div class="side-user">
         <div class="side-av" id="side-av"><?php echo $avatar_url ? '<img src="' . esc_url( $avatar_url ) . '" alt="">' : esc_html( $initial ); ?></div>
         <div class="side-user-meta">
-          <div class="side-user-name"><?php echo esc_html( $display_name ); ?></div>
+          <div class="side-user-name" id="side-user-name"><?php echo esc_html( $display_name ); ?></div>
           <div class="side-user-plan"><?php echo $is_verified ? 'Verified professional' : 'Application ' . esc_html( $application->status ); ?></div>
         </div>
       </div>
@@ -238,7 +275,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <div class="welcome-eyebrow">Your practice
         <?php if ( $is_verified ) : ?><span class="verified-pill"><i class="ti ti-check" style="font-size:11px;"></i> Verified</span><?php endif; ?>
       </div>
-      <h1>Welcome back, <em><?php echo esc_html( $first_name ); ?></em>.</h1>
+      <h1>Welcome back, <em id="welcome-first-name"><?php echo esc_html( $first_name ); ?></em>.</h1>
       <p><?php echo $is_verified
         ? 'This is what clients will see, and your rate is entirely yours to set — Kounselia never changes it for you.'
         : 'Get your profile ready while your application is reviewed. It stays private until you\'re verified.'; ?></p>
@@ -268,8 +305,8 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       </div>
       <div class="stat-card">
         <div class="stat-icon" style="background:var(--sage-light);color:var(--sage);"><i class="ti ti-calendar-event"></i></div>
-        <div class="stat-num">0</div>
-        <div class="stat-label">Client bookings</div>
+        <div class="stat-num"><?php echo (int) count( $upcoming_bookings ); ?></div>
+        <div class="stat-label">Upcoming bookings</div>
       </div>
     </div>
 
@@ -281,7 +318,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <div class="capability-list">
         <div class="capability-row unlocked"><i class="ti ti-user-edit"></i> Edit your profile &amp; rate<span class="tag">Available</span></div>
         <div class="capability-row unlocked"><i class="ti ti-heart-handshake"></i> Use Kounselia as a client too<span class="tag">Available</span></div>
-        <div class="capability-row <?php echo $is_verified ? 'unlocked' : 'locked'; ?>"><i class="ti ti-calendar-event"></i> Receive client bookings<span class="tag"><?php echo $is_verified ? 'Coming soon' : 'Locked until verified'; ?></span></div>
+        <div class="capability-row <?php echo $is_verified ? 'unlocked' : 'locked'; ?>"><i class="ti ti-calendar-event"></i> Receive client bookings<span class="tag"><?php echo $is_verified ? 'Available' : 'Locked until verified'; ?></span></div>
         <div class="capability-row <?php echo $is_verified ? 'unlocked' : 'locked'; ?>"><i class="ti ti-cash"></i> Earnings &amp; payouts<span class="tag"><?php echo $is_verified ? 'Coming soon' : 'Locked until verified'; ?></span></div>
       </div>
     </div>
@@ -299,6 +336,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <?php endif; ?>
 
       <form id="pro-form">
+        <div class="form-field"><label>Full name</label><input type="text" name="full_name" id="pro-name" value="<?php echo esc_attr( $display_name ); ?>" placeholder="Your full name, as clients should see it"></div>
         <div class="form-field"><label>Professional title</label><input type="text" name="title" id="pro-title" value="<?php echo esc_attr( $application->title ); ?>"></div>
         <div class="form-row">
           <div class="form-field"><label>Specialty</label><input type="text" name="specialty" id="pro-specialty" value="<?php echo esc_attr( $application->specialty ); ?>"></div>
@@ -314,6 +352,51 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="pro-msg" id="pro-msg"></div>
       </form>
     </div>
+
+    <div class="section" style="margin-top:32px">
+      <div class="section-head">
+        <h2>Documents</h2>
+        <span class="section-sub">Up to 10 files — add a certificate or a second ID any time</span>
+      </div>
+      <div class="pro-card">
+        <div class="doc-list" id="doc-list">
+          <?php foreach ( $documents as $doc ) : ?>
+          <div class="doc-row" data-doc-id="<?php echo (int) $doc->id; ?>">
+            <i class="ti ti-file-text"></i>
+            <div class="doc-meta">
+              <div class="doc-name"><?php echo esc_html( $doc->original_filename ); ?></div>
+              <div class="doc-type"><?php echo esc_html( $doc_type_labels[ $doc->doc_type ] ?? ucfirst( $doc->doc_type ) ); ?></div>
+            </div>
+            <a class="doc-view" href="<?php echo esc_url( kounselia_professional_document_url( $doc->id ) ); ?>" target="_blank" rel="noopener">View</a>
+            <button type="button" class="doc-remove" onclick="removeDocument(<?php echo (int) $doc->id; ?>, this)"><i class="ti ti-trash"></i></button>
+          </div>
+          <?php endforeach; ?>
+          <?php if ( empty( $documents ) ) : ?>
+          <p class="section-sub" id="doc-empty">No documents on file yet.</p>
+          <?php endif; ?>
+        </div>
+
+        <form id="doc-form" style="margin-top:18px">
+          <div class="form-row">
+            <div class="form-field">
+              <label>Document type</label>
+              <select name="doc_type" id="doc-type">
+                <option value="certificate">Certificate</option>
+                <option value="id">Government ID</option>
+                <option value="license">License / credential</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div class="form-field file-field">
+              <label>File (PDF, JPG, or PNG, up to 8MB)</label>
+              <input type="file" name="document" id="doc-file" accept=".pdf,.jpg,.jpeg,.png">
+            </div>
+          </div>
+          <button type="submit" class="pro-submit" id="doc-save-btn">Add document</button>
+          <div class="pro-msg" id="doc-msg"></div>
+        </form>
+      </div>
+    </div>
   </div>
 
   <!-- BOOKINGS -->
@@ -322,10 +405,67 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <h2>Bookings</h2>
       <span class="section-sub">Client session requests</span>
     </div>
-    <div class="coming-soon">
-      <div class="coming-soon-icon"><i class="ti ti-calendar-event"></i></div>
-      <h3>Bookings are coming soon</h3>
-      <p>Once this launches, clients will be able to book sessions with you directly, and requests will show up right here.</p>
+
+    <div class="section">
+      <div class="section-head">
+        <h2 style="font-size:19px">Your weekly availability</h2>
+        <span class="section-sub">Clients can only book inside these hours</span>
+      </div>
+      <div class="pro-card">
+        <div class="avail-grid" id="avail-grid">
+          <?php
+          $rules_by_day = array();
+          foreach ( $availability_rules as $rule ) {
+              $rules_by_day[ (int) $rule->day_of_week ][] = $rule;
+          }
+          for ( $d = 0; $d <= 6; $d++ ) :
+              $day_rule = $rules_by_day[ $d ][0] ?? null;
+              $enabled  = (bool) $day_rule;
+              $start    = $day_rule ? substr( $day_rule->start_time, 0, 5 ) : '09:00';
+              $end      = $day_rule ? substr( $day_rule->end_time, 0, 5 ) : '17:00';
+          ?>
+          <div class="avail-row" data-day="<?php echo $d; ?>">
+            <label class="avail-toggle">
+              <input type="checkbox" class="avail-enabled" <?php checked( $enabled ); ?>>
+              <span><?php echo esc_html( $day_labels[ $d ] ); ?></span>
+            </label>
+            <input type="time" class="avail-start" value="<?php echo esc_attr( $start ); ?>" <?php disabled( ! $enabled ); ?>>
+            <span class="avail-to">to</span>
+            <input type="time" class="avail-end" value="<?php echo esc_attr( $end ); ?>" <?php disabled( ! $enabled ); ?>>
+          </div>
+          <?php endfor; ?>
+        </div>
+        <button type="button" class="pro-submit" id="avail-save-btn" onclick="saveAvailability()">Save availability</button>
+        <div class="pro-msg" id="avail-msg"></div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head">
+        <h2 style="font-size:19px">Upcoming sessions</h2>
+        <span class="section-sub"><?php echo (int) count( $upcoming_bookings ); ?> scheduled</span>
+      </div>
+      <?php if ( empty( $upcoming_bookings ) ) : ?>
+      <div class="coming-soon">
+        <div class="coming-soon-icon"><i class="ti ti-calendar-event"></i></div>
+        <h3>No sessions booked yet</h3>
+        <p>Once your availability is set and you're verified, clients booking an open slot will show up right here.</p>
+      </div>
+      <?php else : ?>
+      <div class="booking-list" id="pro-booking-list">
+        <?php foreach ( $upcoming_bookings as $booking ) : ?>
+        <div class="booking-row" data-booking-id="<?php echo (int) $booking->id; ?>">
+          <div class="booking-icon"><i class="ti ti-calendar-event"></i></div>
+          <div class="booking-meta">
+            <div class="booking-when"><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?></div>
+            <div class="booking-with"><?php echo esc_html( $booking->client_name ?: $booking->client_email ); ?></div>
+            <?php if ( $booking->client_note ) : ?><div class="booking-note"><?php echo esc_html( $booking->client_note ); ?></div><?php endif; ?>
+          </div>
+          <button type="button" class="booking-cancel" onclick="cancelBooking(<?php echo (int) $booking->id; ?>, this)">Cancel</button>
+        </div>
+        <?php endforeach; ?>
+      </div>
+      <?php endif; ?>
     </div>
   </div>
 
@@ -390,23 +530,182 @@ document.getElementById('pro-form').addEventListener('submit', function(e){
   btn.disabled = true;
   btn.textContent = 'Saving...';
 
+  const name = document.getElementById('pro-name').value.trim();
+
+  const requests = [
+    fetch(KOUNSELIA.ajaxUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        action: 'kounselia_update_professional_profile',
+        nonce: KOUNSELIA.nonce,
+        title: document.getElementById('pro-title').value,
+        specialty: document.getElementById('pro-specialty').value,
+        years_experience: document.getElementById('pro-years').value,
+        bio: document.getElementById('pro-bio').value,
+        rate_amount: document.getElementById('pro-rate').value
+      })
+    }).then(r => r.json())
+  ];
+
+  if (name) {
+    requests.push(
+      fetch(KOUNSELIA.ajaxUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'kounselia_update_profile', nonce: KOUNSELIA.nonce, name })
+      }).then(r => r.json())
+    );
+  }
+
+  Promise.all(requests)
+  .then(results => {
+    btn.disabled = false;
+    btn.textContent = 'Save changes';
+    const failed = results.find(res => !res.success);
+    if (!failed) {
+      msg.classList.add('notice');
+      msg.textContent = 'Saved.';
+      if (name) {
+        const firstName = name.split(' ')[0];
+        const nameEl = document.getElementById('welcome-first-name');
+        const sideEl = document.getElementById('side-user-name');
+        if (nameEl) nameEl.textContent = firstName;
+        if (sideEl) sideEl.textContent = name;
+      }
+    } else {
+      msg.classList.add('error');
+      msg.textContent = (failed.data && failed.data.message) ? failed.data.message : 'Something went wrong, please try again.';
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = 'Save changes';
+    msg.classList.add('error');
+    msg.textContent = 'Something went wrong, please check your connection and try again.';
+  });
+});
+
+/* ---------------- DOCUMENTS ---------------- */
+
+document.getElementById('doc-form').addEventListener('submit', function(e){
+  e.preventDefault();
+  const btn = document.getElementById('doc-save-btn');
+  const msg = document.getElementById('doc-msg');
+  const fileInput = document.getElementById('doc-file');
+  msg.className = 'pro-msg';
+  msg.textContent = '';
+
+  if (!fileInput.files.length) {
+    msg.classList.add('error');
+    msg.textContent = 'Please choose a file to upload.';
+    return;
+  }
+
+  const fd = new FormData();
+  fd.append('action', 'kounselia_upload_professional_document');
+  fd.append('nonce', KOUNSELIA.nonce);
+  fd.append('doc_type', document.getElementById('doc-type').value);
+  fd.append('document', fileInput.files[0]);
+
+  btn.disabled = true;
+  btn.textContent = 'Uploading...';
+
+  fetch(KOUNSELIA.ajaxUrl, { method: 'POST', body: fd })
+  .then(r => r.json())
+  .then(res => {
+    btn.disabled = false;
+    btn.textContent = 'Add document';
+    if (res.success) {
+      msg.classList.add('notice');
+      msg.textContent = res.data.message || 'Uploaded.';
+      const doc = res.data.document;
+      const empty = document.getElementById('doc-empty');
+      if (empty) empty.remove();
+      const row = document.createElement('div');
+      row.className = 'doc-row';
+      row.dataset.docId = doc.id;
+      row.innerHTML = '<i class="ti ti-file-text"></i><div class="doc-meta"><div class="doc-name"></div><div class="doc-type"></div></div><a class="doc-view" target="_blank" rel="noopener">View</a><button type="button" class="doc-remove"><i class="ti ti-trash"></i></button>';
+      row.querySelector('.doc-name').textContent = doc.original_filename;
+      row.querySelector('.doc-type').textContent = doc.doc_type;
+      row.querySelector('.doc-view').href = doc.url;
+      row.querySelector('.doc-remove').onclick = function(){ removeDocument(doc.id, this); };
+      document.getElementById('doc-list').appendChild(row);
+      document.getElementById('doc-form').reset();
+    } else {
+      msg.classList.add('error');
+      msg.textContent = (res.data && res.data.message) ? res.data.message : 'Something went wrong, please try again.';
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = 'Add document';
+    msg.classList.add('error');
+    msg.textContent = 'Something went wrong, please check your connection and try again.';
+  });
+});
+
+function removeDocument(docId, btnEl){
+  if (!confirm('Remove this document?')) return;
+  btnEl.disabled = true;
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      action: 'kounselia_update_professional_profile',
-      nonce: KOUNSELIA.nonce,
-      title: document.getElementById('pro-title').value,
-      specialty: document.getElementById('pro-specialty').value,
-      years_experience: document.getElementById('pro-years').value,
-      bio: document.getElementById('pro-bio').value,
-      rate_amount: document.getElementById('pro-rate').value
-    })
+    body: new URLSearchParams({ action: 'kounselia_delete_professional_document', nonce: KOUNSELIA.nonce, doc_id: docId })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      const row = document.querySelector('.doc-row[data-doc-id="' + docId + '"]');
+      if (row) row.remove();
+    } else {
+      btnEl.disabled = false;
+      alert((res.data && res.data.message) ? res.data.message : 'Could not remove that document.');
+    }
+  })
+  .catch(() => { btnEl.disabled = false; alert('Something went wrong, please check your connection and try again.'); });
+}
+
+/* ---------------- AVAILABILITY ---------------- */
+
+document.querySelectorAll('.avail-row').forEach(function(row){
+  const toggle = row.querySelector('.avail-enabled');
+  const start = row.querySelector('.avail-start');
+  const end = row.querySelector('.avail-end');
+  toggle.addEventListener('change', function(){
+    start.disabled = !toggle.checked;
+    end.disabled = !toggle.checked;
+  });
+});
+
+function saveAvailability(){
+  const btn = document.getElementById('avail-save-btn');
+  const msg = document.getElementById('avail-msg');
+  msg.className = 'pro-msg';
+  msg.textContent = '';
+
+  const rules = [];
+  document.querySelectorAll('.avail-row').forEach(function(row){
+    const toggle = row.querySelector('.avail-enabled');
+    if (!toggle.checked) return;
+    const start = row.querySelector('.avail-start').value;
+    const end = row.querySelector('.avail-end').value;
+    if (!start || !end || start >= end) return;
+    rules.push({ day: parseInt(row.dataset.day, 10), start, end });
+  });
+
+  btn.disabled = true;
+  btn.textContent = 'Saving...';
+
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_save_availability', nonce: KOUNSELIA.nonce, rules: JSON.stringify(rules) })
   })
   .then(r => r.json())
   .then(res => {
     btn.disabled = false;
-    btn.textContent = 'Save changes';
+    btn.textContent = 'Save availability';
     if (res.success) {
       msg.classList.add('notice');
       msg.textContent = res.data.message || 'Saved.';
@@ -417,11 +716,40 @@ document.getElementById('pro-form').addEventListener('submit', function(e){
   })
   .catch(() => {
     btn.disabled = false;
-    btn.textContent = 'Save changes';
+    btn.textContent = 'Save availability';
     msg.classList.add('error');
     msg.textContent = 'Something went wrong, please check your connection and try again.';
   });
-});
+}
+
+/* ---------------- BOOKINGS ---------------- */
+
+function cancelBooking(bookingId, btnEl){
+  if (!confirm('Cancel this session? The client will be notified.')) return;
+  btnEl.disabled = true;
+  btnEl.textContent = 'Cancelling...';
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_cancel_booking', nonce: KOUNSELIA.nonce, booking_id: bookingId })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (res.success) {
+      const row = document.querySelector('.booking-row[data-booking-id="' + bookingId + '"]');
+      if (row) row.remove();
+    } else {
+      btnEl.disabled = false;
+      btnEl.textContent = 'Cancel';
+      alert((res.data && res.data.message) ? res.data.message : 'Could not cancel that booking.');
+    }
+  })
+  .catch(() => {
+    btnEl.disabled = false;
+    btnEl.textContent = 'Cancel';
+    alert('Something went wrong, please check your connection and try again.');
+  });
+}
 </script>
 
 </body>
