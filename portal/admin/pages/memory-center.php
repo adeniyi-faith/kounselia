@@ -276,9 +276,20 @@ function kounselia_generate_memory_meta( $text, $sessions, $type = 'node' ) {
                             <i class="ti ti-git-commit"></i> Continuous context graph tracking identity, patterns, and history.
                         </div>
                     </div>
-                    <div>
-                        <button class="btn-ghost" style="border: 1px solid var(--border); padding: 8px 16px;" onclick="alert('Raw JSON Editor coming soon.')"><i class="ti ti-code"></i> View Raw JSON</button>
+                    <div style="display:flex;gap:10px;">
+                        <button class="btn-ghost" style="border: 1px solid var(--border); padding: 8px 16px;" onclick="document.getElementById('rawJsonModal').style.display='flex'"><i class="ti ti-code"></i> View Raw JSON</button>
+                        <button class="btn-ghost" style="border: 1px solid var(--rose); color: var(--rose); padding: 8px 16px;" onclick="wipeMemory(<?php echo (int) $active_user_id; ?>)"><i class="ti ti-trash"></i> Wipe Memory</button>
                     </div>
+                </div>
+
+                <div id="rawJsonModal" style="display:none;position:fixed;inset:0;background:rgba(24,22,15,0.4);z-index:200;align-items:center;justify-content:center;">
+                  <div style="background:var(--surface);max-width:640px;width:92%;max-height:80vh;overflow-y:auto;border-radius:12px;padding:24px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                      <h3 style="font-family:'Cormorant Garamond',serif;font-size:20px;">Raw memory JSON</h3>
+                      <button onclick="document.getElementById('rawJsonModal').style.display='none'" style="background:none;border:none;cursor:pointer;font-size:18px;">×</button>
+                    </div>
+                    <pre style="font-family:'JetBrains Mono',monospace;font-size:12px;background:#1E1E1E;color:#D4D4D4;padding:16px;border-radius:8px;white-space:pre-wrap;word-break:break-word;"><?php echo esc_html( wp_json_encode( array( 'memory' => $memory, 'reflection' => $reflection ), JSON_PRETTY_PRINT ) ); ?></pre>
+                  </div>
                 </div>
 
                 <?php 
@@ -372,6 +383,23 @@ function filterUsers() {
     rows.forEach(row => {
         const text = row.innerText.toLowerCase();
         row.style.display = text.includes(input) ? '' : 'none';
+    });
+}
+
+const ADMIN_AJAX_URL = "<?php echo esc_js( set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' ) ); ?>";
+const ADMIN_NONCE    = "<?php echo esc_js( wp_create_nonce( 'kounselia_admin_nonce' ) ); ?>";
+
+function wipeMemory(userId) {
+    if (!confirm('DANGER: Permanently wipe this member\'s entire memory profile? This cannot be undone.')) return;
+    fetch(ADMIN_AJAX_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ action: 'kounselia_admin_wipe_member_data', nonce: ADMIN_NONCE, user_id: userId, target: 'memory' })
+    })
+    .then(res => res.json())
+    .then(data => {
+        alert((data.data && data.data.message) || (data.success ? 'Done.' : 'Action failed.'));
+        if (data.success) window.location.reload();
     });
 }
 </script>
