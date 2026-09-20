@@ -237,6 +237,7 @@ function kounselia_create_booking( $professional_id, $client_user_id, $scheduled
         'scheduled_end'   => date( 'Y-m-d H:i:s', $end_ts ),
         'status'          => 'confirmed',
         'client_note'     => $note ? substr( $note, 0, 500 ) : null,
+        'room_token'      => wp_generate_password( 40, false ),
         'created_at'      => $now,
         'updated_at'      => $now,
     ) );
@@ -281,6 +282,50 @@ function kounselia_get_client_bookings( $client_user_id, $upcoming_only = true )
 }
 
 /**
+ * A booking joined with the professional's user_id, so callers can check
+ * "is this person one of the two people on this booking" without
+ * repeating the join everywhere that check is needed.
+ */
+function kounselia_get_booking_with_parties( $booking_id ) {
+    global $wpdb;
+    return $wpdb->get_row( $wpdb->prepare(
+        "SELECT b.*, p.user_id AS professional_user_id
+         FROM {$wpdb->prefix}kounselia_bookings b
+         INNER JOIN {$wpdb->prefix}kounselia_professionals p ON p.id = b.professional_id
+         WHERE b.id = %d",
+        $booking_id
+    ) );
+}
+
+function kounselia_user_is_booking_party( $booking, $user_id ) {
+    if ( ! $booking || ! $user_id ) {
+        return false;
+    }
+    return ( (int) $booking->client_user_id === (int) $user_id ) || ( (int) $booking->professional_user_id === (int) $user_id );
+}
+
+/**
+ * Whether the video/voice room for a booking can be joined right now —
+ * open a little before the scheduled time so people aren't locked out by
+ * clock skew, closed well after it so a stale link doesn't stay live
+ * indefinitely.
+ */
+function kounselia_booking_join_window( $booking ) {
+    $opens_at  = strtotime( $booking->scheduled_start ) - ( 10 * MINUTE_IN_SECONDS );
+    $closes_at = strtotime( $booking->scheduled_end ) + ( 15 * MINUTE_IN_SECONDS );
+    return array( 'opens_at' => $opens_at, 'closes_at' => $closes_at );
+}
+
+function kounselia_booking_is_joinable( $booking ) {
+    if ( ! $booking || 'confirmed' !== $booking->status ) {
+        return false;
+    }
+    $window = kounselia_booking_join_window( $booking );
+    $now    = current_time( 'timestamp' );
+    return ( $now >= $window['opens_at'] && $now <= $window['closes_at'] );
+}
+
+/**
  * Cancel a booking. Either side of the appointment can do this — the
  * client, or the professional whose slot it was. Anyone else gets
  * rejected before any row is touched.
@@ -288,18 +333,12 @@ function kounselia_get_client_bookings( $client_user_id, $upcoming_only = true )
 function kounselia_cancel_booking( $booking_id, $acting_user_id, $reason = '' ) {
     global $wpdb;
 
-    $booking = $wpdb->get_row( $wpdb->prepare(
-        "SELECT b.*, p.user_id AS professional_user_id
-         FROM {$wpdb->prefix}kounselia_bookings b
-         INNER JOIN {$wpdb->prefix}kounselia_professionals p ON p.id = b.professional_id
-         WHERE b.id = %d",
-        $booking_id
-    ) );
+    $booking = kounselia_get_booking_with_parties( $booking_id );
 
     if ( ! $booking ) {
         return new WP_Error( 'not_found', 'Booking not found.' );
     }
-    if ( (int) $booking->client_user_id !== (int) $acting_user_id && (int) $booking->professional_user_id !== (int) $acting_user_id ) {
+    if ( ! kounselia_user_is_booking_party( $booking, $acting_user_id ) ) {
         return new WP_Error( 'forbidden', 'You cannot cancel this booking.' );
     }
     if ( 'confirmed' !== $booking->status ) {
@@ -496,3 +535,142 @@ function kounselia_ajax_cancel_booking() {
     wp_send_json_success( array( 'message' => 'Booking cancelled.' ) );
 }
 add_action( 'wp_ajax_kounselia_cancel_booking', 'kounselia_ajax_cancel_booking' );
+
+/* -------------------------------------------------------------------------
+ * BOOKING MESSAGES — a private thread between the two people on one
+ * booking. Not the AI counselor chat (kounselia_messages/kounselia_sessions)
+ * — this is a person talking to another person about a specific session.
+ * ---------------------------------------------------------------------- */
+
+function kounselia_get_booking_messages( $booking_id ) {
+    global $wpdb;
+    return $wpdb->get_results( $wpdb->prepare(
+        "SELECT m.*, u.display_name AS sender_name
+         FROM {$wpdb->prefix}kounselia_booking_messages m
+         LEFT JOIN {$wpdb->users} u ON u.ID = m.sender_user_id
+         WHERE m.booking_id = %d
+         ORDER BY m.created_at ASC, m.id ASC",
+        $booking_id
+    ) );
+}
+
+function kounselia_send_booking_message( $booking_id, $sender_user_id, $content ) {
+    global $wpdb;
+
+    $content = trim( (string) $content );
+    if ( '' === $content ) {
+        return new WP_Error( 'empty_message', 'Please write a message first.' );
+    }
+    $content = substr( $content, 0, 2000 );
+
+    $booking = kounselia_get_booking_with_parties( $booking_id );
+    if ( ! $booking ) {
+        return new WP_Error( 'not_found', 'Booking not found.' );
+    }
+    if ( ! kounselia_user_is_booking_party( $booking, $sender_user_id ) ) {
+        return new WP_Error( 'forbidden', 'You are not part of this booking.' );
+    }
+
+    $wpdb->insert( $wpdb->prefix . 'kounselia_booking_messages', array(
+        'booking_id'     => $booking_id,
+        'sender_user_id' => $sender_user_id,
+        'content'        => $content,
+        'created_at'     => current_time( 'mysql' ),
+    ) );
+
+    $message_id = (int) $wpdb->insert_id;
+    kounselia_notify_booking_message( $booking, $sender_user_id, $content );
+
+    return $message_id;
+}
+
+/**
+ * Mark every message the other party sent as read. Called whenever the
+ * reader opens/refreshes the thread — cheap enough to just always run.
+ */
+function kounselia_mark_booking_messages_read( $booking_id, $reader_user_id ) {
+    global $wpdb;
+    $wpdb->query( $wpdb->prepare(
+        "UPDATE {$wpdb->prefix}kounselia_booking_messages
+         SET read_at = %s
+         WHERE booking_id = %d AND sender_user_id != %d AND read_at IS NULL",
+        current_time( 'mysql' ),
+        $booking_id,
+        $reader_user_id
+    ) );
+}
+
+function kounselia_notify_booking_message( $booking, $sender_user_id, $content ) {
+    if ( ! function_exists( 'kounselia_send_html_email' ) ) {
+        return;
+    }
+    $recipient_user_id = ( (int) $booking->client_user_id === (int) $sender_user_id )
+        ? $booking->professional_user_id
+        : $booking->client_user_id;
+
+    $recipient = get_userdata( $recipient_user_id );
+    $sender    = get_userdata( $sender_user_id );
+    if ( ! $recipient ) {
+        return;
+    }
+
+    kounselia_send_html_email(
+        $recipient->user_email,
+        'New message about your upcoming session',
+        'New message',
+        '<p>' . esc_html( $sender ? $sender->display_name : 'The other person on your booking' ) . ' sent you a message: </p><blockquote style="margin:0;padding:12px 16px;border-left:3px solid #ccc;color:#444">' . esc_html( $content ) . '</blockquote>'
+    );
+}
+
+function kounselia_ajax_get_booking_messages() {
+    kounselia_verify_nonce();
+
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( array( 'message' => 'Please sign in first.' ), 401 );
+    }
+
+    $booking_id = isset( $_POST['booking_id'] ) ? absint( $_POST['booking_id'] ) : 0;
+    $user_id    = get_current_user_id();
+
+    $booking = $booking_id ? kounselia_get_booking_with_parties( $booking_id ) : null;
+    if ( ! $booking || ! kounselia_user_is_booking_party( $booking, $user_id ) ) {
+        wp_send_json_error( array( 'message' => 'You do not have access to this conversation.' ), 403 );
+    }
+
+    kounselia_mark_booking_messages_read( $booking_id, $user_id );
+
+    $messages = array_map( function( $m ) use ( $user_id ) {
+        return array(
+            'id'          => (int) $m->id,
+            'content'     => $m->content,
+            'created_at'  => $m->created_at,
+            'sender_name' => $m->sender_name,
+            'is_mine'     => ( (int) $m->sender_user_id === (int) $user_id ),
+        );
+    }, kounselia_get_booking_messages( $booking_id ) );
+
+    wp_send_json_success( array( 'messages' => $messages ) );
+}
+add_action( 'wp_ajax_kounselia_get_booking_messages', 'kounselia_ajax_get_booking_messages' );
+
+function kounselia_ajax_send_booking_message() {
+    kounselia_verify_nonce();
+
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( array( 'message' => 'Please sign in first.' ), 401 );
+    }
+    if ( kounselia_rate_limited( 'send_booking_message', 60, 3600 ) ) {
+        wp_send_json_error( array( 'message' => 'Too many messages. Please slow down.' ), 429 );
+    }
+
+    $booking_id = isset( $_POST['booking_id'] ) ? absint( $_POST['booking_id'] ) : 0;
+    $content    = isset( $_POST['content'] ) ? sanitize_textarea_field( wp_unslash( $_POST['content'] ) ) : '';
+
+    $result = kounselia_send_booking_message( $booking_id, get_current_user_id(), $content );
+    if ( is_wp_error( $result ) ) {
+        wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+    }
+
+    wp_send_json_success( array( 'message_id' => $result ) );
+}
+add_action( 'wp_ajax_kounselia_send_booking_message', 'kounselia_ajax_send_booking_message' );

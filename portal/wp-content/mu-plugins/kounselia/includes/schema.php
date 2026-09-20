@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.14.0'; // Bumped version: booking calendar (kounselia_professional_availability, kounselia_bookings)
+    $current_version   = '1.15.0'; // Bumped version: booking messages + video room token (kounselia_booking_messages, kounselia_bookings.room_token)
 
     if ( $installed_version === $current_version ) {
         return;
@@ -375,6 +375,7 @@ function kounselia_install_tables() {
         client_note VARCHAR(500) NULL,
         cancelled_by BIGINT UNSIGNED NULL,
         cancel_reason VARCHAR(500) NULL,
+        room_token VARCHAR(64) NULL,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
         PRIMARY KEY  (id),
@@ -382,6 +383,22 @@ function kounselia_install_tables() {
         KEY client_user_id (client_user_id),
         KEY scheduled_start (scheduled_start),
         KEY status (status)
+    ) {$charset_collate};";
+
+    // A private text thread attached to one booking — the client and the
+    // professional on that booking are the only two people who can ever
+    // read or write to it. Scoped to the booking (not a standing
+    // client<->professional relationship) so access naturally ends the
+    // same way the booking's own access control already works.
+    $sql_booking_messages = "CREATE TABLE {$prefix}kounselia_booking_messages (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        booking_id BIGINT UNSIGNED NOT NULL,
+        sender_user_id BIGINT UNSIGNED NOT NULL,
+        content TEXT NOT NULL,
+        created_at DATETIME NOT NULL,
+        read_at DATETIME NULL,
+        PRIMARY KEY  (id),
+        KEY booking_id (booking_id)
     ) {$charset_collate};";
 
     dbDelta( $sql_sessions );
@@ -403,6 +420,7 @@ function kounselia_install_tables() {
     dbDelta( $sql_professional_documents );
     dbDelta( $sql_professional_availability );
     dbDelta( $sql_bookings );
+    dbDelta( $sql_booking_messages );
     dbDelta( $sql_subscriptions );
     dbDelta( $sql_payments );
 

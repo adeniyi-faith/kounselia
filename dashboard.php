@@ -264,6 +264,26 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .session-meta p{font-size:12.5px;color:var(--text3);margin-top:2px}
 .session-link{font-size:13px;color:var(--accent);font-weight:500;text-decoration:none;white-space:nowrap}
 .session-link:hover{text-decoration:underline}
+.booking-session-row .booking-actions{display:flex;align-items:center;gap:14px;flex-shrink:0}
+.booking-session-row .booking-join{display:inline-flex;align-items:center;gap:5px;color:var(--sage)}
+@media (max-width:480px){.booking-session-row{flex-wrap:wrap}.booking-session-row .booking-actions{flex-basis:100%;margin-top:10px;justify-content:flex-start}}
+
+.chat-overlay{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-end;justify-content:center;z-index:9999}
+.chat-overlay.active{display:flex}
+.chat-modal{background:var(--surface);width:100%;max-width:480px;border-radius:20px 20px 0 0;display:flex;flex-direction:column;max-height:80vh}
+@media (min-width:640px){.chat-overlay{align-items:center}.chat-modal{border-radius:20px;height:600px}}
+.chat-modal-head{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);flex-shrink:0}
+.chat-modal-head h3{font-family:'Cormorant Garamond',serif;font-size:19px;font-weight:500;margin:0}
+.chat-modal-head button{background:none;border:none;font-size:20px;color:var(--text3);cursor:pointer;padding:4px}
+.chat-messages{flex:1;overflow-y:auto;padding:16px 20px;display:flex;flex-direction:column;gap:10px}
+.chat-bubble{max-width:78%;padding:10px 14px;border-radius:14px;font-size:13.5px;line-height:1.5}
+.chat-bubble.mine{align-self:flex-end;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.chat-bubble.theirs{align-self:flex-start;background:var(--surface2);color:var(--text);border-bottom-left-radius:4px}
+.chat-bubble-time{font-size:10.5px;opacity:.65;margin-top:4px}
+.chat-input-row{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border);flex-shrink:0}
+.chat-input-row input{flex:1;padding:11px 14px;border:1.5px solid var(--border);border-radius:24px;font-family:inherit;font-size:14px;background:var(--bg);outline:none}
+.chat-input-row input:focus{border-color:var(--accent)}
+.chat-input-row button{width:40px;height:40px;border-radius:50%;border:none;background:var(--accent);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .empty-state{background:var(--surface2);border:1px dashed var(--border);border-radius:var(--r);padding:36px 24px;text-align:center}
 .empty-state i{font-size:26px;color:var(--text3);margin-bottom:10px;display:block}
 .empty-state p{font-size:14px;color:var(--text2);margin-bottom:16px}
@@ -772,13 +792,20 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <?php else : ?>
         <div id="my-booking-list">
         <?php foreach ( $my_bookings as $booking ) : ?>
-        <div class="session-row" data-booking-id="<?php echo (int) $booking->id; ?>">
+        <?php $can_join = function_exists( 'kounselia_booking_is_joinable' ) ? kounselia_booking_is_joinable( $booking ) : false; ?>
+        <div class="session-row booking-session-row" data-booking-id="<?php echo (int) $booking->id; ?>">
           <div class="session-av ic-gold"><i class="ti ti-calendar-event"></i></div>
           <div class="session-meta">
             <h4><?php echo esc_html( $booking->pro_name ); ?><?php echo $booking->pro_title ? ' · ' . esc_html( $booking->pro_title ) : ''; ?></h4>
             <p><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?></p>
           </div>
-          <a class="session-link" href="javascript:void(0)" onclick="cancelMyBooking(<?php echo (int) $booking->id; ?>, this)">Cancel</a>
+          <div class="booking-actions">
+            <?php if ( $can_join ) : ?>
+              <a class="session-link booking-join" href="/video-call.php?booking_id=<?php echo (int) $booking->id; ?>"><i class="ti ti-video"></i> Join</a>
+            <?php endif; ?>
+            <a class="session-link js-booking-chat" href="javascript:void(0)" data-booking-id="<?php echo (int) $booking->id; ?>" data-other-name="<?php echo esc_attr( $booking->pro_name ); ?>">Message</a>
+            <a class="session-link" href="javascript:void(0)" onclick="cancelMyBooking(<?php echo (int) $booking->id; ?>, this)">Cancel</a>
+          </div>
         </div>
         <?php endforeach; ?>
         </div>
@@ -1130,6 +1157,21 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <button class="intake-btn" id="book-confirm-btn" onclick="confirmBooking()" style="display:none">Confirm booking</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- BOOKING CHAT MODAL -->
+<div class="chat-overlay" id="chat-overlay">
+  <div class="chat-modal">
+    <div class="chat-modal-head">
+      <h3 id="chat-modal-name">Conversation</h3>
+      <button type="button" onclick="closeBookingChat()"><i class="ti ti-x"></i></button>
+    </div>
+    <div class="chat-messages" id="chat-messages"></div>
+    <form id="chat-form" class="chat-input-row">
+      <input type="text" id="chat-input" placeholder="Write a message..." autocomplete="off">
+      <button type="submit"><i class="ti ti-send"></i></button>
+    </form>
   </div>
 </div>
 
@@ -1844,6 +1886,84 @@ function cancelMyBooking(bookingId, linkEl){
   })
   .catch(() => toast('Something went wrong. Please try again.', true));
 }
+
+/* ---------------- BOOKING CHAT ---------------- */
+
+let chatBookingId = null;
+let chatPollTimer = null;
+
+document.querySelectorAll('.js-booking-chat').forEach(function(link){
+  link.addEventListener('click', function(){
+    openBookingChat(parseInt(link.dataset.bookingId, 10), link.dataset.otherName);
+  });
+});
+
+function openBookingChat(bookingId, otherName){
+  chatBookingId = bookingId;
+  document.getElementById('chat-modal-name').textContent = otherName;
+  document.getElementById('chat-messages').innerHTML = '<p style="text-align:center;color:var(--text3);font-size:13px">Loading...</p>';
+  document.getElementById('chat-overlay').classList.add('active');
+  loadBookingChat();
+  clearInterval(chatPollTimer);
+  chatPollTimer = setInterval(loadBookingChat, 4000);
+}
+
+function closeBookingChat(){
+  document.getElementById('chat-overlay').classList.remove('active');
+  clearInterval(chatPollTimer);
+  chatPollTimer = null;
+  chatBookingId = null;
+}
+
+function loadBookingChat(){
+  if (!chatBookingId) return;
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_get_booking_messages', nonce: KOUNSELIA.nonce, booking_id: chatBookingId })
+  })
+  .then(r => r.json())
+  .then(res => {
+    if (!res.success) return;
+    const wrap = document.getElementById('chat-messages');
+    const wasAtBottom = (wrap.scrollTop + wrap.clientHeight) >= (wrap.scrollHeight - 20);
+    wrap.innerHTML = '';
+    if (!res.data.messages.length) {
+      wrap.innerHTML = '<p style="text-align:center;color:var(--text3);font-size:13px">No messages yet. Say hello.</p>';
+    } else {
+      res.data.messages.forEach(function(m){
+        const bubble = document.createElement('div');
+        bubble.className = 'chat-bubble ' + (m.is_mine ? 'mine' : 'theirs');
+        const text = document.createElement('div');
+        text.textContent = m.content;
+        bubble.appendChild(text);
+        const time = document.createElement('div');
+        time.className = 'chat-bubble-time';
+        time.textContent = new Date(m.created_at.replace(' ', 'T')).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        bubble.appendChild(time);
+        wrap.appendChild(bubble);
+      });
+    }
+    if (wasAtBottom) wrap.scrollTop = wrap.scrollHeight;
+  })
+  .catch(() => {});
+}
+
+document.getElementById('chat-form').addEventListener('submit', function(e){
+  e.preventDefault();
+  const input = document.getElementById('chat-input');
+  const content = input.value.trim();
+  if (!content || !chatBookingId) return;
+  input.value = '';
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_send_booking_message', nonce: KOUNSELIA.nonce, booking_id: chatBookingId, content })
+  })
+  .then(r => r.json())
+  .then(() => loadBookingChat())
+  .catch(() => {});
+});
 </script>
 </body>
 </html>
