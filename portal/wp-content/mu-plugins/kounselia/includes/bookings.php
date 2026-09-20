@@ -112,17 +112,18 @@ function kounselia_save_availability_rules( $professional_id, $rules ) {
  * SLOTS
  * ---------------------------------------------------------------------- */
 
-function kounselia_get_booked_slot_starts( $professional_id ) {
+function kounselia_get_booked_slot_starts( $professional_id, $exclude_booking_id = 0 ) {
     global $wpdb;
     $reservation_cutoff = date( 'Y-m-d H:i:s', current_time( 'timestamp' ) - kounselia_booking_reservation_seconds() );
-    $rows = $wpdb->get_col( $wpdb->prepare(
-        "SELECT scheduled_start FROM {$wpdb->prefix}kounselia_bookings
-         WHERE professional_id = %d AND scheduled_start >= %s
-         AND ( status = 'confirmed' OR ( status = 'pending_payment' AND created_at >= %s ) )",
-        $professional_id,
-        current_time( 'mysql' ),
-        $reservation_cutoff
-    ) );
+    $sql = "SELECT scheduled_start FROM {$wpdb->prefix}kounselia_bookings
+            WHERE professional_id = %d AND scheduled_start >= %s
+            AND ( status = 'confirmed' OR ( status = 'pending_payment' AND created_at >= %s ) )";
+    $args = array( $professional_id, current_time( 'mysql' ), $reservation_cutoff );
+    if ( $exclude_booking_id ) {
+        $sql   .= ' AND id != %d';
+        $args[] = $exclude_booking_id;
+    }
+    $rows = $wpdb->get_col( $wpdb->prepare( $sql, $args ) );
     return array_flip( $rows );
 }
 
@@ -131,7 +132,7 @@ function kounselia_get_booked_slot_starts( $professional_id ) {
  * 'Y-m-d H:i:s' strings) over the booking horizon, skipping anything
  * already booked or too soon to book.
  */
-function kounselia_get_available_slots( $professional_id ) {
+function kounselia_get_available_slots( $professional_id, $exclude_booking_id = 0 ) {
     $rules = kounselia_get_availability_rules( $professional_id );
     if ( empty( $rules ) ) {
         return array();
@@ -147,7 +148,7 @@ function kounselia_get_available_slots( $professional_id ) {
         $by_day[ (int) $rule->day_of_week ][] = $rule;
     }
 
-    $booked = kounselia_get_booked_slot_starts( $professional_id );
+    $booked = kounselia_get_booked_slot_starts( $professional_id, $exclude_booking_id );
 
     $slots = array();
     for ( $d = 0; $d <= $days_ahead; $d++ ) {
@@ -210,7 +211,7 @@ function kounselia_get_professional_by_id( $professional_id ) {
  * list rather than trusting the client's submitted time, so a slot that
  * was taken or dropped from availability a second ago can't be booked.
  */
-function kounselia_create_booking( $professional_id, $client_user_id, $scheduled_start_mysql, $note ) {
+function kounselia_create_booking( $professional_id, $client_user_id, $scheduled_start_mysql, $note, $series_id = 0 ) {
     global $wpdb;
 
     $professional = kounselia_get_professional_by_id( $professional_id );
@@ -265,6 +266,7 @@ function kounselia_create_booking( $professional_id, $client_user_id, $scheduled
         'status'          => 'pending_payment',
         'client_note'     => $note ? substr( $note, 0, 500 ) : null,
         'room_token'      => wp_generate_password( 40, false ),
+        'series_id'       => $series_id ?: null,
         'created_at'      => $now,
         'updated_at'      => $now,
     ) );
@@ -313,6 +315,29 @@ function kounselia_get_client_bookings( $client_user_id, $upcoming_only = true )
     $sql .= ' ORDER BY b.scheduled_start ASC';
 
     return $wpdb->get_results( $wpdb->prepare( $sql, $args ) );
+}
+
+/**
+ * Sessions that have already happened, most recent first — this is
+ * where a "rate this session" prompt comes from, and where a review
+ * already left shows up alongside it.
+ */
+function kounselia_get_client_past_bookings( $client_user_id, $limit = 10 ) {
+    global $wpdb;
+    return $wpdb->get_results( $wpdb->prepare(
+        "SELECT b.*, p.title AS pro_title, u.display_name AS pro_name,
+                r.id AS review_id, r.rating AS review_rating, r.comment AS review_comment
+         FROM {$wpdb->prefix}kounselia_bookings b
+         INNER JOIN {$wpdb->prefix}kounselia_professionals p ON p.id = b.professional_id
+         INNER JOIN {$wpdb->users} u ON u.ID = p.user_id
+         LEFT JOIN {$wpdb->prefix}kounselia_professional_reviews r ON r.booking_id = b.id
+         WHERE b.client_user_id = %d AND b.status = 'confirmed' AND b.scheduled_end < %s
+         ORDER BY b.scheduled_start DESC
+         LIMIT %d",
+        $client_user_id,
+        current_time( 'mysql' ),
+        $limit
+    ) );
 }
 
 /**
@@ -428,11 +453,87 @@ function kounselia_do_cancel_booking( $booking, $acting_user_id, $reason = '' ) 
 }
 
 /* -------------------------------------------------------------------------
+ * RESCHEDULE — moving an already-paid booking to a new time, instead of
+ * cancelling (which refunds) and rebooking (which charges again). Only
+ * the two people on the booking can do this, and only while it's still
+ * 'confirmed' and in the future.
+ * ---------------------------------------------------------------------- */
+
+function kounselia_reschedule_booking( $booking_id, $acting_user_id, $new_start_mysql ) {
+    global $wpdb;
+
+    $booking = kounselia_get_booking_with_parties( $booking_id );
+    if ( ! $booking ) {
+        return new WP_Error( 'not_found', 'Booking not found.' );
+    }
+    if ( ! kounselia_user_is_booking_party( $booking, $acting_user_id ) ) {
+        return new WP_Error( 'forbidden', 'You cannot reschedule this booking.' );
+    }
+    if ( 'confirmed' !== $booking->status ) {
+        return new WP_Error( 'invalid_state', 'This booking is no longer active.' );
+    }
+    if ( strtotime( $booking->scheduled_start ) <= current_time( 'timestamp' ) ) {
+        return new WP_Error( 'too_late', 'This session has already started, so it can\'t be rescheduled.' );
+    }
+
+    $start_ts = strtotime( $new_start_mysql );
+    if ( ! $start_ts ) {
+        return new WP_Error( 'invalid_slot', 'That time is no longer available.' );
+    }
+    $normalized_start = date( 'Y-m-d H:i:s', $start_ts );
+
+    $valid_slots = kounselia_get_available_slots( $booking->professional_id, $booking_id );
+    if ( ! in_array( $normalized_start, $valid_slots, true ) ) {
+        return new WP_Error( 'invalid_slot', 'That time is no longer available. Please pick another slot.' );
+    }
+
+    $old_start = $booking->scheduled_start;
+    $end_ts    = $start_ts + ( kounselia_session_length_minutes() * 60 );
+
+    $wpdb->update( $wpdb->prefix . 'kounselia_bookings', array(
+        'scheduled_start'  => $normalized_start,
+        'scheduled_end'    => date( 'Y-m-d H:i:s', $end_ts ),
+        'reminder_sent_at' => null, // a moved session gets its own fresh reminder
+        'updated_at'       => current_time( 'mysql' ),
+    ), array( 'id' => $booking_id ) );
+
+    kounselia_notify_booking_rescheduled( $booking_id, $acting_user_id, $old_start );
+
+    return true;
+}
+
+function kounselia_ajax_reschedule_booking() {
+    kounselia_verify_nonce();
+
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( array( 'message' => 'Please sign in first.' ), 401 );
+    }
+    if ( kounselia_rate_limited( 'reschedule_booking', 10, 3600 ) ) {
+        wp_send_json_error( array( 'message' => 'Too many attempts. Please try again later.' ), 429 );
+    }
+
+    $booking_id      = isset( $_POST['booking_id'] ) ? absint( $_POST['booking_id'] ) : 0;
+    $scheduled_start = isset( $_POST['scheduled_start'] ) ? sanitize_text_field( wp_unslash( $_POST['scheduled_start'] ) ) : '';
+
+    if ( ! $booking_id || ! $scheduled_start ) {
+        wp_send_json_error( array( 'message' => 'Please choose a new time.' ), 400 );
+    }
+
+    $result = kounselia_reschedule_booking( $booking_id, get_current_user_id(), $scheduled_start );
+    if ( is_wp_error( $result ) ) {
+        wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+    }
+
+    wp_send_json_success( array( 'message' => 'Session rescheduled.' ) );
+}
+add_action( 'wp_ajax_kounselia_reschedule_booking', 'kounselia_ajax_reschedule_booking' );
+
+/* -------------------------------------------------------------------------
  * NOTIFICATIONS
  * ---------------------------------------------------------------------- */
 
 function kounselia_notify_booking_created( $booking_id ) {
-    if ( ! function_exists( 'kounselia_send_html_email' ) ) {
+    if ( ! function_exists( 'kounselia_notify_user' ) ) {
         return;
     }
     global $wpdb;
@@ -450,29 +551,42 @@ function kounselia_notify_booking_created( $booking_id ) {
     $professional_user = get_userdata( $booking->professional_user_id );
     $client_user        = get_userdata( $booking->client_user_id );
     $when                = date_i18n( 'l, F j, Y \a\t g:i A', strtotime( $booking->scheduled_start ) );
+    $site_url            = rtrim( home_url(), '/' );
 
     if ( $professional_user ) {
-        kounselia_send_html_email(
-            $professional_user->user_email,
+        kounselia_notify_user(
+            $booking->professional_user_id,
+            'booking_created',
             'New session booked',
-            'New booking',
-            '<p>' . esc_html( $client_user ? $client_user->display_name : 'A client' ) . ' just booked a session with you for <strong>' . esc_html( $when ) . '</strong>.</p>',
-            'View your bookings',
-            rtrim( home_url(), '/' ) . '/pro-dashboard.php'
+            ( $client_user ? $client_user->display_name : 'A client' ) . ' booked a session for ' . $when . '.',
+            '/pro-dashboard.php',
+            array(
+                'subject'      => 'New session booked',
+                'headline'     => 'New booking',
+                'content_html' => '<p>' . esc_html( $client_user ? $client_user->display_name : 'A client' ) . ' just booked a session with you for <strong>' . esc_html( $when ) . '</strong>.</p>',
+                'btn_text'     => 'View your bookings',
+                'btn_url'      => $site_url . '/pro-dashboard.php',
+            )
         );
     }
     if ( $client_user ) {
-        kounselia_send_html_email(
-            $client_user->user_email,
+        kounselia_notify_user(
+            $booking->client_user_id,
+            'booking_created',
             'Your session is booked',
-            'Booking confirmed',
-            '<p>Your session is confirmed for <strong>' . esc_html( $when ) . '</strong>' . ( $professional_user ? ' with ' . esc_html( $professional_user->display_name ) : '' ) . '.</p>'
+            'Confirmed for ' . $when . ( $professional_user ? ' with ' . $professional_user->display_name : '' ) . '.',
+            '/dashboard.php#professionals',
+            array(
+                'subject'      => 'Your session is booked',
+                'headline'     => 'Booking confirmed',
+                'content_html' => '<p>Your session is confirmed for <strong>' . esc_html( $when ) . '</strong>' . ( $professional_user ? ' with ' . esc_html( $professional_user->display_name ) : '' ) . '.</p>',
+            )
         );
     }
 }
 
 function kounselia_notify_booking_cancelled( $booking_id, $cancelled_by_user_id ) {
-    if ( ! function_exists( 'kounselia_send_html_email' ) ) {
+    if ( ! function_exists( 'kounselia_notify_user' ) ) {
         return;
     }
     global $wpdb;
@@ -503,16 +617,60 @@ function kounselia_notify_booking_cancelled( $booking_id, $cancelled_by_user_id 
     }
 
     foreach ( $notify_ids as $notify_user_id ) {
-        $notify_user = get_userdata( $notify_user_id );
-        if ( $notify_user ) {
-            kounselia_send_html_email(
-                $notify_user->user_email,
-                'A session was cancelled',
-                'Booking cancelled',
-                '<p>The session scheduled for <strong>' . esc_html( $when ) . '</strong> has been cancelled.</p>'
-            );
-        }
+        $notify_is_pro = ( (int) $notify_user_id === (int) $booking->professional_user_id );
+        kounselia_notify_user(
+            $notify_user_id,
+            'booking_cancelled',
+            'A session was cancelled',
+            'The session scheduled for ' . $when . ' has been cancelled.',
+            $notify_is_pro ? '/pro-dashboard.php#bookings' : '/dashboard.php#professionals',
+            array(
+                'subject'      => 'A session was cancelled',
+                'headline'     => 'Booking cancelled',
+                'content_html' => '<p>The session scheduled for <strong>' . esc_html( $when ) . '</strong> has been cancelled.</p>',
+            )
+        );
     }
+}
+
+/**
+ * Notifies the other party (not whoever moved it) that a booking's time
+ * changed, showing both the old and new time so it's unambiguous.
+ */
+function kounselia_notify_booking_rescheduled( $booking_id, $acting_user_id, $old_start_mysql ) {
+    if ( ! function_exists( 'kounselia_notify_user' ) ) {
+        return;
+    }
+    global $wpdb;
+    $booking = $wpdb->get_row( $wpdb->prepare(
+        "SELECT b.*, p.user_id AS professional_user_id
+         FROM {$wpdb->prefix}kounselia_bookings b
+         INNER JOIN {$wpdb->prefix}kounselia_professionals p ON p.id = b.professional_id
+         WHERE b.id = %d",
+        $booking_id
+    ) );
+    if ( ! $booking ) {
+        return;
+    }
+
+    $old_when = date_i18n( 'l, F j, Y \a\t g:i A', strtotime( $old_start_mysql ) );
+    $new_when = date_i18n( 'l, F j, Y \a\t g:i A', strtotime( $booking->scheduled_start ) );
+
+    $acted_by_pro   = ( (int) $acting_user_id === (int) $booking->professional_user_id );
+    $notify_user_id = $acted_by_pro ? $booking->client_user_id : $booking->professional_user_id;
+
+    kounselia_notify_user(
+        $notify_user_id,
+        'booking_rescheduled',
+        'A session was rescheduled',
+        'Moved from ' . $old_when . ' to ' . $new_when . '.',
+        $acted_by_pro ? '/dashboard.php#professionals' : '/pro-dashboard.php#bookings',
+        array(
+            'subject'      => 'A session was rescheduled',
+            'headline'     => 'Booking rescheduled',
+            'content_html' => '<p>A session originally scheduled for <strong>' . esc_html( $old_when ) . '</strong> has been moved to <strong>' . esc_html( $new_when ) . '</strong>.</p>',
+        )
+    );
 }
 
 /* -------------------------------------------------------------------------
@@ -552,7 +710,8 @@ function kounselia_ajax_get_professional_slots() {
         wp_send_json_error( array( 'message' => 'Please sign in first.' ), 401 );
     }
 
-    $professional_id = isset( $_POST['professional_id'] ) ? absint( $_POST['professional_id'] ) : 0;
+    $professional_id      = isset( $_POST['professional_id'] ) ? absint( $_POST['professional_id'] ) : 0;
+    $reschedule_booking_id = isset( $_POST['reschedule_booking_id'] ) ? absint( $_POST['reschedule_booking_id'] ) : 0;
     if ( ! $professional_id ) {
         wp_send_json_error( array( 'message' => 'Invalid request.' ), 400 );
     }
@@ -562,8 +721,20 @@ function kounselia_ajax_get_professional_slots() {
         wp_send_json_error( array( 'message' => 'That professional is not currently taking bookings.' ), 404 );
     }
 
+    // Rescheduling: exclude the booking's own current slot from "taken"
+    // so it doesn't block itself, but only once we've confirmed the
+    // requester is actually one of the two people on that booking.
+    $exclude_booking_id = 0;
+    if ( $reschedule_booking_id ) {
+        $existing_booking = kounselia_get_booking_with_parties( $reschedule_booking_id );
+        if ( $existing_booking && kounselia_user_is_booking_party( $existing_booking, get_current_user_id() )
+            && (int) $existing_booking->professional_id === $professional_id ) {
+            $exclude_booking_id = $reschedule_booking_id;
+        }
+    }
+
     wp_send_json_success( array(
-        'slots'           => kounselia_get_available_slots( $professional_id ),
+        'slots'           => kounselia_get_available_slots( $professional_id, $exclude_booking_id ),
         'session_minutes' => kounselia_session_length_minutes(),
     ) );
 }
@@ -582,13 +753,28 @@ function kounselia_ajax_create_booking() {
     $professional_id = isset( $_POST['professional_id'] ) ? absint( $_POST['professional_id'] ) : 0;
     $scheduled_start = isset( $_POST['scheduled_start'] ) ? sanitize_text_field( wp_unslash( $_POST['scheduled_start'] ) ) : '';
     $note            = isset( $_POST['note'] ) ? sanitize_textarea_field( wp_unslash( $_POST['note'] ) ) : '';
+    $make_recurring  = ! empty( $_POST['make_recurring'] );
 
     if ( ! $professional_id || ! $scheduled_start ) {
         wp_send_json_error( array( 'message' => 'Please choose a time.' ), 400 );
     }
 
-    $booking_id = kounselia_create_booking( $professional_id, get_current_user_id(), $scheduled_start, $note );
+    $series_id = 0;
+    if ( $make_recurring && function_exists( 'kounselia_create_booking_series' ) ) {
+        $start_ts = strtotime( $scheduled_start );
+        if ( $start_ts ) {
+            $series_id = kounselia_create_booking_series( $professional_id, get_current_user_id(), (int) date( 'w', $start_ts ), date( 'H:i', $start_ts ) );
+            if ( is_wp_error( $series_id ) ) {
+                wp_send_json_error( array( 'message' => $series_id->get_error_message() ), 400 );
+            }
+        }
+    }
+
+    $booking_id = kounselia_create_booking( $professional_id, get_current_user_id(), $scheduled_start, $note, $series_id );
     if ( is_wp_error( $booking_id ) ) {
+        if ( $series_id ) {
+            kounselia_delete_booking_series( $series_id );
+        }
         wp_send_json_error( array( 'message' => $booking_id->get_error_message() ), 400 );
     }
 
@@ -602,6 +788,9 @@ function kounselia_ajax_create_booking() {
         // Don't leave a dead reservation holding the slot hostage just
         // because checkout itself couldn't be started.
         kounselia_delete_unpaid_booking( $booking_id );
+        if ( $series_id ) {
+            kounselia_delete_booking_series( $series_id );
+        }
         wp_send_json_error( array( 'message' => $checkout->get_error_message() ), 502 );
     }
 
@@ -793,24 +982,28 @@ function kounselia_mark_booking_messages_read( $booking_id, $reader_user_id ) {
 }
 
 function kounselia_notify_booking_message( $booking, $sender_user_id, $content ) {
-    if ( ! function_exists( 'kounselia_send_html_email' ) ) {
+    if ( ! function_exists( 'kounselia_notify_user' ) ) {
         return;
     }
     $recipient_user_id = ( (int) $booking->client_user_id === (int) $sender_user_id )
         ? $booking->professional_user_id
         : $booking->client_user_id;
 
-    $recipient = get_userdata( $recipient_user_id );
-    $sender    = get_userdata( $sender_user_id );
-    if ( ! $recipient ) {
-        return;
-    }
+    $sender = get_userdata( $sender_user_id );
+    $sender_name = $sender ? $sender->display_name : 'The other person on your booking';
+    $recipient_is_pro = ( (int) $recipient_user_id === (int) $booking->professional_user_id );
 
-    kounselia_send_html_email(
-        $recipient->user_email,
-        'New message about your upcoming session',
-        'New message',
-        '<p>' . esc_html( $sender ? $sender->display_name : 'The other person on your booking' ) . ' sent you a message: </p><blockquote style="margin:0;padding:12px 16px;border-left:3px solid #ccc;color:#444">' . esc_html( $content ) . '</blockquote>'
+    kounselia_notify_user(
+        $recipient_user_id,
+        'booking_message',
+        'New message from ' . $sender_name,
+        wp_trim_words( $content, 20, '…' ),
+        $recipient_is_pro ? '/pro-dashboard.php#bookings' : '/dashboard.php#professionals',
+        array(
+            'subject'      => 'New message about your upcoming session',
+            'headline'     => 'New message',
+            'content_html' => '<p>' . esc_html( $sender_name ) . ' sent you a message: </p><blockquote style="margin:0;padding:12px 16px;border-left:3px solid #ccc;color:#444">' . esc_html( $content ) . '</blockquote>',
+        )
     );
 }
 
