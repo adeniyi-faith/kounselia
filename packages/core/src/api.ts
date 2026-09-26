@@ -5,7 +5,7 @@
 // Every function here resolves (never throws) so a dropped connection
 // can't leave a spinner running forever in the UI that awaited it.
 import { postAction } from './http';
-import type { HistoryMessage, KounseliaConfig, SendMessageResult } from './types';
+import type { CounselorSummary, HistoryMessage, KounseliaConfig, SendMessageResult } from './types';
 
 export const CONNECTION_ERROR_MESSAGE =
   "I couldn't reach Kounselia just now. Please check your internet connection and try again.";
@@ -120,5 +120,19 @@ export async function fetchVoiceAudio(
     return json?.success && json.data?.audio ? json.data.audio : null;
   } catch {
     return null;
+  }
+}
+
+export type CounselorsResult = { status: 'ok'; counselors: CounselorSummary[] } | { status: 'error' };
+
+export async function fetchCounselors(config: KounseliaConfig): Promise<CounselorsResult> {
+  try {
+    const json = await postAction(config, 'kounselia_get_counselors');
+    if (json?.success && Array.isArray(json.data?.counselors)) {
+      return { status: 'ok', counselors: json.data.counselors };
+    }
+    return { status: 'error' };
+  } catch {
+    return { status: 'error' };
   }
 }

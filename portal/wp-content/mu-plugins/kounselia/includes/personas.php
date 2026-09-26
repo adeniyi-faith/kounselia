@@ -155,6 +155,41 @@ function kounselia_get_all_ui() {
     return $defaults;
 }
 
+/**
+ * The counselors a member can talk to, in a tidy shape for the mobile app
+ * (the website gets the same information printed into its pages). Only
+ * active counselors are included — the same rule the dashboard uses.
+ * Icon and colour lose their CSS prefixes: 'ti-heart' becomes 'heart',
+ * 'ic-rose' becomes 'rose'.
+ */
+function kounselia_public_counselors() {
+    $list = array();
+    foreach ( kounselia_get_all_ui() as $slug => $ui ) {
+        $prompt = kounselia_get_counselor_prompt( $slug );
+        if ( ! $prompt ) {
+            continue;
+        }
+        $list[] = array(
+            'slug'          => $slug,
+            'name'          => isset( $ui['name'] ) ? $ui['name'] : $slug,
+            'spec'          => isset( $ui['spec'] ) ? $ui['spec'] : '',
+            'desc'          => isset( $ui['desc'] ) ? $ui['desc'] : '',
+            'icon'          => preg_replace( '/^ti-/', '', isset( $ui['icon'] ) ? $ui['icon'] : 'ti-message-circle' ),
+            'color'         => preg_replace( '/^ic-/', '', ! empty( $ui['class'] ) ? $ui['class'] : 'ic-blue' ),
+            'voice_enabled' => (bool) $prompt['voice_enabled'],
+        );
+    }
+    return $list;
+}
+
+// Public, read-only information (every website page that has the chat
+// already prints it), so there's no sign-in or nonce check.
+function kounselia_ajax_get_counselors() {
+    wp_send_json_success( array( 'counselors' => kounselia_public_counselors() ) );
+}
+add_action( 'wp_ajax_kounselia_get_counselors', 'kounselia_ajax_get_counselors' );
+add_action( 'wp_ajax_nopriv_kounselia_get_counselors', 'kounselia_ajax_get_counselors' );
+
 function kounselia_counselor_slugs() {
     return array_keys( kounselia_get_all_ui() );
 }

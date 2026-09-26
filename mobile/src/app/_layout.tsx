@@ -8,6 +8,7 @@ import {
 } from '@expo-google-fonts/outfit';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { tablerFont } from '@/components/TablerIcon';
 import { SessionProvider, useSession } from '@/session';
 import { colors } from '@/theme';
 
@@ -23,6 +24,7 @@ export default function RootLayout() {
     Outfit_600SemiBold,
     CormorantGaramond_400Regular,
     CormorantGaramond_500Medium,
+    ...tablerFont,
   });
 
   return (

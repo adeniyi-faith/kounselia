@@ -51,7 +51,7 @@ function kounselia_ajax_get_history() {
 
     global $wpdb;
     $rows = $wpdb->get_results( $wpdb->prepare(
-        "SELECT id, sender, content FROM {$wpdb->prefix}kounselia_messages WHERE session_id = %d AND sender IN ('user','bot') ORDER BY id ASC LIMIT 200",
+        "SELECT id, sender, content, created_at FROM {$wpdb->prefix}kounselia_messages WHERE session_id = %d AND sender IN ('user','bot') ORDER BY id ASC LIMIT 200",
         $session_id
     ) );
 
@@ -63,6 +63,9 @@ function kounselia_ajax_get_history() {
             'sender'  => $row->sender,
             'content' => $row->content,
             'rating'  => isset( $ratings[ (int) $row->id ] ) ? $ratings[ (int) $row->id ] : null,
+            // Stored in the site's local time; sent as UTC so the app can
+            // show it in the member's own time zone.
+            'sent_at' => get_gmt_from_date( $row->created_at, 'Y-m-d\\TH:i:s\\Z' ),
         );
     }, $rows );
 

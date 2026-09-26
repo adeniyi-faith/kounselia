@@ -32,6 +32,23 @@ export const colors = {
   brandNavy: '#26446F',
 };
 
+// The counselor colour classes (.ic-rose etc. in inc/kounselia-styles.php):
+// a strong colour for the icon on a pale version of it.
+const counselorPalette: Record<string, { fg: string; bg: string }> = {
+  blue: { fg: colors.accent, bg: colors.accentLight },
+  gold: { fg: colors.gold, bg: colors.goldLight },
+  rose: { fg: colors.rose, bg: colors.roseLight },
+  sage: { fg: colors.sage, bg: colors.sageLight },
+  teal: { fg: colors.teal, bg: colors.tealLight },
+  plum: { fg: colors.plum, bg: colors.plumLight },
+  sienna: { fg: colors.sienna, bg: colors.siennaLight },
+  navy: { fg: colors.navy, bg: colors.navyLight },
+};
+
+export function counselorColors(name: string) {
+  return counselorPalette[name] ?? counselorPalette.blue;
+}
+
 export const radius = {
   r: 24,
   sm: 16,
@@ -53,6 +70,11 @@ export const fonts = {
 // --shadow-btn / --shadow-md. iOS draws real shadows; Android only has
 // "elevation", so it gets the nearest equivalent.
 export const shadows = {
+  // --shadow-sm
+  soft: Platform.select({
+    ios: { shadowColor: '#18160F', shadowOpacity: 0.04, shadowRadius: 6, shadowOffset: { width: 0, height: 4 } },
+    default: { elevation: 1 },
+  }),
   button: Platform.select({
     ios: { shadowColor: '#1E3A5F', shadowOpacity: 0.25, shadowRadius: 7, shadowOffset: { width: 0, height: 4 } },
     default: { elevation: 4 },
