@@ -8,9 +8,16 @@ export default defineConfig({
   plugins: [react()],
   build: {
     outDir: 'dist',
+    // Keeps the CSS as its own kounselia-chat.css (which the PHP loader
+    // inlines) instead of IIFE mode injecting it from the JS.
+    cssCodeSplit: false,
     rollupOptions: {
       input: 'src/main.tsx',
       output: {
+        // The bundle is inlined as a classic <script>, so without a wrapper
+        // its minified top-level names become globals — a stray `var C`
+        // once overwrote window.C (the counselor list) and broke talk.php.
+        format: 'iife',
         entryFileNames: 'kounselia-chat.js',
         assetFileNames: (asset) =>
           asset.name?.endsWith('.css') ? 'kounselia-chat.css' : 'assets/[name][extname]',

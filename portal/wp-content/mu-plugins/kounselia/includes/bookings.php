@@ -952,6 +952,8 @@ function kounselia_send_booking_message( $booking_id, $sender_user_id, $content 
         'created_at'     => current_time( 'mysql' ),
         'flagged_safety' => $flagged_safety,
         'flag_reason'    => $flag_reason,
+        // 0 = waiting for the background AI risk check (safety-ai-screening.php).
+        'ai_screened'    => $flagged_safety ? 1 : 0,
     ) );
 
     $message_id = (int) $wpdb->insert_id;

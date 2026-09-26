@@ -37,6 +37,7 @@ function kounselia_default_plans() {
             'id'          => 'pro-monthly',
             'name'        => 'Pro',
             'price_amount'=> 4999,
+            'price_usd'   => 4.99,
             'currency'    => 'NGN',
             'interval'    => 'monthly',
             'features'    => array(
@@ -184,15 +185,19 @@ function kounselia_ajax_init_subscription_payment() {
     }
 
     $user      = wp_get_current_user();
-    $amount    = (float) $plan['price_amount'];
+    $currency  = kounselia_viewer_currency();
+    $amount    = kounselia_plan_price( $plan, $currency );
+    if ( $amount <= 0 ) {
+        wp_send_json_error( array( 'message' => 'That plan is not available right now.' ), 400 );
+    }
     $reference = 'KOUNSELIA-' . $user->ID . '-' . time() . '-' . wp_generate_password( 6, false );
 
     $callback_url = home_url( '/subscription-callback.php' );
 
     $result = kounselia_paystack_request( 'POST', '/transaction/initialize', array(
         'email'        => $user->user_email,
-        'amount'       => (int) round( $amount * 100 ), // Paystack expects kobo.
-        'currency'     => $plan['currency'],
+        'amount'       => (int) round( $amount * 100 ), // Paystack expects the smallest unit: kobo / cents.
+        'currency'     => $currency,
         'reference'    => $reference,
         'callback_url' => $callback_url,
         'metadata'     => array( 'user_id' => $user->ID, 'plan_id' => $plan_id ),
@@ -209,7 +214,7 @@ function kounselia_ajax_init_subscription_payment() {
         'plan_id'    => $plan_id,
         'reference'  => $reference,
         'amount'     => $amount,
-        'currency'   => $plan['currency'],
+        'currency'   => $currency,
         'status'     => 'pending',
         'created_at' => $now,
         'updated_at' => $now,
@@ -253,9 +258,10 @@ function kounselia_complete_subscription_payment( $reference ) {
     // Verified amount must match what we asked for — guards against a
     // tampered client-side amount ever mattering (we never trusted it
     // for the charge itself, but this keeps the receipt honest too).
-    $verified_kobo = (int) ( $result['data']['amount'] ?? 0 );
-    $expected_kobo = (int) round( (float) $payment->amount * 100 );
-    if ( $verified_kobo !== $expected_kobo ) {
+    $verified_kobo     = (int) ( $result['data']['amount'] ?? 0 );
+    $expected_kobo     = (int) round( (float) $payment->amount * 100 );
+    $verified_currency = strtoupper( (string) ( $result['data']['currency'] ?? $payment->currency ) );
+    if ( $verified_kobo !== $expected_kobo || $verified_currency !== strtoupper( $payment->currency ) ) {
         $wpdb->update( $payments_table, array(
             'status'           => 'failed',
             'gateway_response' => wp_json_encode( $result['data'] ),
@@ -267,11 +273,15 @@ function kounselia_complete_subscription_payment( $reference ) {
     $plan = kounselia_get_plan( $payment->plan_id );
     $now  = current_time( 'mysql' );
 
-    $wpdb->update( $payments_table, array(
-        'status'           => 'success',
-        'gateway_response' => wp_json_encode( $result['data'] ),
-        'updated_at'       => $now,
-    ), array( 'id' => $payment->id ) );
+    // The browser redirect and the Paystack webhook can land at the same
+    // moment — only whichever one flips the row first activates the plan.
+    $claimed = $wpdb->query( $wpdb->prepare(
+        "UPDATE {$payments_table} SET status = 'success', gateway_response = %s, updated_at = %s WHERE id = %d AND status != 'success'",
+        wp_json_encode( $result['data'] ), $now, $payment->id
+    ) );
+    if ( ! $claimed ) {
+        return array( 'success' => true, 'message' => 'Payment already confirmed.' );
+    }
 
     $period_end = kounselia_subscription_period_end( $plan['interval'] ?? 'monthly', current_time( 'timestamp' ) );
     $sub_data   = array(

@@ -75,6 +75,34 @@ function kounselia_safety_critical_markers() {
         'hurting myself',
         'hurt myself',
         'cutting myself',
+        // Built-in indirect phrases (kounselia_builtin_crisis_phrases) that
+        // describe acute danger rather than general distress.
+        'kms',
+        'unalive',
+        'unaliving',
+        'sewerslide',
+        'end it all',
+        'ending it all',
+        'off myself',
+        'dont want to be alive',
+        'dont want to live',
+        'dont want to wake up',
+        'better off without me',
+        'no point in living',
+        'going to jump',
+        'jump off a bridge',
+        'jump off the roof',
+        'slit my wrists',
+        'hang myself',
+        'hanging myself',
+        'shoot myself',
+        'take all my pills',
+        'took all my pills',
+        'swallow all the pills',
+        'writing a suicide note',
+        'he is going to kill me',
+        'she is going to kill me',
+        'afraid he will kill me',
     );
 }
 
@@ -95,7 +123,7 @@ define( 'KOUNSELIA_SAFETY_NOTIFY_COOLDOWN', 30 * MINUTE_IN_SECONDS );
  * immediately if it's critical and not within the per-session cooldown.
  * Called right after kounselia_log_message() stores the flagged message.
  */
-function kounselia_record_safety_escalation( $message_id, $session_id, $flag_reason ) {
+function kounselia_record_safety_escalation( $message_id, $session_id, $flag_reason, $severity = null ) {
     global $wpdb;
 
     $session = $wpdb->get_row( $wpdb->prepare(
@@ -103,7 +131,7 @@ function kounselia_record_safety_escalation( $message_id, $session_id, $flag_rea
         $session_id
     ) );
 
-    $severity = kounselia_classify_safety_severity( $flag_reason );
+    $severity = $severity ? $severity : kounselia_classify_safety_severity( $flag_reason );
     $now      = current_time( 'mysql' );
 
     $wpdb->insert( $wpdb->prefix . 'kounselia_safety_escalations', array(
@@ -133,10 +161,10 @@ function kounselia_record_safety_escalation( $message_id, $session_id, $flag_rea
  * message. $user_id is whoever sent the flagged message — the person a
  * concerning phrase actually came from, client or professional.
  */
-function kounselia_record_booking_message_safety_escalation( $booking_message_id, $booking_id, $flag_reason, $user_id ) {
+function kounselia_record_booking_message_safety_escalation( $booking_message_id, $booking_id, $flag_reason, $user_id, $severity = null ) {
     global $wpdb;
 
-    $severity = kounselia_classify_safety_severity( $flag_reason );
+    $severity = $severity ? $severity : kounselia_classify_safety_severity( $flag_reason );
     $now      = current_time( 'mysql' );
 
     $wpdb->insert( $wpdb->prefix . 'kounselia_safety_escalations', array(

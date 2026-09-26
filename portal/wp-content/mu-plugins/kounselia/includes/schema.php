@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.18.0'; // Bumped version: reviews, reschedule, recurring series, reminders, notification center
+    $current_version   = '1.19.0'; // Bumped version: message feedback, payout follow-up, multi-currency booking payments, AI safety screening
 
     if ( $installed_version === $current_version ) {
         return;
@@ -58,9 +58,11 @@ function kounselia_install_tables() {
         created_at DATETIME NOT NULL,
         flagged_safety TINYINT(1) UNSIGNED NOT NULL DEFAULT 0,
         flag_reason VARCHAR(255) NULL,
+        ai_screened TINYINT(1) UNSIGNED NOT NULL DEFAULT 1,
         PRIMARY KEY  (id),
         KEY session_id (session_id),
-        KEY flagged_safety (flagged_safety)
+        KEY flagged_safety (flagged_safety),
+        KEY ai_screened (ai_screened, created_at)
     ) {$charset_collate};";
 
     // Server-side enforcement of the guest message limit
@@ -415,9 +417,11 @@ function kounselia_install_tables() {
         read_at DATETIME NULL,
         flagged_safety TINYINT(1) UNSIGNED NOT NULL DEFAULT 0,
         flag_reason VARCHAR(255) NULL,
+        ai_screened TINYINT(1) UNSIGNED NOT NULL DEFAULT 1,
         PRIMARY KEY  (id),
         KEY booking_id (booking_id),
-        KEY flagged_safety (flagged_safety)
+        KEY flagged_safety (flagged_safety),
+        KEY ai_screened (ai_screened, created_at)
     ) {$charset_collate};";
 
     // What a client paid for one booking, and how that payment splits
@@ -436,6 +440,8 @@ function kounselia_install_tables() {
         currency VARCHAR(8) NOT NULL DEFAULT 'NGN',
         platform_fee_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
         professional_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+        payout_currency VARCHAR(8) NOT NULL DEFAULT 'NGN',
+        exchange_rate DECIMAL(14,4) NULL,
         reference VARCHAR(100) NOT NULL,
         status VARCHAR(16) NOT NULL DEFAULT 'pending',
         payout_id BIGINT UNSIGNED NULL,
@@ -483,6 +489,8 @@ function kounselia_install_tables() {
         paystack_reference VARCHAR(100) NULL,
         failure_reason VARCHAR(500) NULL,
         gateway_response TEXT NULL,
+        check_attempts INT UNSIGNED NOT NULL DEFAULT 0,
+        last_checked_at DATETIME NULL,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
         completed_at DATETIME NULL,
@@ -526,6 +534,7 @@ function kounselia_install_tables() {
         status VARCHAR(16) NOT NULL DEFAULT 'active',
         paystack_authorization_code VARCHAR(100) NULL,
         paystack_email VARCHAR(191) NULL,
+        currency VARCHAR(8) NOT NULL DEFAULT 'NGN',
         cancel_reason VARCHAR(500) NULL,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
@@ -572,6 +581,25 @@ function kounselia_install_tables() {
         KEY user_id (user_id)
     ) {$charset_collate};";
 
+    // A member's thumbs up/down on one counselor reply. One row per
+    // message (re-rating replaces the old rating) so staff can see which
+    // replies landed and which didn't.
+    $sql_message_feedback = "CREATE TABLE {$prefix}kounselia_message_feedback (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        message_id BIGINT UNSIGNED NOT NULL,
+        session_id BIGINT UNSIGNED NOT NULL,
+        counselor_slug VARCHAR(64) NOT NULL,
+        user_id BIGINT UNSIGNED NULL,
+        guest_token VARCHAR(64) NULL,
+        rating VARCHAR(8) NOT NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY message_id (message_id),
+        KEY session_id (session_id),
+        KEY counselor_rating (counselor_slug, rating)
+    ) {$charset_collate};";
+
     dbDelta( $sql_sessions );
     dbDelta( $sql_messages );
     dbDelta( $sql_guest_limits );
@@ -601,6 +629,7 @@ function kounselia_install_tables() {
     dbDelta( $sql_booking_series );
     dbDelta( $sql_notifications );
     dbDelta( $sql_push_tokens );
+    dbDelta( $sql_message_feedback );
 
     if ( function_exists( 'kounselia_ensure_professional_docs_dir' ) ) {
         kounselia_ensure_professional_docs_dir();
@@ -698,4 +727,4 @@ function kounselia_cleanup_message_slashes() {
             $wpdb->update( $table, array( 'content' => $clean ), array( 'id' => $row->id ) );
         }
     }
-}
+}

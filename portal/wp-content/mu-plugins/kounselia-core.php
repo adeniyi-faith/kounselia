@@ -56,9 +56,11 @@ require_once KOUNSELIA_CORE_DIR . '/includes/dashboard.php';         // 6.  Dash
 require_once KOUNSELIA_CORE_DIR . '/includes/account.php';           // 7-9. Avatar, profile, password
 require_once KOUNSELIA_CORE_DIR . '/includes/chat-helpers.php';      // 10. Session/guest-limit/safety/Gemini-client helpers
 require_once KOUNSELIA_CORE_DIR . '/includes/safety-escalation.php'; // 10B. Safety escalation: severity, staff alerts, acknowledgment
+require_once KOUNSELIA_CORE_DIR . '/includes/safety-ai-screening.php'; // 10C. Background AI risk check for messages keywords missed
 require_once KOUNSELIA_CORE_DIR . '/includes/chat-endpoint.php';     // 11. Main chat AJAX endpoint
 require_once KOUNSELIA_CORE_DIR . '/includes/voice.php';             // 12-13. TTS + Gemini Live voice
-require_once KOUNSELIA_CORE_DIR . '/includes/resume.php';            // 14. Resuming a conversation
+require_once KOUNSELIA_CORE_DIR . '/includes/resume.php';            // 14. Resuming a conversation (+ Clear chat)
+require_once KOUNSELIA_CORE_DIR . '/includes/message-feedback.php';  // 14B. Thumbs up/down on counselor replies
 require_once KOUNSELIA_CORE_DIR . '/includes/mood.php';              // 15. Mood check-in
 require_once KOUNSELIA_CORE_DIR . '/includes/journal.php';           // 16. Private journal
 require_once KOUNSELIA_CORE_DIR . '/includes/password-reset.php';    // 17. Forgot password
@@ -66,8 +68,10 @@ require_once KOUNSELIA_CORE_DIR . '/includes/memory.php';            // 18. Stru
 require_once KOUNSELIA_CORE_DIR . '/includes/check-ins.php';         // 18B. Smart Check-ins: dated events extracted from memory synthesis
 require_once KOUNSELIA_CORE_DIR . '/includes/professionals.php';     // 18C. Professional marketplace: applications, verification, private docs
 require_once KOUNSELIA_CORE_DIR . '/includes/bookings.php';          // 18E. Booking calendar: availability + confirmed sessions
+require_once KOUNSELIA_CORE_DIR . '/includes/currency.php';          // 18D-0. Naira vs dollar pricing by visitor location
 require_once KOUNSELIA_CORE_DIR . '/includes/payments.php';          // 18D. Paystack subscriptions: plans, checkout, cancellation
 require_once KOUNSELIA_CORE_DIR . '/includes/booking-payments.php';  // 18F. Booking checkout + professional payouts
+require_once KOUNSELIA_CORE_DIR . '/includes/payment-reconciliation.php'; // 18F-2. Paystack webhook, pending-charge sweep, payout follow-up
 require_once KOUNSELIA_CORE_DIR . '/includes/booking-series.php';    // 18G. Recurring weekly sessions
 require_once KOUNSELIA_CORE_DIR . '/includes/booking-reminders.php'; // 18H. "Starts soon" reminders (WP-Cron)
 require_once KOUNSELIA_CORE_DIR . '/includes/reviews.php';           // 18I. Session ratings & reviews
