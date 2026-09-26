@@ -1,7 +1,7 @@
 import { cancelBooking, cancelSeries, fetchBookings, type BookingsData, type Professional, type UpcomingBooking } from '@kounselia/core';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { Toast, useToast } from '@/components/chat/Toast';
@@ -12,11 +12,13 @@ import { RateSheet } from '@/components/dashboard/RateSheet';
 import { sessionWhen } from '@/components/dashboard/when';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
-import { colors, fonts, radius, shadows } from '@/theme';
+import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 
 // Sessions with licensed professionals — the website dashboard's
 // "Your upcoming sessions", "Past sessions" and "Find a professional".
 export default function Book() {
+  const styles = useStyles();
+  const colors = useColors();
   const { config } = useSession();
   const [data, setData] = useState<BookingsData | null>(null);
   const [failed, setFailed] = useState(false);
@@ -89,7 +91,7 @@ export default function Book() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
       >
         <Text style={styles.title} accessibilityRole="header">
           Sessions with professionals
@@ -101,7 +103,7 @@ export default function Book() {
               <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
-            <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
+            <ActivityIndicator color={colors.accentText} style={{ marginTop: 40 }} />
           )
         ) : (
           <>
@@ -139,11 +141,11 @@ export default function Book() {
                       accessibilityRole="button"
                       style={styles.action}
                     >
-                      <TablerIcon name="message" size={16} color={colors.accent} />
+                      <TablerIcon name="message" size={16} color={colors.accentText} />
                       <Text style={styles.actionText}>Message</Text>
                     </Pressable>
                     <Pressable onPress={() => moreFor(b)} accessibilityRole="button" accessibilityLabel="Reschedule or cancel" style={styles.action}>
-                      <TablerIcon name="calendar-cog" size={16} color={colors.accent} />
+                      <TablerIcon name="calendar-cog" size={16} color={colors.accentText} />
                       <Text style={styles.actionText}>Change</Text>
                     </Pressable>
                   </View>
@@ -157,7 +159,7 @@ export default function Book() {
                 {data.past.map((b) => (
                   <View key={b.id} style={[styles.row, styles.rowTop]}>
                     <View style={[styles.av, { backgroundColor: colors.accentLight }]}>
-                      <TablerIcon name="check" size={18} color={colors.accent} />
+                      <TablerIcon name="check" size={18} color={colors.accentText} />
                     </View>
                     <View style={styles.meta}>
                       <Text style={styles.name}>
@@ -214,6 +216,8 @@ export default function Book() {
 }
 
 function ProfessionalTile({ pro }: { pro: Professional }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/book/[proId]', params: { proId: String(pro.id), pro: JSON.stringify(pro) } })}
@@ -243,7 +247,7 @@ function ProfessionalTile({ pro }: { pro: Professional }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 40 },
   title: { fontFamily: fonts.serifMedium, fontSize: 28, color: colors.text, marginTop: 8 },
@@ -260,7 +264,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     letterSpacing: 0.3,
     textTransform: 'uppercase',
-    color: colors.accent,
+    color: colors.accentText,
     backgroundColor: colors.accentLight,
     borderRadius: 999,
     paddingVertical: 2,
@@ -279,10 +283,10 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.bg,
   },
-  joinAction: { backgroundColor: colors.sage, borderColor: colors.sage },
-  actionText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  joinAction: { backgroundColor: colors.sageFill, borderColor: colors.sageFill },
+  actionText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accentText },
   stars: { fontSize: 14, color: colors.gold, letterSpacing: 1 },
-  link: { fontFamily: fonts.medium, fontSize: 14, color: colors.accent },
+  link: { fontFamily: fonts.medium, fontSize: 14, color: colors.accentText },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   tile: {
     width: '47.5%',
@@ -297,7 +301,7 @@ const styles = StyleSheet.create({
   },
   tileName: { fontFamily: fonts.serifMedium, fontSize: 17, color: colors.text, marginTop: 10, textAlign: 'center' },
   tileSpec: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, color: colors.text3, textAlign: 'center', marginTop: 2 },
-  price: { fontFamily: fonts.semibold, fontSize: 13, color: colors.accent, marginTop: 6, textAlign: 'center' },
+  price: { fontFamily: fonts.semibold, fontSize: 13, color: colors.accentText, marginTop: 6, textAlign: 'center' },
   proPrice: { fontFamily: fonts.medium, fontSize: 12, color: colors.gold, marginTop: 2, textAlign: 'center' },
   fullPrice: { fontFamily: fonts.regular, color: colors.text3, textDecorationLine: 'line-through' },
-});
+}));

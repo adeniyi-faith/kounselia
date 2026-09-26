@@ -3,7 +3,7 @@
 import { fetchBlogPost, type BlogPost } from '@kounselia/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Share, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBrowser } from '@/browser/BrowserProvider';
 import { WebFrame } from '@/browser/WebFrame';
@@ -12,12 +12,15 @@ import { Button } from '@/components/Button';
 import { HeaderButton, ScreenHeader } from '@/components/ScreenHeader';
 import { SITE_URL } from '@/config';
 import { useSession } from '@/session';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles, useColors, useTheme } from '@/theme';
 
 const ARTICLE_LINK = new RegExp(`^${SITE_URL.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}/blog/([a-z0-9-]+)/?(?:[?#].*)?$`, 'i');
 const NOT_ARTICLES = ['tag', 'tags', 'feed', 'rss', 'search', 'page', 'author'];
 
 export default function Article() {
+  const styles = useStyles();
+  const colors = useColors();
+  const { scheme } = useTheme();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { config } = useSession();
   const { openInApp } = useBrowser();
@@ -43,7 +46,7 @@ export default function Article() {
   }, [load]);
 
   const baseUrl = `${SITE_URL}/blog/${slug}`;
-  const html = useMemo(() => (post ? articleHtml(post) : ''), [post]);
+  const html = useMemo(() => (post ? articleHtml(post, colors, scheme === 'dark') : ''), [post, colors, scheme]);
 
   function shouldLoad(url: string, isTopFrame: boolean) {
     // The article itself, jumps within it, and videos embedded in it.
@@ -71,16 +74,16 @@ export default function Article() {
         </View>
       ) : (
         <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator color={colors.accentText} />
         </View>
       )}
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   web: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
-});
+}));

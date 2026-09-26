@@ -3,13 +3,15 @@
 // Save button for anyone who'd rather be sure.
 import { saveJournal, type KounseliaConfig } from '@kounselia/core';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors, fonts } from '@/theme';
+import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { fonts, makeStyles, useColors } from '@/theme';
 import { Card } from './Card';
 
 const AUTOSAVE_MS = 1800;
 
 export function JournalCard({ config, initial }: { config: KounseliaConfig; initial: string }) {
+  const styles = useStyles();
+  const colors = useColors();
   const [text, setText] = useState(initial);
   const [focused, setFocused] = useState(false);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -94,7 +96,7 @@ export function JournalCard({ config, initial }: { config: KounseliaConfig; init
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   input: {
     minHeight: 120,
     borderWidth: 1.5,
@@ -114,4 +116,4 @@ const styles = StyleSheet.create({
   status: { fontFamily: fonts.medium, fontSize: 13, color: colors.sage, flexShrink: 1 },
   btn: { minWidth: 140, alignItems: 'center', paddingVertical: 10, paddingHorizontal: 18, borderRadius: 50, backgroundColor: colors.accent },
   btnText: { fontFamily: fonts.medium, fontSize: 14, color: '#fff' },
-});
+}));

@@ -3,9 +3,9 @@
 // sideways row on Home.
 import type { BlogCard } from '@kounselia/core';
 import { Image } from 'expo-image';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { TablerIcon } from '@/components/TablerIcon';
-import { colors, fonts, radius, shadows } from '@/theme';
+import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 
 export function articleDate(iso: string | null) {
   if (!iso) return '';
@@ -15,6 +15,8 @@ export function articleDate(iso: string | null) {
 }
 
 export function ArticleCard({ post, onPress, compact }: { post: BlogCard; onPress: () => void; compact?: boolean }) {
+  const styles = useStyles();
+  const colors = useColors();
   const topic = post.tags[0]?.name;
   return (
     <Pressable
@@ -52,7 +54,7 @@ export function ArticleCard({ post, onPress, compact }: { post: BlogCard; onPres
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -73,4 +75,4 @@ const styles = StyleSheet.create({
   meta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   metaText: { fontFamily: fonts.regular, fontSize: 12, color: colors.text3 },
   dot: { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.text3 },
-});
+}));

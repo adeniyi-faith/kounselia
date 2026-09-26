@@ -4,7 +4,7 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityIndicator, Pressable, StyleSheet, Text, type ViewStyle } from 'react-native';
-import { colors, fonts, radius, shadows } from '@/theme';
+import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 
 interface Props {
   title: string;
@@ -16,6 +16,8 @@ interface Props {
 }
 
 export function Button({ title, onPress, variant = 'primary', busy = false, disabled = false, style }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const inactive = busy || disabled;
   const primary = variant === 'primary';
 
@@ -52,7 +54,7 @@ export function Button({ title, onPress, variant = 'primary', busy = false, disa
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   base: {
     minHeight: 54,
     borderRadius: radius.pill,
@@ -63,4 +65,4 @@ const styles = StyleSheet.create({
   gradient: { borderRadius: radius.pill },
   ghost: { borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface },
   label: { fontFamily: fonts.medium, fontSize: 15 },
-});
+}));

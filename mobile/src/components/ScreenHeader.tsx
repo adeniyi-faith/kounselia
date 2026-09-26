@@ -2,11 +2,13 @@
 // title, and room for a button on the right.
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '@/theme';
+import { Pressable, Text, View } from 'react-native';
+import { fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from './TablerIcon';
 
 export function ScreenHeader({ title, right, onBack }: { title: string; right?: ReactNode; onBack?: () => void }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <View style={styles.nav}>
       <Pressable
@@ -28,6 +30,8 @@ export function ScreenHeader({ title, right, onBack }: { title: string; right?: 
 
 // A round icon button for the right-hand side of the header.
 export function HeaderButton({ icon, label, onPress }: { icon: string; label: string; onPress: () => void }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={label} style={styles.back} hitSlop={6}>
       <TablerIcon name={icon} size={19} color={colors.text2} />
@@ -35,7 +39,7 @@ export function HeaderButton({ icon, label, onPress }: { icon: string; label: st
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   nav: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10 },
   back: {
     width: 40,
@@ -48,4 +52,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   title: { flex: 1, fontFamily: fonts.medium, fontSize: 16, color: colors.text },
-});
+}));

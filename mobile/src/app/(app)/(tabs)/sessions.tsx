@@ -1,7 +1,7 @@
 import { fetchSessions, type SessionSummary } from '@kounselia/core';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { CounselorAvatar } from '@/components/CounselorAvatar';
@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/dashboard/Card';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useCounselors } from '@/counselors';
 import { useSession } from '@/session';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles, useColors } from '@/theme';
 
 // "3 hours ago", "2 days ago" — like the website's session list.
 function ago(iso: string | null): string {
@@ -25,6 +25,8 @@ function ago(iso: string | null): string {
 
 // The dashboard's Sessions tab: recent conversations, most recent first.
 export default function Sessions() {
+  const styles = useStyles();
+  const colors = useColors();
   const { config } = useSession();
   const { bySlug } = useCounselors();
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
@@ -70,7 +72,7 @@ export default function Sessions() {
               <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
-            <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
+            <ActivityIndicator color={colors.accentText} style={{ marginTop: 40 }} />
           )}
         </View>
       ) : (
@@ -79,7 +81,7 @@ export default function Sessions() {
           keyExtractor={(s) => String(s.id)}
           contentContainerStyle={styles.list}
           ListHeaderComponent={header}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
           ListEmptyComponent={
             <EmptyState>
               <TablerIcon name="feather" size={28} color={colors.text3} />
@@ -114,7 +116,7 @@ export default function Sessions() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   list: { padding: 16, paddingBottom: 40 },
   title: { fontFamily: fonts.serifMedium, fontSize: 28, color: colors.text, marginTop: 8, marginBottom: 16 },
@@ -134,7 +136,7 @@ const styles = StyleSheet.create({
   meta: { flex: 1, minWidth: 0 },
   name: { fontFamily: fonts.semibold, fontSize: 15, color: colors.text },
   sub: { fontFamily: fonts.regular, fontSize: 13, color: colors.text3, marginTop: 2 },
-  link: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  link: { fontFamily: fonts.medium, fontSize: 13, color: colors.accentText },
   center: { marginTop: 24, gap: 16 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
-});
+}));

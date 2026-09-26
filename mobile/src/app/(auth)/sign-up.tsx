@@ -1,15 +1,16 @@
 import * as Haptics from 'expo-haptics';
 import { Link } from 'expo-router';
 import { useRef, useState } from 'react';
-import { StyleSheet, Text, type TextInput } from 'react-native';
+import { Text, type TextInput } from 'react-native';
 import { Button } from '@/components/Button';
 import { FormMessage } from '@/components/FormMessage';
 import { FormScreen } from '@/components/FormScreen';
 import { TextField } from '@/components/TextField';
 import { useSession } from '@/session';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles } from '@/theme';
 
 export default function SignUp() {
+  const styles = useStyles();
   const { signUp } = useSession();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -89,7 +90,7 @@ export default function SignUp() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   switch: { textAlign: 'center', marginTop: 20, fontFamily: fonts.regular, fontSize: 14, color: colors.text2 },
-  link: { color: colors.accent, fontFamily: fonts.medium },
-});
+  link: { color: colors.accentText, fontFamily: fonts.medium },
+}));

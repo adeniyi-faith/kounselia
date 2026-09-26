@@ -3,7 +3,7 @@
 // all of it. Only today's entry can be changed, as on the website.
 import { fetchJournalEntries, type JournalEntry } from '@kounselia/core';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { SectionHead } from '@/components/dashboard/Card';
@@ -11,7 +11,7 @@ import { JournalCard } from '@/components/dashboard/JournalCard';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
-import { colors, fonts, radius, shadows } from '@/theme';
+import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 
 // "2026-09-26" is a calendar day, not a moment, so it's read as local noon
 // to never slip into the day before or after.
@@ -22,6 +22,8 @@ function dayLabel(date: string) {
 }
 
 export default function Journal() {
+  const styles = useStyles();
+  const colors = useColors();
   const { config } = useSession();
   const [entries, setEntries] = useState<JournalEntry[] | null>(null);
   const [today, setToday] = useState('');
@@ -78,7 +80,7 @@ export default function Journal() {
               <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
             </>
           ) : (
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color={colors.accentText} />
           )}
         </View>
       </SafeAreaView>
@@ -94,7 +96,7 @@ export default function Journal() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
         onEndReached={more}
         onEndReachedThreshold={0.4}
         ListHeaderComponent={
@@ -114,7 +116,7 @@ export default function Journal() {
             <Text style={styles.emptyText}>Your earlier entries will appear here. Write a little each day, it adds up.</Text>
           </View>
         }
-        ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.accent} style={{ marginTop: 16 }} /> : null}
+        ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.accentText} style={{ marginTop: 16 }} /> : null}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         renderItem={({ item }) => {
           const expanded = open === item.date;
@@ -141,7 +143,7 @@ export default function Journal() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
@@ -166,8 +168,8 @@ const styles = StyleSheet.create({
     ...shadows.soft,
   },
   entryHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  entryDate: { fontFamily: fonts.semibold, fontSize: 13, color: colors.accent },
+  entryDate: { fontFamily: fonts.semibold, fontSize: 13, color: colors.accentText },
   entryText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 23, color: colors.text },
   empty: { alignItems: 'center', gap: 10, paddingVertical: 28, paddingHorizontal: 24 },
   emptyText: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.text2, textAlign: 'center' },
-});
+}));
