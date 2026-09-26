@@ -108,6 +108,15 @@ $memory_time = "112ms";
 .brain-header {
     display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px;
 }
+.grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-3 { grid-template-columns: repeat(3, 1fr); margin-bottom: 32px; }
+@media (max-width: 760px) {
+    .grid-4 { grid-template-columns: repeat(2, 1fr); }
+    .grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 460px) {
+    .grid-4, .grid-3 { grid-template-columns: 1fr; }
+}
 .live-indicator {
     display: inline-flex; align-items: center; gap: 8px;
     background: var(--sage-light); color: var(--sage);
@@ -197,7 +206,7 @@ tr.open + .log-drawer { display: table-row; }
         </div>
     </div>
 
-    <div class="grid" style="grid-template-columns: repeat(4, 1fr);">
+    <div class="grid grid-4">
         <div class="card">
             <div class="label">Requests Today</div>
             <div class="num"><?php echo $fmt_requests; ?></div>
@@ -220,7 +229,7 @@ tr.open + .log-drawer { display: table-row; }
         </div>
     </div>
 
-    <div class="grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 32px;">
+    <div class="grid grid-3">
         <div class="card" style="padding: 16px 20px;">
             <div class="label" style="margin-bottom: 4px;">Memory Retrieval Time</div>
             <div class="num" style="font-size: 22px;"><?php echo $memory_time; ?></div>

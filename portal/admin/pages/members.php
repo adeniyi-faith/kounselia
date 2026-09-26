@@ -188,12 +188,6 @@ table.admin-table tbody tr:hover td {
 .d-control { display: flex; justify-content: space-between; align-items: center; padding: 14px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-sm); margin-bottom: 10px; }
 .d-control div { font-size: 14px; font-weight: 500; }
 .d-control span { display: block; font-size: 12px; color: var(--text3); font-weight: 400; margin-top: 2px; }
-.btn-action { padding: 8px 16px; border-radius: 50px; font-size: 12.5px; font-weight: 500; border: none; cursor: pointer; transition: all 0.2s; }
-.btn-action.pro { background: var(--gold); color: #fff; }
-.btn-action.downgrade { background: var(--surface2); color: var(--text2); }
-.btn-action.ban { background: var(--rose); color: #fff; }
-.btn-action.unban { background: var(--sage); color: #fff; }
-
 .d-session { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
 .d-session:last-child { border-bottom: none; }
 .d-session-info { font-size: 13.5px; font-weight: 500; }

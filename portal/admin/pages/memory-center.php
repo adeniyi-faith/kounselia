@@ -137,6 +137,10 @@ function kounselia_generate_memory_meta( $text, $sessions, $type = 'node' ) {
 .mc-sidebar-head {
     padding: 16px 20px; border-bottom: 1px solid var(--border); background: var(--surface2);
 }
+@media (max-width: 1024px) {
+    .memory-layout { flex-direction: column; height: auto; min-height: 0; }
+    .mc-sidebar { width: 100%; height: 360px; }
+}
 .mc-sidebar-head input {
     width: 100%; padding: 10px 14px; border-radius: var(--r-sm); border: 1px solid var(--border);
     font-family: inherit; font-size: 13px; margin-top: 10px;
