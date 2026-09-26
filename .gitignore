@@ -41,6 +41,7 @@ portal/wp-content/index.php
 
 # Test tooling (see tests/, composer.json) — never part of the deployed site
 vendor/
+.phpunit.result.cache
 !tests/.htaccess
 # Friendly-URL rules for the CMS pages and blog (see page/ and blog/)
 !page/.htaccess
