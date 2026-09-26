@@ -1,7 +1,7 @@
 // Sign in for the mobile app. Instead of a cookie, the server hands back
 // a token; the app saves it in the phone's secure storage and puts it in
 // its KounseliaConfig (`authToken`) so every later call carries it.
-import { postAction } from './http';
+import { postAction, ServerReplyError } from './http';
 import type { AppUser, KounseliaConfig } from './types';
 
 export type AppAuthResult =
@@ -9,6 +9,14 @@ export type AppAuthResult =
   | { success: false; message: string };
 
 const CONNECTION_MESSAGE = "Couldn't connect. Please check your internet connection and try again.";
+
+/** What to tell the member when a request didn't get a proper answer. */
+export function failureMessage(error: unknown): string {
+  if (error instanceof ServerReplyError) {
+    return `Kounselia's server couldn't take the request just now (error ${error.status}). Please try again in a little while.`;
+  }
+  return CONNECTION_MESSAGE;
+}
 
 async function postAppAuth(
   config: KounseliaConfig,
@@ -21,8 +29,8 @@ async function postAppAuth(
       return { success: true, token: json.data.token, user: json.data.user };
     }
     return { success: false, message: json?.data?.message || 'Something went wrong. Please try again.' };
-  } catch {
-    return { success: false, message: CONNECTION_MESSAGE };
+  } catch (error) {
+    return { success: false, message: failureMessage(error) };
   }
 }
 
