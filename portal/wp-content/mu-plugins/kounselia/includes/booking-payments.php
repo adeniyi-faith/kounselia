@@ -92,6 +92,18 @@ function kounselia_init_booking_payment( $booking_id ) {
     $platform_fee_amount = $split['platform_fee_amount'];
     $professional_amount = $split['professional_amount'];
 
+    // Pro members' discount comes out of Kounselia's commission, never the
+    // professional's naira share (see kounselia_member_session_price()).
+    // It's applied to what the client pays (in their currency) and taken
+    // off the platform fee (in naira).
+    if ( function_exists( 'kounselia_member_session_price' ) ) {
+        $price = kounselia_member_session_price( $booking->client_user_id, $rate_ngn, kounselia_booking_commission_percent() );
+        if ( $price['discount_percent'] > 0 ) {
+            $amount              = round( $amount * ( 1 - $price['discount_percent'] / 100 ), 2 );
+            $platform_fee_amount = $price['platform_fee'];
+        }
+    }
+
     $reference = 'KOUNSELIA-BOOKING-' . $booking_id . '-' . time() . '-' . wp_generate_password( 6, false );
 
     $result = kounselia_paystack_request( 'POST', '/transaction/initialize', array(
