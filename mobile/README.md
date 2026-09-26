@@ -37,9 +37,17 @@ EXPO_PUBLIC_KOUNSELIA_AJAX_URL=https://staging.example.com/portal/wp-admin/admin
 
 - `src/app/` — screens (Expo Router: each file is a screen).
   - `(auth)/` — welcome, sign in, sign up, forgot password (signed-out only).
-  - `(app)/` — everything behind sign-in.
+  - `(app)/(tabs)/` — Home, Talk (the counselor grid) and Settings, with
+    the website dashboard's tab bar (`components/TabBar.tsx`).
+  - `(app)/chat/[slug].tsx` — a conversation with one counselor.
 - `src/components/` — buttons, text fields, etc. styled like the website.
 - `src/theme.ts` — colours and fonts, copied from `inc/kounselia-styles.php`.
+- `src/counselors.tsx` — the counselor list, loaded from the server
+  (`kounselia_get_counselors`), so admin changes show up without an app update.
+- `src/chat/useChat.ts` — one conversation: history, sending, retrying,
+  rating, clearing.
+- `components/TablerIcon.tsx` — the website's icon set, so counselor icons
+  chosen in the admin match. Update with `node scripts/build-tabler-icons.mjs`.
 - `src/session.tsx` — who is signed in; hands out the `config` every
   `@kounselia/core` call needs.
 
