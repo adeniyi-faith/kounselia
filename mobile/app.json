@@ -36,6 +36,18 @@
           "resizeMode": "contain",
           "backgroundColor": "#26446F"
         }
+      ],
+      [
+        "react-native-audio-api",
+        {
+          "iosMicrophonePermission": "Kounselia uses your microphone so you can talk to your counselor and speak your messages instead of typing them.",
+          "iosBackgroundMode": false,
+          "androidForegroundService": false,
+          "androidPermissions": [
+            "android.permission.RECORD_AUDIO",
+            "android.permission.MODIFY_AUDIO_SETTINGS"
+          ]
+        }
       ]
     ],
     "experiments": {

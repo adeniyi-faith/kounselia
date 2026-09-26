@@ -153,5 +153,11 @@ export function useChat(config: KounseliaConfig, counselor: CounselorSummary) {
     return true;
   }, [config, counselor]);
 
-  return { messages, phase, typing, load, send, retry, rate, clear };
+  // For the voice call, which continues the same conversation.
+  const getSessionId = useCallback(() => sessionId.current, []);
+  const setSessionId = useCallback((id: number) => {
+    sessionId.current = id;
+  }, []);
+
+  return { messages, phase, typing, load, send, retry, rate, clear, getSessionId, setSessionId };
 }
