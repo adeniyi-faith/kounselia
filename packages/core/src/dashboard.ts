@@ -12,7 +12,7 @@ export type Result<T> = { ok: true; data: T } | { ok: false; offline?: boolean; 
 
 const OFFLINE = "Couldn't reach Kounselia. Please check your internet connection.";
 
-async function call<T>(config: KounseliaConfig, action: string, params: Record<string, string | number | undefined> = {}): Promise<Result<T>> {
+export async function callAction<T>(config: KounseliaConfig, action: string, params: Record<string, string | number | undefined> = {}): Promise<Result<T>> {
   try {
     const json = await postAction(config, action, params);
     if (json?.success) return { ok: true, data: (json.data ?? {}) as T };
@@ -25,6 +25,8 @@ async function call<T>(config: KounseliaConfig, action: string, params: Record<s
     return { ok: false, offline: true, message: OFFLINE };
   }
 }
+
+const call = callAction;
 
 // ---- Home -----------------------------------------------------------------
 

@@ -32,6 +32,8 @@ interface Session {
   signIn(email: string, password: string): Promise<AppAuthResult>;
   signUp(name: string, email: string, password: string): Promise<AppAuthResult>;
   signOut(): Promise<void>;
+  // After the member changes their details in Settings.
+  updateUser(changes: Partial<AppUser>): void;
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -132,6 +134,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const old = config;
         await forget();
         await appLogout(old);
+      },
+      updateUser: (changes) => {
+        if (!user) return;
+        const next = { ...user, ...changes };
+        setUser(next);
+        writeSecure(USER_KEY, JSON.stringify(next));
       },
     }),
     [status, user, config, remember],

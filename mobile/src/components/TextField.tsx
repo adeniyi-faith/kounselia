@@ -21,6 +21,7 @@ export const TextField = forwardRef<TextInput, Props>(function TextField({ label
       <View style={[styles.box, focused && styles.boxFocused]}>
         <TextInput
           ref={ref}
+          accessibilityLabel={label}
           {...input}
           secureTextEntry={password && !visible}
           placeholderTextColor={colors.text3}

@@ -6,3 +6,4 @@ export * from './appAuth';
 export * from './voiceCall';
 export * from './transcription';
 export * from './dashboard';
+export * from './content';

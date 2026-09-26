@@ -1,10 +1,10 @@
 import { createBooking, fetchBookings, fetchBookingStatus, fetchSlots, rescheduleBooking, type Professional, type Slots } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useBrowser } from '@/browser/BrowserProvider';
 import { Button } from '@/components/Button';
 import { ProfessionalAvatar } from '@/components/dashboard/ProfessionalAvatar';
 import { FormMessage } from '@/components/FormMessage';
@@ -28,6 +28,7 @@ export default function BookProfessional() {
   const professionalId = Number(proId);
   const rescheduleId = reschedule ? Number(reschedule) : undefined;
   const { config } = useSession();
+  const { openInApp } = useBrowser();
 
   // The Book tab passes the professional along; only fetch it if not.
   const [pro, setPro] = useState<Professional | null>(() => {
@@ -49,6 +50,7 @@ export default function BookProfessional() {
   const [waiting, setWaiting] = useState<{ bookingId: number; url: string } | null>(null);
   const [checking, setChecking] = useState(false);
   const done = useRef(false);
+  const checkRef = useRef<() => void>(() => undefined);
 
   useEffect(() => {
     (async () => {
@@ -113,8 +115,11 @@ export default function BookProfessional() {
     openPayment(res.data.authorization_url);
   }
 
-  function openPayment(url: string) {
-    WebBrowser.openBrowserAsync(url, { toolbarColor: colors.surface, controlsColor: colors.accent, dismissButtonStyle: 'done' }).catch(() => undefined);
+  // Paystack's page opens inside the app. When Paystack sends them back to
+  // our "payment received" page, it closes by itself and we check at once.
+  async function openPayment(url: string) {
+    await openInApp(url, { title: 'Secure payment', closeWhen: (u) => u.includes('booking-payment-callback') });
+    checkRef.current();
   }
 
   const checkPayment = useCallback(
@@ -126,9 +131,6 @@ export default function BookProfessional() {
       if (done.current) return;
       if (res.ok && res.data.status === 'confirmed') {
         done.current = true;
-        // Close the payment page for them (iPhone only; on Android they see
-        // Paystack's "Payment received" page and tap back).
-        if (Platform.OS === 'ios') WebBrowser.dismissBrowser().catch(() => undefined);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
         Alert.alert("You're booked", `Your session with ${pro?.name ?? 'your professional'} is confirmed. You'll find it under Book, with a Join button 10 minutes before it starts.`);
         router.back();
@@ -143,6 +145,9 @@ export default function BookProfessional() {
     },
     [config, pro, waiting],
   );
+  useEffect(() => {
+    checkRef.current = () => checkPayment();
+  }, [checkPayment]);
 
   // While waiting: check every 4 seconds, and whenever the app comes back
   // to the front (e.g. after closing the payment page). Stops after 20 minutes.
