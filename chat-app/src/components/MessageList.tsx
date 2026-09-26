@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { ChatMessage, Counselor } from '../core/types';
+import type { ChatMessage, Counselor } from '@kounselia/core';
 import { MessageBubble } from './MessageBubble';
 import { TypingIndicator } from './TypingIndicator';
 

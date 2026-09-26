@@ -6,6 +6,9 @@ import react from '@vitejs/plugin-react';
 // the same way it reads the hand-written assets today.
 export default defineConfig({
   plugins: [react()],
+  // @kounselia/core lives outside this folder (packages/core, shared with
+  // the mobile app); let the dev server read it.
+  server: { fs: { allow: ['.', '../packages/core'] } },
   build: {
     outDir: 'dist',
     // Keeps the CSS as its own kounselia-chat.css (which the PHP loader

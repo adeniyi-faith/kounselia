@@ -53,6 +53,7 @@ require_once KOUNSELIA_CORE_DIR . '/includes/emails.php';            // NEW: Bra
 require_once KOUNSELIA_CORE_DIR . '/includes/mail-delivery.php';     // Email delivery: default mailer or Brevo, daily limits, log
 require_once KOUNSELIA_CORE_DIR . '/includes/notifications.php';     // NEW: In-app/email/push notification dispatch + device tokens
 require_once KOUNSELIA_CORE_DIR . '/includes/auth.php';              // 3-5. Login, register, logout
+require_once KOUNSELIA_CORE_DIR . '/includes/app-auth.php';          // 5B. Mobile app sign-in (token instead of cookie + nonce)
 require_once KOUNSELIA_CORE_DIR . '/includes/dashboard.php';         // 6.  Dashboard helpers
 require_once KOUNSELIA_CORE_DIR . '/includes/account.php';           // 7-9. Avatar, profile, password
 require_once KOUNSELIA_CORE_DIR . '/includes/chat-helpers.php';      // 10. Session/guest-limit/safety/Gemini-client helpers

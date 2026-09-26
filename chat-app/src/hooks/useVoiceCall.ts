@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { fetchVoiceToken, logVoiceTurn } from '../core/voiceCall';
-import type { KounseliaConfig } from '../core/types';
+import { fetchVoiceToken, logVoiceTurn } from '@kounselia/core';
+import type { KounseliaConfig } from '@kounselia/core';
 
 // Talks directly to Gemini's realtime voice websocket from the browser,
 // using a short-lived token the backend hands out. This whole hook is

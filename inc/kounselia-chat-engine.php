@@ -81,6 +81,13 @@ if ( function_exists( 'kounselia_get_counselor_prompt' ) ) {
     }
     unset( $kounselia_ui_row );
 }
+// The chat reads each counselor's colour class (e.g. "ic-rose") as `av`,
+// but it's stored as `class`, so without this the avatar squares in the
+// chat had no colour.
+foreach ( $kounselia_ui_for_js as &$kounselia_ui_row ) {
+    $kounselia_ui_row['av'] = isset( $kounselia_ui_row['class'] ) ? $kounselia_ui_row['class'] : '';
+}
+unset( $kounselia_ui_row );
 ?>
 window.C = <?php echo wp_json_encode( $kounselia_ui_for_js ); ?>;
 </script>

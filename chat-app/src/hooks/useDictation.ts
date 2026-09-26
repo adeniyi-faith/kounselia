@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { transcribeAudio } from '../core/transcription';
-import type { KounseliaConfig } from '../core/types';
+import { transcribeAudio } from '@kounselia/core';
+import type { KounseliaConfig } from '@kounselia/core';
 
 export type DictationState = 'idle' | 'recording' | 'transcribing';
 

@@ -6,9 +6,9 @@ import {
   rateMessage as rateMessageOnServer,
   sendChatMessage,
   synthesizeMemory,
-} from '../core/api';
-import { getGuestToken } from '../core/guestToken';
-import type { ChatMessage, Counselor, KounseliaConfig } from '../core/types';
+} from '@kounselia/core';
+import { getGuestToken } from '../guestToken';
+import type { ChatMessage, Counselor, KounseliaConfig } from '@kounselia/core';
 
 const GUEST_MESSAGE_LIMIT = 6;
 const MEMORY_SYNC_EVERY = 5;
