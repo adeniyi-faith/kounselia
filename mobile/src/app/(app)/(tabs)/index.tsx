@@ -1,10 +1,13 @@
-import { fetchHome, saveMood, type HomeData } from '@kounselia/core';
+import { dismissCheckin, fetchHome, saveMood, type HomeData } from '@kounselia/core';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { SectionHead } from '@/components/dashboard/Card';
+import { CareTeamCard } from '@/components/dashboard/CareTeamCard';
+import { CheckInCard } from '@/components/dashboard/CheckInCard';
+import { joinSession } from '@/components/dashboard/joinSession';
 import { JournalCard } from '@/components/dashboard/JournalCard';
 import { MoodCard } from '@/components/dashboard/MoodCard';
 import { RecommendedCard } from '@/components/dashboard/RecommendedCard';
@@ -24,6 +27,7 @@ export default function Home() {
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [savingMood, setSavingMood] = useState<string | null>(null);
+  const [joining, setJoining] = useState(false);
   const toast = useToast();
 
   const load = useCallback(async () => {
@@ -61,7 +65,21 @@ export default function Home() {
     await load();
   }
 
+  async function laterCheckin(id: number) {
+    // Hide it straight away; the server remembers the choice.
+    setHome((h) => (h ? { ...h, checkin: null } : h));
+    dismissCheckin(config, id);
+  }
+
+  async function join(bookingId: number) {
+    setJoining(true);
+    const problem = await joinSession(config, bookingId);
+    setJoining(false);
+    if (problem) toast.show(problem);
+  }
+
   const firstName = user?.name?.split(' ')[0];
+  const checkinCounselor = home?.checkin ? bySlug(home.checkin.counselor_slug) : undefined;
   const recommended = home ? bySlug(home.recommended.slug) : undefined;
 
   return (
@@ -86,6 +104,19 @@ export default function Home() {
         ) : (
           <>
             <View style={styles.gap} />
+            {home.checkin && checkinCounselor && (
+              <CheckInCard
+                checkin={home.checkin}
+                counselor={checkinCounselor}
+                onTell={() => {
+                  const id = home.checkin!.id;
+                  setHome((h) => (h ? { ...h, checkin: null } : h));
+                  router.push({ pathname: '/chat/[slug]', params: { slug: checkinCounselor.slug, checkin: String(id) } });
+                }}
+                onLater={() => laterCheckin(home.checkin!.id)}
+              />
+            )}
+            <CareTeamCard care={home.care} joining={joining} onJoin={join} onManage={() => router.navigate('/book')} />
             <MoodCard mood={home.mood} saving={savingMood} onPick={pickMood} />
             <StatsRow stats={home.stats} />
 

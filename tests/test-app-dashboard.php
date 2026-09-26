@@ -130,6 +130,37 @@ class Test_App_Dashboard extends WP_Ajax_UnitTestCase {
         $this->assertArrayNotHasKey( 'url', (array) $res['data'] );
     }
 
+    function test_home_has_the_check_in_and_the_care_team() {
+        global $wpdb;
+        $user = self::factory()->user->create();
+        wp_set_current_user( $user );
+        $wpdb->insert( $wpdb->prefix . 'kounselia_memory_upcoming_events', array(
+            'user_id' => $user, 'event_text' => 'Your job interview', 'event_date' => current_time( 'Y-m-d' ),
+            'status' => 'pending', 'created_at' => current_time( 'mysql' ),
+        ) );
+        $session_id = kounselia_resolve_session( 'marcus', $user, '', 0 );
+        kounselia_log_message( $session_id, 'user', 'Big interview today' );
+
+        $res = $this->ajax( 'kounselia_app_home' );
+
+        $this->assertSame( 'Your job interview', $res['data']['checkin']['event_text'] );
+        $this->assertSame( 'marcus', $res['data']['checkin']['counselor_slug'] ); // the counselor they last talked to
+        $this->assertNull( $res['data']['care']['next'] );
+
+        $booking_id = $this->booking( $user, DAY_IN_SECONDS );
+        $res        = $this->ajax( 'kounselia_app_home' );
+        $this->assertSame( $booking_id, $res['data']['care']['next']['id'] );
+        $this->assertSame( 'Dr. Ada Obi', $res['data']['care']['next']['pro_name'] );
+        $this->assertSame( 0, $res['data']['care']['next']['more_booked'] );
+    }
+
+    function test_no_check_in_when_nothing_is_due() {
+        $user = self::factory()->user->create();
+        wp_set_current_user( $user );
+        $res = $this->ajax( 'kounselia_app_home' );
+        $this->assertNull( $res['data']['checkin'] );
+    }
+
     function test_slots_come_with_utc_times() {
         $this->assertSame( get_gmt_from_date( '2030-01-02 09:00:00', 'Y-m-d\TH:i:s\Z' ), kounselia_app_utc( '2030-01-02 09:00:00' ) );
         $this->assertNull( kounselia_app_utc( null ) );
