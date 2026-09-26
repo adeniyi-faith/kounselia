@@ -17,7 +17,7 @@ export function CheckInCard(props: { checkin: CheckIn; counselor: CounselorSumma
         <CounselorAvatar icon={counselor.icon} color={counselor.color} size={52} />
         <View style={styles.meta}>
           <Text style={styles.title}>{counselor.name} wants to check in</Text>
-          <Text style={styles.reason}>You mentioned “{checkin.event_text}” — how did it go?</Text>
+          <Text style={styles.reason}>You mentioned “{checkin.event_text}”. How did it go?</Text>
         </View>
       </View>
       <View style={styles.actions}>

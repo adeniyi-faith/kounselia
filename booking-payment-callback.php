@@ -32,7 +32,7 @@ if ( ! is_user_logged_in() ) {
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title><?php echo $paid ? 'Payment received' : 'Payment not completed'; ?> — Kounselia</title>
+<title><?php echo $paid ? 'Payment received' : 'Payment not completed'; ?> | Kounselia</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F8F6F2;font-family:'Outfit',sans-serif;color:#18160F;padding:24px;box-sizing:border-box;text-align:center}

@@ -98,7 +98,7 @@ export function CareTeamCard({ care, joining, onJoin, onManage }: Props) {
         </View>
       </View>
       <Text style={styles.body}>
-        Book a video session with a licensed, verified professional — on your schedule.
+        Book a video session with a licensed, verified professional, at a time that suits you.
         {discount ? <Text style={styles.perk}> You save {discount} with Pro.</Text> : null}
       </Text>
       <Pressable onPress={onManage} accessibilityRole="button" style={[styles.btnWide, styles.btnFill]}>

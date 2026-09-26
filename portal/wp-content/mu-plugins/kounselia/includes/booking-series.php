@@ -132,7 +132,7 @@ function kounselia_maybe_save_series_authorization( $booking_id, $paystack_data 
                 $booking->client_user_id,
                 'series_needs_manual_renewal',
                 'Weekly sessions need to be booked manually',
-                'Your payment method can\'t be auto-charged for future weeks — please book each session yourself.',
+                'Your payment method can\'t be auto-charged for future weeks, so please book each session yourself.',
                 '/dashboard.php#professionals'
             );
         }
