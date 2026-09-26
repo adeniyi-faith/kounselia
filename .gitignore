@@ -46,3 +46,7 @@ vendor/
 !page/.htaccess
 !blog/.htaccess
 !professionals/.htaccess
+# Keeps the mobile app's source and the shared JS package from being
+# served by the website (the whole repo is deployed to the web root)
+!mobile/.htaccess
+!packages/.htaccess

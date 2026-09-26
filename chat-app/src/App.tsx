@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AuthModal, type AuthModalView } from './components/AuthModal';
 import { ChatScreen } from './components/ChatScreen';
-import type { CounselorMap, KounseliaConfig } from './core/types';
+import type { CounselorMap, KounseliaConfig } from '@kounselia/core';
 
 interface Props {
   config: KounseliaConfig;

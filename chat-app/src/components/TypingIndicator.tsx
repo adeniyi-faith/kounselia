@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { Counselor } from '../core/types';
+import type { Counselor } from '@kounselia/core';
 
 // After 3.5s of waiting, we tell the user their message may be
 // getting reviewed by more than one counselor, instead of just

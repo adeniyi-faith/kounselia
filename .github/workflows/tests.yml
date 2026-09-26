@@ -55,3 +55,30 @@ jobs:
         run: vendor/bin/phpunit
         env:
           WP_TESTS_DIR: /tmp/wordpress-tests-lib
+
+  javascript:
+    name: Web chat, mobile app & shared core
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # packages/core is shared by both apps, and must stay free of
+      # browser-only code so the mobile app can use it.
+      - name: Typecheck shared core
+        working-directory: packages/core
+        run: npm ci && npm run typecheck
+
+      - name: Build web chat
+        working-directory: chat-app
+        run: npm ci && npm run build
+
+      - name: Typecheck mobile app
+        working-directory: mobile
+        run: npm ci && npm run typecheck && npx expo-doctor

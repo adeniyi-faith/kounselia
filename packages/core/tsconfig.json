@@ -1,0 +1,20 @@
+{
+  // "lib" deliberately leaves out DOM: this package must also run in
+  // React Native, so it may only use what both have (fetch,
+  // URLSearchParams, AbortController, timers). "types": [] keeps any
+  // stray @types packages from sneaking browser globals back in.
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2020"],
+    "types": [],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "isolatedModules": true,
+    "noEmit": true,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

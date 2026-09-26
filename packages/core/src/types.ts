@@ -1,4 +1,4 @@
-// Shapes shared by the web chat and, later, the React Native app.
+// Shapes shared by the web chat and the React Native app.
 // Nothing in this file talks to the DOM or the browser.
 
 export interface Counselor {
@@ -12,6 +12,18 @@ export interface Counselor {
 }
 
 export type CounselorMap = Record<string, Counselor>;
+
+// A counselor as the kounselia_get_counselors action sends it (used by
+// the mobile app; the website reads window.C instead).
+export interface CounselorSummary {
+  slug: string;
+  name: string;
+  spec: string;
+  desc: string;
+  icon: string; // Tabler icon name without the "ti-" prefix, e.g. "heart"
+  color: string; // colour name without the "ic-" prefix, e.g. "rose"
+  voice_enabled: boolean;
+}
 
 export interface ChatMessage {
   id: string; // local id, stable for React list rendering
@@ -40,19 +52,22 @@ export interface HistoryMessage {
   content: string;
   id?: number;
   rating?: 'up' | 'down' | null;
+  sent_at?: string; // UTC, ISO 8601
 }
 
 export interface KounseliaConfig {
   ajaxUrl: string;
-  nonce: string;
+  // Website only: the security code the page is printed with. The mobile
+  // app leaves this out and signs requests with `authToken` instead.
+  nonce?: string;
   loggedIn: boolean;
+  // 'app' marks requests as coming from the mobile app (see http.ts).
+  client?: 'web' | 'app';
+  authToken?: string | null;
 }
 
-declare global {
-  interface Window {
-    KOUNSELIA: KounseliaConfig;
-    C: CounselorMap;
-    kounseliaMountChat?: () => void;
-    __kounseliaDeferMount?: boolean;
-  }
+export interface AppUser {
+  id: number;
+  name: string;
+  email: string;
 }

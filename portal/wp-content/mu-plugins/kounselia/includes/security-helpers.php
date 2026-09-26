@@ -15,9 +15,13 @@ if ( ! defined( 'ABSPATH' ) ) {
  * ---------------------------------------------------------------------- */
 
 /**
- * Verify the request nonce.
+ * Verify the request nonce. Mobile app requests carry no nonce and are
+ * signed in by token instead — see app-auth.php for why that's safe.
  */
 function kounselia_verify_nonce() {
+    if ( function_exists( 'kounselia_is_app_request' ) && kounselia_is_app_request() ) {
+        return;
+    }
     if ( empty( $_POST['nonce'] ) || ! wp_verify_nonce( wp_unslash( $_POST['nonce'] ), 'kounselia_auth' ) ) {
         wp_send_json_error( array( 'message' => 'Security check failed, please refresh the page and try again.' ), 403 );
     }

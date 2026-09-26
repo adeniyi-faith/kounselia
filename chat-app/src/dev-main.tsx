@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import './tokens.css';
 import './styles.css';
-import type { CounselorMap } from './core/types';
+import type { CounselorMap } from '@kounselia/core';
 
 // Dev-only preview so the chat screen can be looked at with `npm run dev`
 // without a real WordPress site running behind it. Not part of the
