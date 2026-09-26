@@ -81,4 +81,5 @@ require_once KOUNSELIA_CORE_DIR . '/includes/reviews.php';           // 18I. Ses
 require_once KOUNSELIA_CORE_DIR . '/includes/admin-access.php';      // 19. Admin capability, staff role, audit log
 require_once KOUNSELIA_CORE_DIR . '/includes/admin-2fa.php';         // 19B. Admin two-factor authentication (TOTP)
 require_once KOUNSELIA_CORE_DIR . '/includes/content.php';           // 20. CMS: editable pages, blog, footer
+require_once KOUNSELIA_CORE_DIR . '/includes/professionals-public.php'; // 20B. Public professional directory & profiles
 require_once KOUNSELIA_CORE_DIR . '/includes/newsletter.php';        // 21. Newsletter & email CRM: contacts, segments, campaigns

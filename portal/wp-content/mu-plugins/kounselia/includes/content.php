@@ -535,6 +535,7 @@ function kounselia_footer_defaults() {
                 'title' => 'Platform',
                 'links' => array(
                     array( 'label' => 'Our counselors', 'page' => 'our-counselors', 'url' => '' ),
+                    array( 'label' => 'Find a professional', 'page' => '', 'url' => '/professionals/' ),
                     array( 'label' => 'Create account', 'page' => 'get-started', 'url' => '' ),
                     array( 'label' => 'Pro plans', 'page' => 'pro-plans', 'url' => '' ),
                     array( 'label' => '30 day programs', 'page' => '30-day-programs', 'url' => '' ),
@@ -549,6 +550,7 @@ function kounselia_footer_defaults() {
                     array( 'label' => 'Partnerships', 'page' => 'partnerships', 'url' => '' ),
                     array( 'label' => 'Grant enquiries', 'page' => 'grant-enquiries', 'url' => '' ),
                     array( 'label' => 'Press', 'page' => 'press', 'url' => '' ),
+                    array( 'label' => 'For professionals', 'page' => '', 'url' => '/professionals/join' ),
                 ),
             ),
             array(
@@ -1013,6 +1015,8 @@ function kounselia_default_pages() {
                 . '<p>[kounselia_counselors]</p>'
                 . '<h2>How a conversation works</h2>'
                 . '<ul><li><strong>Start anytime.</strong> There is no appointment and no waiting list.</li><li><strong>Go at your own pace.</strong> Write as much or as little as you want. Nobody rushes you.</li><li><strong>Come back to where you left off.</strong> With a free account, your counselor remembers your story so you never have to start over.</li></ul>'
+                . '<h2>Want to talk to a licensed human?</h2>'
+                . '<p>Our counselors are AI — and they will always say so. When you would rather speak with a licensed psychologist, counsellor or therapist, you can book a private video session with one of our <a href="/professionals/">verified professionals</a>.</p>'
                 . '<div class="k-callout"><p><strong>Kounselia is a supportive wellness service, not a replacement for clinical care.</strong> If you are in danger or thinking about ending your life, please see our <a href="/page/safety-resources">safety resources</a> for immediate help.</p></div>',
         ),
         array(

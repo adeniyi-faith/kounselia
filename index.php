@@ -273,6 +273,35 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
     </div>
   </div>
 
+  <!-- LICENSED PROFESSIONALS (see /professionals/ and includes/professionals-public.php) -->
+  <?php $kounselia_home_pros = function_exists( 'kounselia_public_professionals' ) ? kounselia_public_professionals( 3 ) : array(); ?>
+  <div class="pros-section" id="professionals-anchor">
+    <div class="container">
+      <div class="pros-head">
+        <div>
+          <div class="section-eyebrow">Licensed professionals</div>
+          <h2 class="section-title">When you want a person in the room</h2>
+          <p>Our AI counselors are there any time. When you're ready for more, book a private video session with a licensed psychologist, counsellor or therapist — every one verified by our team.</p>
+        </div>
+      </div>
+      <?php if ( $kounselia_home_pros ) : ?>
+        <div class="k-pro-grid">
+          <?php foreach ( $kounselia_home_pros as $kounselia_pro ) { echo kounselia_professional_card_html( $kounselia_pro ); } ?>
+        </div>
+      <?php else : ?>
+        <div class="pros-empty">
+          <div><i class="ti ti-rosette-discount-check"></i><b>Licences verified</b>We check every professional's credentials with the body that issued them.</div>
+          <div><i class="ti ti-video"></i><b>Private video sessions</b>Book a time that suits you and meet from your dashboard.</div>
+          <div><i class="ti ti-star"></i><b>Real reviews</b>Rated by clients after real sessions — anonymously.</div>
+        </div>
+      <?php endif; ?>
+      <div class="pros-actions">
+        <a class="k-btn" href="/professionals/">Meet our professionals</a>
+        <a class="k-btn outline" href="/professionals/join">Are you a professional? Join us</a>
+      </div>
+    </div>
+  </div>
+
   <!-- VOICES -->
   <div class="voices-section">
     <div class="container">
