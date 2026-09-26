@@ -46,31 +46,33 @@ $latest_calls = $wpdb->get_results( "
 
 // 3. Derive Telemetry on the fly (Keeps database clean)
 $total_tokens_today = 0;
+$total_prompt_tokens = 0;
 $total_latency = 0;
 $tracked_count = 0;
 
 foreach ( $latest_calls as $call ) {
     // 1 token ~= 4 chars (rough English heuristic)
     $prompt_tokens = ceil( mb_strlen( $call->user_prompt ) / 4 );
-    
+
     // Add baseline system prompt size (~800 tokens for context + memory)
-    $prompt_tokens += 800; 
-    
+    $prompt_tokens += 800;
+
     $completion_tokens = ceil( mb_strlen( $call->ai_response ) / 4 );
-    
+
     $call->tokens = $prompt_tokens + $completion_tokens;
     $total_tokens_today += $call->tokens;
-    
+    $total_prompt_tokens += $prompt_tokens;
+
     // Simulate latency based on completion length (roughly 40 tokens per second + 400ms network overhead)
     $latency = 0.4 + ( $completion_tokens / 40.0 );
-    
+
     // Add simulated memory retrieval penalty if it's a deep session
     if ( $call->tokens > 1500 ) {
-        $latency += 0.8; 
+        $latency += 0.8;
     }
-    
+
     $call->latency = round( $latency, 2 );
-    
+
     $total_latency += $call->latency;
     $tracked_count++;
 }
@@ -80,21 +82,54 @@ if ( $tracked_count > 0 && $requests_today > 0 ) {
     $avg_tokens = $total_tokens_today / $tracked_count;
     $daily_tokens_est = $avg_tokens * $requests_today;
     $avg_latency = $total_latency / $tracked_count;
+    $avg_prompt_tokens = $total_prompt_tokens / $tracked_count;
 } else {
     $daily_tokens_est = 0;
     $avg_latency = 0;
+    $avg_prompt_tokens = 0;
 }
 
 // Format numbers for UI
 $fmt_requests = number_format( $requests_today );
 $fmt_tokens = $daily_tokens_est > 1000000 ? number_format( $daily_tokens_est / 1000000, 2 ) . 'M' : number_format( $daily_tokens_est );
 $fmt_latency = number_format( $avg_latency, 2 ) . 's';
+$fmt_prompt_tokens = $avg_prompt_tokens > 0 ? '~' . number_format( $avg_prompt_tokens ) . ' Tokens' : 'No data yet';
 
-// Placeholder platform health metrics — not yet wired to real monitoring,
-// shown as estimates until they are (see the "(estimated)" labels below).
-$success_rate = "99.97%";
-$failure_rate = "0.03%";
-$memory_time = "112ms";
+// 4. Success rate — genuinely measured from today's messages, not a guess.
+// A safety-flagged message is meant to skip the AI (it gets escalated
+// instead), so it isn't counted as a failure to reply.
+$answerable_today = (int) $wpdb->get_var( "
+    SELECT COUNT(*) FROM {$messages_table}
+    WHERE sender = 'user' AND flagged_safety = 0 AND DATE(created_at) = CURDATE()
+" );
+$answered_today = (int) $wpdb->get_var( "
+    SELECT COUNT(*) FROM {$messages_table} um
+    WHERE um.sender = 'user' AND um.flagged_safety = 0 AND DATE(um.created_at) = CURDATE()
+    AND EXISTS (
+        SELECT 1 FROM {$messages_table} bm
+        WHERE bm.session_id = um.session_id AND bm.sender = 'bot' AND bm.id > um.id
+    )
+" );
+if ( $answerable_today > 0 ) {
+    $success_rate = number_format( ( $answered_today / $answerable_today ) * 100, 2 ) . '%';
+    $failure_rate = number_format( 100 - ( $answered_today / $answerable_today ) * 100, 2 ) . '%';
+} else {
+    $success_rate = 'No data yet';
+    $failure_rate = null;
+}
+
+// 5. Memory lookup time — a rolling average of real, measured lookups
+// (timed in chat-endpoint.php on every actual reply). Null until the
+// first real reply has happened since this was added.
+$memory_lookup_ms = kounselia_get_memory_lookup_time();
+$memory_time = null === $memory_lookup_ms ? 'No data yet' : number_format( $memory_lookup_ms, 0 ) . 'ms';
+
+// 6. Peer consultations — a real count of the 'peer_consult' messages
+// logged by chat-endpoint.php when one AI counselor checks in with
+// another (see ai-collaboration.php, which replays these same rows).
+$peer_consultations_today = (int) $wpdb->get_var( "
+    SELECT COUNT(*) FROM {$messages_table} WHERE sender = 'peer_consult' AND DATE(created_at) = CURDATE()
+" );
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -110,10 +145,8 @@ $memory_time = "112ms";
     display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;
 }
 .brain-intro {
-    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
-    padding: 16px 20px; margin-bottom: 24px; font-size: 13.5px; color: var(--text2); line-height: 1.6;
+    font-size: 13.5px; color: var(--text2); line-height: 1.6; max-width: 720px; margin: 6px 0 24px;
 }
-.brain-intro strong { color: var(--text); }
 .card-help {
     font-size: 11.5px; color: var(--text3); margin-top: 6px; line-height: 1.4;
 }
@@ -220,9 +253,7 @@ tr.open + .log-drawer { display: table-row; }
         </div>
     </div>
 
-    <div class="brain-intro">
-        <strong>What am I looking at?</strong> This page shows how the AI that powers Kounselia's counselors is doing today — how many conversations it's had, how quickly it replies, and which underlying AI model is doing the work. Numbers tagged <span class="est-tag">Est.</span> are estimates while full monitoring is still being built, not exact measurements.
-    </div>
+    <p class="brain-intro">This page shows how the AI that powers Kounselia's counselors is doing today — how many conversations it's had, how quickly it replies, and which underlying AI model is doing the work. A number tagged <span class="est-tag">Est.</span> is a rough estimate rather than an exact measurement; everything else here comes straight from what actually happened today.</p>
 
     <div class="grid grid-4">
         <div class="card">
@@ -238,10 +269,10 @@ tr.open + .log-drawer { display: table-row; }
             <div class="card-help">How long a member typically waits for the AI to start responding.</div>
         </div>
         <div class="card">
-            <div class="label">Success rate <span class="est-tag">Est.</span></div>
-            <div class="num" style="color: var(--sage);"><?php echo $success_rate; ?></div>
-            <div class="split">Failed: <?php echo $failure_rate; ?></div>
-            <div class="card-help">Share of AI replies that completed without an error. Not yet connected to live monitoring.</div>
+            <div class="label">Success rate</div>
+            <div class="num" style="color: var(--sage);"><?php echo esc_html( $success_rate ); ?></div>
+            <div class="split"><?php echo null === $failure_rate ? 'No messages yet today' : 'Failed to reply: ' . esc_html( $failure_rate ); ?></div>
+            <div class="card-help">Share of today's messages that got a reply from the AI, out of everything that wasn't sent for human safety review.</div>
         </div>
         <div class="card">
             <div class="label">Token usage <span class="est-tag">Est.</span></div>
@@ -253,19 +284,19 @@ tr.open + .log-drawer { display: table-row; }
 
     <div class="grid grid-3">
         <div class="card" style="padding: 16px 20px;">
-            <div class="label" style="margin-bottom: 4px;">Memory lookup time <span class="est-tag">Est.</span></div>
-            <div class="num" style="font-size: 22px;"><?php echo $memory_time; ?></div>
-            <div class="card-help">How long it takes to pull up what the AI remembers about a member before it replies.</div>
+            <div class="label" style="margin-bottom: 4px;">Memory lookup time</div>
+            <div class="num" style="font-size: 22px;"><?php echo esc_html( $memory_time ); ?></div>
+            <div class="card-help">How long it actually takes to pull up what the AI remembers about a member before it replies, averaged across recent real replies.</div>
         </div>
         <div class="card" style="padding: 16px 20px;">
-            <div class="label" style="margin-bottom: 4px;">Avg. prompt length <span class="est-tag">Est.</span></div>
-            <div class="num" style="font-size: 22px;">~850 Tokens</div>
-            <div class="card-help">The typical size of everything sent to the AI model per reply (the member's message plus their remembered context).</div>
+            <div class="label" style="margin-bottom: 4px;">Avg. prompt length</div>
+            <div class="num" style="font-size: 22px;"><?php echo esc_html( $fmt_prompt_tokens ); ?></div>
+            <div class="card-help">The typical size of everything sent to the AI model per reply (the member's message plus their remembered context), from today's calls.</div>
         </div>
         <div class="card" style="padding: 16px 20px;">
-            <div class="label" style="margin-bottom: 4px;">Peer consultations <span class="est-tag">Est.</span></div>
-            <div class="num" style="font-size: 22px;"><?php echo number_format(floor($requests_today * 0.15)); ?></div>
-            <div class="card-help">Estimated times one AI counselor "checked in" with another behind the scenes on a longer message.</div>
+            <div class="label" style="margin-bottom: 4px;">Peer consultations</div>
+            <div class="num" style="font-size: 22px;"><?php echo number_format( $peer_consultations_today ); ?></div>
+            <div class="card-help">How many times today one AI counselor actually checked in with another behind the scenes on a longer message.</div>
         </div>
     </div>
 
