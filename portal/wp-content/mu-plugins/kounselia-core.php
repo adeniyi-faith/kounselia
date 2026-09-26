@@ -79,6 +79,7 @@ require_once KOUNSELIA_CORE_DIR . '/includes/payment-reconciliation.php'; // 18F
 require_once KOUNSELIA_CORE_DIR . '/includes/booking-series.php';    // 18G. Recurring weekly sessions
 require_once KOUNSELIA_CORE_DIR . '/includes/booking-reminders.php'; // 18H. "Starts soon" reminders (WP-Cron)
 require_once KOUNSELIA_CORE_DIR . '/includes/reviews.php';           // 18I. Session ratings & reviews
+require_once KOUNSELIA_CORE_DIR . '/includes/app-dashboard.php';     // 18J. Dashboard data for the mobile app (home, sessions, bookings, video room)
 require_once KOUNSELIA_CORE_DIR . '/includes/admin-access.php';      // 19. Admin capability, staff role, audit log
 require_once KOUNSELIA_CORE_DIR . '/includes/admin-2fa.php';         // 19B. Admin two-factor authentication (TOTP)
 require_once KOUNSELIA_CORE_DIR . '/includes/content.php';           // 20. CMS: editable pages, blog, footer

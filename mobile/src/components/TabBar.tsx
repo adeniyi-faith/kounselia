@@ -9,8 +9,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '@/theme';
 import { TablerIcon } from './TablerIcon';
 
-const ICONS: Record<string, string> = { index: 'home', settings: 'settings' };
-const LABELS: Record<string, string> = { index: 'Home', settings: 'Settings' };
+const ICONS: Record<string, string> = { index: 'home', sessions: 'history', book: 'calendar-event', settings: 'settings' };
+const LABELS: Record<string, string> = { index: 'Home', sessions: 'Sessions', book: 'Book', settings: 'Settings' };
 const CENTRE = 'talk';
 
 export function TabBar({ state, navigation, descriptors }: BottomTabBarProps) {
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
-  tab: { width: 64, alignItems: 'center', gap: 3, paddingVertical: 6 },
+  tab: { width: 60, alignItems: 'center', gap: 3, paddingVertical: 6 },
   label: { fontFamily: fonts.medium, fontSize: 10 },
   fab: {
     width: 60,
