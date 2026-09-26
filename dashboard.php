@@ -24,7 +24,6 @@ $stats           = function_exists( 'kounselia_get_dashboard_stats' ) ? kounseli
 $recent_sessions = function_exists( 'kounselia_get_recent_sessions' ) ? kounselia_get_recent_sessions( $user->ID, 5 ) : array();
 
 $mood_options  = function_exists( 'kounselia_mood_options' ) ? kounselia_mood_options() : array();
-$mood_map      = function_exists( 'kounselia_mood_counselor_map' ) ? kounselia_mood_counselor_map() : array();
 $today_mood    = function_exists( 'kounselia_get_today_mood' ) ? kounselia_get_today_mood( $user->ID ) : null;
 $recent_moods  = function_exists( 'kounselia_get_recent_moods' ) ? kounselia_get_recent_moods( $user->ID, 7 ) : array();
 $today_journal = function_exists( 'kounselia_get_today_journal' ) ? kounselia_get_today_journal( $user->ID ) : '';
@@ -87,21 +86,9 @@ foreach ( $all_ui as $slug => $c_data ) {
 }
 
 $tried_slugs = wp_list_pluck( $recent_sessions, 'counselor_slug' );
-$not_tried   = array_diff( array_keys( $counselors ), $tried_slugs );
 
-if ( $today_mood && isset( $mood_map[ $today_mood ] ) && isset( $counselors[ $mood_map[ $today_mood ] ] ) ) {
-    $recommended_slug = $mood_map[ $today_mood ];
-    $recommend_reason  = "Matched to how you said you're feeling today.";
-} elseif ( ! empty( $not_tried ) ) {
-    $recommended_slug = reset( $not_tried );
-    $recommend_reason  = "Someone you haven't talked to yet.";
-} elseif ( ! empty( $tried_slugs ) ) {
-    $recommended_slug = $tried_slugs[0];
-    $recommend_reason  = 'Pick up where you left off.';
-} else {
-    $recommended_slug = !empty($counselors) ? array_keys($counselors)[0] : 'serena';
-    $recommend_reason  = 'A good place to start.';
-}
+// Same rule the mobile app uses (includes/app-dashboard.php).
+list( $recommended_slug, $recommend_reason ) = kounselia_recommended_counselor( $today_mood, array_keys( $counselors ), array_values( array_unique( $tried_slugs ) ) );
 $recommended = isset($counselors[$recommended_slug]) ? $counselors[$recommended_slug] : array('name' => 'Counselor', 'spec' => '', 'icon' => 'ti-heart', 'class' => 'ic-blue');
 ?>
 <!DOCTYPE html>
