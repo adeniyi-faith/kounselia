@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { useRef, useState } from 'react';
-import { Text, type TextInput } from 'react-native';
+import { Keyboard, Text, type TextInput } from 'react-native';
 import { Button } from '@/components/Button';
 import { FormMessage } from '@/components/FormMessage';
 import { FormScreen } from '@/components/FormScreen';
@@ -68,9 +68,18 @@ export default function SignIn() {
       <Button title="Sign in" onPress={submit} busy={busy} />
       <Text style={styles.switch}>
         New to Kounselia?{' '}
-        <Link href="/sign-up" replace style={styles.link}>
+        <Text
+          accessibilityRole="link"
+          style={styles.link}
+          onPress={() => {
+            // Put the keyboard away first, then cross-fade to the other form
+            // in place (see "switched" in app/(auth)/_layout.tsx).
+            Keyboard.dismiss();
+            router.replace({ pathname: '/sign-up', params: { switched: '1' } });
+          }}
+        >
           Create an account
-        </Link>
+        </Text>
       </Text>
     </FormScreen>
   );
