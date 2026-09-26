@@ -58,7 +58,8 @@ require_once KOUNSELIA_CORE_DIR . '/includes/chat-helpers.php';      // 10. Sess
 require_once KOUNSELIA_CORE_DIR . '/includes/safety-escalation.php'; // 10B. Safety escalation: severity, staff alerts, acknowledgment
 require_once KOUNSELIA_CORE_DIR . '/includes/chat-endpoint.php';     // 11. Main chat AJAX endpoint
 require_once KOUNSELIA_CORE_DIR . '/includes/voice.php';             // 12-13. TTS + Gemini Live voice
-require_once KOUNSELIA_CORE_DIR . '/includes/resume.php';            // 14. Resuming a conversation
+require_once KOUNSELIA_CORE_DIR . '/includes/resume.php';            // 14. Resuming a conversation (+ Clear chat)
+require_once KOUNSELIA_CORE_DIR . '/includes/message-feedback.php';  // 14B. Thumbs up/down on counselor replies
 require_once KOUNSELIA_CORE_DIR . '/includes/mood.php';              // 15. Mood check-in
 require_once KOUNSELIA_CORE_DIR . '/includes/journal.php';           // 16. Private journal
 require_once KOUNSELIA_CORE_DIR . '/includes/password-reset.php';    // 17. Forgot password

@@ -25,12 +25,12 @@ function kounselia_resolve_session( $counselor_slug, $user_id, $guest_token, $re
     if ( $requested_session_id > 0 ) {
         if ( $user_id ) {
             $owned = $wpdb->get_var( $wpdb->prepare(
-                "SELECT id FROM {$table} WHERE id = %d AND counselor_slug = %s AND user_id = %d LIMIT 1",
+                "SELECT id FROM {$table} WHERE id = %d AND counselor_slug = %s AND user_id = %d AND status = 'active' LIMIT 1",
                 $requested_session_id, $counselor_slug, $user_id
             ) );
         } else {
             $owned = $wpdb->get_var( $wpdb->prepare(
-                "SELECT id FROM {$table} WHERE id = %d AND counselor_slug = %s AND guest_token = %s LIMIT 1",
+                "SELECT id FROM {$table} WHERE id = %d AND counselor_slug = %s AND guest_token = %s AND status = 'active' LIMIT 1",
                 $requested_session_id, $counselor_slug, $guest_token
             ) );
         }

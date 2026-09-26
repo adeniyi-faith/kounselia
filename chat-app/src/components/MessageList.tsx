@@ -9,9 +9,11 @@ interface Props {
   counselor: Counselor;
   loggedIn: boolean;
   onPlayVoice: (messageId: number) => Promise<string | null>;
+  onRate: (messageId: number, rating: 'up' | 'down') => Promise<boolean>;
+  onNotify: (message: string) => void;
 }
 
-export function MessageList({ messages, typing, counselor, loggedIn, onPlayVoice }: Props) {
+export function MessageList({ messages, typing, counselor, loggedIn, onPlayVoice, onRate, onNotify }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -27,6 +29,8 @@ export function MessageList({ messages, typing, counselor, loggedIn, onPlayVoice
           counselor={counselor}
           loggedIn={loggedIn}
           onPlayVoice={onPlayVoice}
+          onRate={onRate}
+          onNotify={onNotify}
         />
       ))}
       {typing && <TypingIndicator counselor={counselor} />}
