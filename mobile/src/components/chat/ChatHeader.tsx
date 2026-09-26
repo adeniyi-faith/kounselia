@@ -14,9 +14,11 @@ interface Props {
   onBack: () => void;
   onShare: () => void;
   onClear: () => void;
+  // Only for counselors with voice switched on in the admin.
+  onCall?: () => void;
 }
 
-export function ChatHeader({ counselor, onBack, onShare, onClear }: Props) {
+export function ChatHeader({ counselor, onBack, onShare, onClear, onCall }: Props) {
   const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -44,6 +46,11 @@ export function ChatHeader({ counselor, onBack, onShare, onClear }: Props) {
           {counselor.spec}
         </Text>
       </View>
+      {onCall && (
+        <Pressable onPress={onCall} accessibilityRole="button" accessibilityLabel={`Voice call with ${counselor.name}`} style={[styles.iconBtn, styles.call]} hitSlop={6}>
+          <TablerIcon name="phone" size={19} color="#00A884" />
+        </Pressable>
+      )}
       <Pressable
         onPress={() => setMenuOpen(true)}
         accessibilityRole="button"
@@ -108,6 +115,8 @@ const styles = StyleSheet.create({
   badge: { width: 14, height: 14, borderRadius: 7, backgroundColor: '#3B82F6', alignItems: 'center', justifyContent: 'center' },
   spec: { fontFamily: fonts.regular, fontSize: 12, color: colors.text2, marginTop: 2 },
   iconBtn: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  // .icon-btn.action-call
+  call: { backgroundColor: 'rgba(0,168,132,0.1)' },
   // .chat-dropdown
   menu: {
     position: 'absolute',
