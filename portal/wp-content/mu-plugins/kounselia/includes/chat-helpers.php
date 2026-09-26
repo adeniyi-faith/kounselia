@@ -107,6 +107,8 @@ function kounselia_log_message( $session_id, $sender, $content ) {
         'created_at'     => current_time( 'mysql' ),
         'flagged_safety' => $flagged_safety,
         'flag_reason'    => $flag_reason,
+        // 0 = waiting for the background AI risk check (safety-ai-screening.php).
+        'ai_screened'    => ( 'user' === $sender && ! $flagged_safety ) ? 0 : 1,
     ) );
     $message_id = (int) $wpdb->insert_id;
 
@@ -174,16 +176,173 @@ function kounselia_update_safety_keywords( $keywords ) {
     return $clean;
 }
 
-function kounselia_message_matches_safety_keywords( $content ) {
-    $content = strtolower( (string) $content );
-    if ( '' === trim( $content ) ) {
+/**
+ * Indirect, euphemistic and slang ways people say they're at risk, which
+ * a plain keyword list misses. Always checked on top of the admin's own
+ * list (and not stored in it, so existing sites get them too). Written
+ * the way kounselia_normalize_safety_text() leaves text: lowercase
+ * letters, digits and single spaces, no apostrophes.
+ */
+function kounselia_builtin_crisis_phrases() {
+    return array(
+        'kms',
+        'kys',
+        'unalive',
+        'unaliving',
+        'sewerslide',
+        'end it all',
+        'ending it all',
+        'end things',
+        'off myself',
+        'dont want to be alive',
+        'dont want to live',
+        'dont want to be here anymore',
+        'dont want to exist',
+        'dont want to wake up',
+        'wish i could disappear forever',
+        'wish i was never born',
+        'wish i had never been born',
+        'better off without me',
+        'no point in living',
+        'no point living',
+        'nothing to live for',
+        'cant do this anymore',
+        'want it all to end',
+        'want it to be over',
+        'going to jump',
+        'jump off a bridge',
+        'jump off the roof',
+        'slit my wrists',
+        'hang myself',
+        'hanging myself',
+        'shoot myself',
+        'take all my pills',
+        'took all my pills',
+        'swallow all the pills',
+        'saying goodbye to everyone',
+        'writing a suicide note',
+        'goodbye note',
+        'hurt someone',
+        'kill him',
+        'kill her',
+        'kill them',
+        'he is going to kill me',
+        'she is going to kill me',
+        'afraid he will kill me',
+        'not safe at home',
+    );
+}
+
+/**
+ * Lowercases, turns curly apostrophes and punctuation into spaces (and
+ * drops apostrophes so "can't" and "cant" match the same), and squashes
+ * letters stretched for emphasis ("diiiie" -> "die").
+ */
+function kounselia_normalize_safety_text( $text ) {
+    $text = strtolower( (string) $text );
+    $text = str_replace( array( "'", '’', '‘', '`' ), '', $text );
+    $text = preg_replace( '/[^a-z0-9]+/u', ' ', $text );
+    $text = preg_replace( '/([a-z])\1{2,}/', '$1', $text );
+    return trim( preg_replace( '/\s+/', ' ', $text ) );
+}
+
+/**
+ * True if a message word is the same as a keyword word, or a one-letter
+ * typo of it ("suicde", "myslef"). Only words of five letters or more
+ * get typo tolerance: short words are too easily one letter away from
+ * something harmless ("kill" vs "will").
+ */
+function kounselia_safety_word_matches( $word, $keyword_word ) {
+    if ( $word === $keyword_word ) {
+        return true;
+    }
+    if ( strlen( $keyword_word ) < 5 || abs( strlen( $word ) - strlen( $keyword_word ) ) > 1 ) {
         return false;
     }
+    return kounselia_typo_distance( $word, $keyword_word ) <= 1;
+}
+
+/**
+ * Edit distance where swapping two neighbouring letters ("myslef") counts
+ * as one typo, not two as it would with PHP's levenshtein().
+ */
+function kounselia_typo_distance( $a, $b ) {
+    $la = strlen( $a );
+    $lb = strlen( $b );
+    $d  = array();
+    for ( $i = 0; $i <= $la; $i++ ) {
+        $d[ $i ][0] = $i;
+    }
+    for ( $j = 0; $j <= $lb; $j++ ) {
+        $d[0][ $j ] = $j;
+    }
+    for ( $i = 1; $i <= $la; $i++ ) {
+        for ( $j = 1; $j <= $lb; $j++ ) {
+            $cost        = ( $a[ $i - 1 ] === $b[ $j - 1 ] ) ? 0 : 1;
+            $d[ $i ][ $j ] = min( $d[ $i - 1 ][ $j ] + 1, $d[ $i ][ $j - 1 ] + 1, $d[ $i - 1 ][ $j - 1 ] + $cost );
+            if ( $i > 1 && $j > 1 && $a[ $i - 1 ] === $b[ $j - 2 ] && $a[ $i - 2 ] === $b[ $j - 1 ] ) {
+                $d[ $i ][ $j ] = min( $d[ $i ][ $j ], $d[ $i - 2 ][ $j - 2 ] + 1 );
+            }
+        }
+    }
+    return $d[ $la ][ $lb ];
+}
+
+/**
+ * Returns the matching keyword/phrase (in its original form, so severity
+ * classification and the admin Safety page show something readable), or
+ * false. Checks the admin's keyword list first, then the built-in
+ * indirect phrases, each as a whole phrase and then allowing typos.
+ */
+function kounselia_message_matches_safety_keywords( $content ) {
+    $text = kounselia_normalize_safety_text( $content );
+    if ( '' === $text ) {
+        return false;
+    }
+
+    // The admin list has always matched anywhere in the text, so a stem
+    // like "abus" still catches "abused" exactly as it did before.
+    $lower = strtolower( (string) $content );
     foreach ( kounselia_get_safety_keywords() as $kw ) {
-        if ( '' !== $kw && false !== strpos( $content, $kw ) ) {
+        if ( '' !== $kw && false !== strpos( $lower, $kw ) ) {
             return $kw;
         }
     }
+
+    $padded = ' ' . $text . ' ';
+    $words  = explode( ' ', $text );
+    $lists  = array_merge( kounselia_get_safety_keywords(), kounselia_builtin_crisis_phrases() );
+
+    foreach ( $lists as $kw ) {
+        $normalized_kw = kounselia_normalize_safety_text( $kw );
+        if ( '' === $normalized_kw ) {
+            continue;
+        }
+        if ( false !== strpos( $padded, ' ' . $normalized_kw . ' ' ) ) {
+            return $kw;
+        }
+    }
+
+    foreach ( $lists as $kw ) {
+        $kw_words = explode( ' ', kounselia_normalize_safety_text( $kw ) );
+        $count    = count( $kw_words );
+        if ( '' === $kw_words[0] || $count > count( $words ) ) {
+            continue;
+        }
+        for ( $i = 0; $i + $count <= count( $words ); $i++ ) {
+            $all = true;
+            for ( $j = 0; $j < $count; $j++ ) {
+                if ( ! kounselia_safety_word_matches( $words[ $i + $j ], $kw_words[ $j ] ) ) {
+                    $all = false;
+                    break;
+                }
+            }
+            if ( $all ) {
+                return $kw;
+            }
+        }
+    }
+
     return false;
 }
 

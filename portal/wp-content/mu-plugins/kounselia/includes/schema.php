@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.19.0'; // Bumped version: message feedback, payout follow-up, multi-currency booking payments
+    $current_version   = '1.19.0'; // Bumped version: message feedback, payout follow-up, multi-currency booking payments, AI safety screening
 
     if ( $installed_version === $current_version ) {
         return;
@@ -58,9 +58,11 @@ function kounselia_install_tables() {
         created_at DATETIME NOT NULL,
         flagged_safety TINYINT(1) UNSIGNED NOT NULL DEFAULT 0,
         flag_reason VARCHAR(255) NULL,
+        ai_screened TINYINT(1) UNSIGNED NOT NULL DEFAULT 1,
         PRIMARY KEY  (id),
         KEY session_id (session_id),
-        KEY flagged_safety (flagged_safety)
+        KEY flagged_safety (flagged_safety),
+        KEY ai_screened (ai_screened, created_at)
     ) {$charset_collate};";
 
     // Server-side enforcement of the guest message limit
@@ -415,9 +417,11 @@ function kounselia_install_tables() {
         read_at DATETIME NULL,
         flagged_safety TINYINT(1) UNSIGNED NOT NULL DEFAULT 0,
         flag_reason VARCHAR(255) NULL,
+        ai_screened TINYINT(1) UNSIGNED NOT NULL DEFAULT 1,
         PRIMARY KEY  (id),
         KEY booking_id (booking_id),
-        KEY flagged_safety (flagged_safety)
+        KEY flagged_safety (flagged_safety),
+        KEY ai_screened (ai_screened, created_at)
     ) {$charset_collate};";
 
     // What a client paid for one booking, and how that payment splits
