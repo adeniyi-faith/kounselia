@@ -4,5 +4,5 @@ export function sessionWhen(iso: string | null, withYear = false): string {
   const d = new Date(iso);
   const day = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric', ...(withYear ? { year: 'numeric' } : {}) });
   if (withYear) return day;
-  return `${day} — ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  return `${day} at ${d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
 }

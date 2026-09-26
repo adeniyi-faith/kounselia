@@ -225,7 +225,7 @@ function kounselia_complete_booking_payment( $reference ) {
             return array(
                 'success'    => false,
                 'conflict'   => true,
-                'message'    => 'That time was booked by someone else while your payment was processing. Your payment went through — our support team will be in touch to reschedule or refund you.',
+                'message'    => 'That time was booked by someone else while your payment was processing. Your payment went through, and our support team will be in touch to reschedule or refund you.',
                 'booking_id' => (int) $payment->booking_id,
             );
         }
