@@ -656,7 +656,8 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .intake-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:background 0.3s ease;}
 .intake-dot.active{background:var(--accent);}
 @media (max-width:600px){
-  .intake-modal{border-radius:28px 28px 0 0;align-items:flex-end;padding:36px 24px;max-height:92vh;overflow-y:auto;transform:translateY(100%);}
+  .intake-overlay{align-items:flex-end;}
+  .intake-modal{width:100%;max-width:none !important;border-radius:28px 28px 0 0;padding:36px 24px;max-height:92vh;overflow-y:auto;transform:translateY(100%);}
   .intake-overlay.active .intake-modal{transform:translateY(0);}
 }
 </style>
