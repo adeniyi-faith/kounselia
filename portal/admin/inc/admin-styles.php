@@ -195,6 +195,9 @@ table.admin-table .cell-who{display:flex;align-items:center;gap:8px;flex-wrap:wr
   table.admin-table td[data-label=""]::before{display:none}
 }
 
+/* Visible only to screen readers — for context sighted users get from
+   color, icons or layout alone (e.g. "fast", "1 of 3 unread"). */
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 .badge{display:inline-flex;align-items:center;font-size:10.5px;padding:3px 9px;border-radius:var(--r-full);font-weight:600;letter-spacing:.02em;white-space:nowrap}
 .badge.member{background:var(--accent-light);color:var(--accent)}
 .badge.guest{background:var(--surface2);color:var(--text2)}
