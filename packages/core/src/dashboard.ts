@@ -3,6 +3,7 @@
 // joining, messaging, rescheduling, cancelling, rating).
 // Server side: includes/app-dashboard.php plus the existing mood,
 // journal, bookings, booking-series and reviews actions.
+import { failureMessage } from './appAuth';
 import { postAction } from './http';
 import type { KounseliaConfig } from './types';
 
@@ -10,7 +11,6 @@ import type { KounseliaConfig } from './types';
 // dropped connection, `error` with the server's own explanation otherwise.
 export type Result<T> = { ok: true; data: T } | { ok: false; offline?: boolean; signedOut?: boolean; message: string };
 
-const OFFLINE = "Couldn't reach Kounselia. Please check your internet connection.";
 
 export async function callAction<T>(config: KounseliaConfig, action: string, params: Record<string, string | number | undefined> = {}): Promise<Result<T>> {
   try {
@@ -21,8 +21,11 @@ export async function callAction<T>(config: KounseliaConfig, action: string, par
       signedOut: !!json?.data?.signed_out,
       message: json?.data?.message || 'Something went wrong. Please try again.',
     };
-  } catch {
-    return { ok: false, offline: true, message: OFFLINE };
+  } catch (error) {
+    // `offline` means "no real answer came back" — a dropped connection or
+    // an error page from the web host — so screens retry rather than
+    // treating it as the server's decision.
+    return { ok: false, offline: true, message: failureMessage(error) };
   }
 }
 
