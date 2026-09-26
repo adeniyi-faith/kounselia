@@ -178,6 +178,33 @@ class Test_App_Auth extends WP_Ajax_UnitTestCase {
         $this->assertSame( 'That email is already registered.', $res['data']['message'] );
     }
 
+    function test_banned_or_deleted_members_are_signed_out_of_the_app() {
+        $banned  = $this->member();
+        $token   = kounselia_issue_app_token( $banned );
+        update_user_meta( $banned, 'kounselia_banned', 1 );
+        $this->assertSame( 0, kounselia_user_id_from_app_token( $token ) );
+        $this->assertCount( 0, $this->token_rows( $banned ) );
+
+        $deleted = self::factory()->user->create();
+        $token   = kounselia_issue_app_token( $deleted );
+        update_user_meta( $deleted, 'kounselia_deleted_at', current_time( 'mysql' ) );
+        $this->assertSame( 0, kounselia_user_id_from_app_token( $token ) );
+    }
+
+    function test_failed_sign_ins_are_limited_per_email_not_per_address() {
+        $this->member();
+        for ( $i = 0; $i < 5; $i++ ) {
+            $this->app_ajax( 'kounselia_app_login', array( 'email' => 'ada@example.com', 'password' => 'nope' ) );
+        }
+        $locked = $this->app_ajax( 'kounselia_app_login', array( 'email' => 'ada@example.com', 'password' => 'correct-horse' ) );
+        $this->assertFalse( $locked['success'] );
+
+        // Someone else on the same (shared) internet address still gets in.
+        self::factory()->user->create( array( 'user_login' => 'bola@example.com', 'user_email' => 'bola@example.com', 'user_pass' => 'another-pass' ) );
+        $other = $this->app_ajax( 'kounselia_app_login', array( 'email' => 'bola@example.com', 'password' => 'another-pass' ) );
+        $this->assertTrue( $other['success'] );
+    }
+
     function test_deleting_a_member_removes_their_app_sign_ins() {
         require_once ABSPATH . 'wp-admin/includes/user.php';
         $user_id = $this->member();

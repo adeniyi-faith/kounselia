@@ -152,6 +152,11 @@ export const createBooking = (config: KounseliaConfig, professionalId: number, s
     make_recurring: weekly ? 1 : undefined,
   });
 
+// "confirmed" once Paystack has told the server the payment went through;
+// "pending_payment" until then.
+export const fetchBookingStatus = (config: KounseliaConfig, bookingId: number) =>
+  call<{ status: string }>(config, 'kounselia_get_booking_status', { booking_id: bookingId });
+
 export const rescheduleBooking = (config: KounseliaConfig, bookingId: number, slot: string) =>
   call<{ message: string }>(config, 'kounselia_reschedule_booking', { booking_id: bookingId, scheduled_start: slot });
 

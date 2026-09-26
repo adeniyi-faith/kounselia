@@ -81,4 +81,4 @@ jobs:
 
       - name: Typecheck mobile app
         working-directory: mobile
-        run: npm ci && npm run typecheck && npx expo-doctor
+        run: npm ci && npm run typecheck && npm run lint && npx expo-doctor

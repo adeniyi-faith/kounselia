@@ -208,7 +208,7 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
           <Composer config={config} busy={chat.typing || chat.phase === 'loading'} onSend={chat.send} onNotify={toast.show} />
         </View>
       </KeyboardAvoidingView>
-      <Toast message={toast.message} />
+      <Toast note={toast.note} />
       <CallOverlay
         visible={callOpen}
         counselor={counselor}

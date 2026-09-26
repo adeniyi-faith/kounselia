@@ -66,7 +66,7 @@ export default function Sessions() {
           {header}
           {failed ? (
             <View style={styles.center}>
-              <Text style={styles.notice}>We couldn't load your sessions. Please check your internet connection.</Text>
+              <Text style={styles.notice}>We couldn’t load your sessions. Please check your internet connection.</Text>
               <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (

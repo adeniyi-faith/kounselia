@@ -31,6 +31,8 @@ export function CounselorsProvider({ children }: { children: ReactNode }) {
   }, [config]);
 
   useEffect(() => {
+    // Loading from the server once signed in is what this effect is for.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     reload();
   }, [reload]);
 
