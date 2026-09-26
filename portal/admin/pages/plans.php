@@ -27,6 +27,26 @@ if ( ! is_array( $plans ) ) {
 if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] ) ) {
     $kounselia_action = sanitize_key( $_POST['kounselia_action'] );
 
+    // What Free and Pro members actually get (see includes/membership.php).
+    if ( 'save_benefits' === $kounselia_action
+        && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_plans' )
+        && function_exists( 'kounselia_save_plan_benefits' ) ) {
+        $kounselia_benefits_input = array();
+        foreach ( array( 'free', 'pro' ) as $kounselia_tier ) {
+            $kounselia_benefits_input[ $kounselia_tier ] = array(
+                'voice_minutes'         => $_POST['b'][ $kounselia_tier ]['voice_minutes'] ?? 5,
+                'memory_messages'       => $_POST['b'][ $kounselia_tier ]['memory_messages'] ?? 16,
+                'recurring_patterns'    => ! empty( $_POST['b'][ $kounselia_tier ]['recurring_patterns'] ),
+                'reflections_per_month' => $_POST['b'][ $kounselia_tier ]['reflections_per_month'] ?? 0,
+                'auto_reflection_days'  => $_POST['b'][ $kounselia_tier ]['auto_reflection_days'] ?? 30,
+                'booking_discount'      => $_POST['b'][ $kounselia_tier ]['booking_discount'] ?? 0,
+            );
+        }
+        kounselia_save_plan_benefits( $kounselia_benefits_input );
+        kounselia_admin_log( 'edited_plan_benefits', 'settings' );
+        $kounselia_notice = 'Plan benefits saved. They apply to members straight away.';
+    }
+
     if ( 'save_plan' === $kounselia_action
         && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_plans' ) ) {
 
@@ -150,6 +170,65 @@ $form_sort_order    = $edit_plan ? $edit_plan['sort_order'] : ( count( $plans ) 
   <?php endif; ?>
   <?php if ( $kounselia_error ) : ?>
     <div class="login-msg error" style="margin-bottom:20px;"><?php echo esc_html( $kounselia_error ); ?></div>
+  <?php endif; ?>
+
+  <?php
+  global $wpdb;
+  $kounselia_sub_stats = $wpdb->get_row( $wpdb->prepare(
+      "SELECT SUM(current_period_end > %s) AS live,
+              SUM(current_period_end > %s AND status = 'active' AND authorization_code IS NOT NULL AND authorization_code != '') AS auto_renew,
+              SUM(current_period_end > %s AND status = 'cancelled') AS ending,
+              SUM(renewal_attempts > 0 AND current_period_end > %s) AS problems
+       FROM {$wpdb->prefix}kounselia_subscriptions",
+      current_time( 'mysql' ), current_time( 'mysql' ), current_time( 'mysql' ), date( 'Y-m-d H:i:s', current_time( 'timestamp' ) - 5 * DAY_IN_SECONDS )
+  ) );
+  ?>
+  <div class="grid">
+    <div class="card"><div class="label">Paying members</div><div class="num"><?php echo (int) $kounselia_sub_stats->live; ?></div></div>
+    <div class="card"><div class="label">Renewing automatically</div><div class="num"><?php echo (int) $kounselia_sub_stats->auto_renew; ?></div></div>
+    <div class="card"><div class="label">Auto-renew turned off</div><div class="num"><?php echo (int) $kounselia_sub_stats->ending; ?></div></div>
+    <div class="card"><div class="label">Payment problems</div><div class="num" style="<?php echo $kounselia_sub_stats->problems ? 'color:var(--rose)' : ''; ?>"><?php echo (int) $kounselia_sub_stats->problems; ?></div></div>
+  </div>
+
+  <?php if ( function_exists( 'kounselia_plan_benefits' ) ) :
+      $kounselia_benefits = kounselia_plan_benefits();
+      $kounselia_rows = array(
+          'voice_minutes'         => array( 'Voice call length (minutes)', 'number', 'Per call.' ),
+          'memory_messages'       => array( 'Conversation memory (messages re-read each reply)', 'number', 'Higher = the counselor keeps more of the current conversation in mind. Costs more AI usage.' ),
+          'recurring_patterns'    => array( 'Counselor notices recurring patterns', 'check', 'Uses the member\'s Milestone Reflection to gently point out repeating themes in chat.' ),
+          'reflections_per_month' => array( 'Milestone Reflections per month', 'number', '0 = unlimited. Each one uses the most capable (most expensive) AI model.' ),
+          'auto_reflection_days'  => array( 'Reflection refreshes itself every … days', 'number', '0 = never automatically.' ),
+          'booking_discount'      => array( 'Discount on professional sessions (%)', 'number', 'Taken from Kounselia\'s commission, never the professional\'s share, so it can\'t exceed the commission rate.' ),
+      );
+      ?>
+  <div class="panel">
+    <div class="panel-title">What each plan includes <span style="font-weight:400;color:var(--text3);font-size:12px;">applies to every paid plan above</span></div>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px;line-height:1.55;max-width:70ch;">These are the real differences between Free and Pro, enforced by the platform. Unlimited text conversations and all safety features are always free. Members see this list on their dashboard and on the Pro plans page.</p>
+    <form method="post">
+      <?php wp_nonce_field( 'kounselia_settings_plans' ); ?>
+      <input type="hidden" name="kounselia_action" value="save_benefits">
+      <table class="admin-table benefits-table">
+        <thead><tr><th>Benefit</th><th style="width:120px">Free</th><th style="width:120px">Pro</th></tr></thead>
+        <tbody>
+        <?php foreach ( $kounselia_rows as $kounselia_key => $kounselia_row ) : ?>
+          <tr>
+            <td data-label=""><b style="font-weight:500"><?php echo esc_html( $kounselia_row[0] ); ?></b><div style="font-size:12px;color:var(--text3);margin-top:2px"><?php echo esc_html( $kounselia_row[2] ); ?></div></td>
+            <?php foreach ( array( 'free', 'pro' ) as $kounselia_tier ) : $kounselia_val = $kounselia_benefits[ $kounselia_tier ][ $kounselia_key ]; ?>
+              <td data-label="<?php echo 'free' === $kounselia_tier ? 'Free' : 'Pro'; ?>">
+                <?php if ( 'check' === $kounselia_row[1] ) : ?>
+                  <input type="checkbox" name="b[<?php echo esc_attr( $kounselia_tier ); ?>][<?php echo esc_attr( $kounselia_key ); ?>]" value="1" <?php checked( ! empty( $kounselia_val ) ); ?> style="width:18px;height:18px;accent-color:var(--accent)">
+                <?php else : ?>
+                  <input type="number" min="0" step="<?php echo 'booking_discount' === $kounselia_key ? '0.5' : '1'; ?>" name="b[<?php echo esc_attr( $kounselia_tier ); ?>][<?php echo esc_attr( $kounselia_key ); ?>]" value="<?php echo esc_attr( $kounselia_val ); ?>" style="width:90px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:14px;background:var(--bg)">
+                <?php endif; ?>
+              </td>
+            <?php endforeach; ?>
+          </tr>
+        <?php endforeach; ?>
+        </tbody>
+      </table>
+      <button type="submit" class="login-submit" style="width:auto;padding:11px 22px;margin-top:16px;">Save plan benefits</button>
+    </form>
+  </div>
   <?php endif; ?>
 
   <div class="panel">

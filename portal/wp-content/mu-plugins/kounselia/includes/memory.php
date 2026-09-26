@@ -59,6 +59,11 @@ function kounselia_imported_memory_clause( $user_id ) {
  * weight of a full clinical report.
  */
 function kounselia_live_pattern_clause( $user_id ) {
+    // Noticing recurring patterns in chat is a plan benefit (Pro by default).
+    if ( function_exists( 'kounselia_member_benefit' ) && ! kounselia_member_benefit( $user_id, 'recurring_patterns' ) ) {
+        return '';
+    }
+
     $reflection_json = get_user_meta( $user_id, 'kounselia_latest_reflection', true );
     if ( empty( $reflection_json ) ) {
         return '';
@@ -380,13 +385,34 @@ function kounselia_ajax_generate_reflection() {
         wp_send_json_error( array( 'message' => 'Unauthorized' ), 401 );
     }
 
-    $result = kounselia_generate_reflection( get_current_user_id() );
+    $user_id = get_current_user_id();
+
+    // On-demand reflections are limited per month on some plans.
+    if ( function_exists( 'kounselia_reflection_allowance' ) ) {
+        $allowance = kounselia_reflection_allowance( $user_id );
+        if ( $allowance['limit'] && $allowance['remaining'] <= 0 ) {
+            wp_send_json_error( array(
+                'message' => "You've used this month's Milestone Reflection. Upgrade to Pro for unlimited reflections, or check back next month.",
+                'upgrade' => true,
+            ), 403 );
+        }
+    }
+
+    $result = kounselia_generate_reflection( $user_id );
 
     if ( ! $result['success'] ) {
         wp_send_json_error( array( 'message' => $result['message'] ), $result['status'] );
     }
 
-    wp_send_json_success( array( 'reflection' => $result['reflection'], 'date' => $result['date'] ) );
+    if ( function_exists( 'kounselia_reflection_record_use' ) ) {
+        kounselia_reflection_record_use( $user_id );
+    }
+
+    wp_send_json_success( array(
+        'reflection' => $result['reflection'],
+        'date'       => $result['date'],
+        'allowance'  => function_exists( 'kounselia_reflection_allowance' ) ? kounselia_reflection_allowance( $user_id ) : null,
+    ) );
 }
 add_action( 'wp_ajax_kounselia_generate_reflection', 'kounselia_ajax_generate_reflection' );
 
@@ -511,8 +537,18 @@ define( 'KOUNSELIA_REFLECTION_REFRESH_INTERVAL', 7 * DAY_IN_SECONDS );
  * queued for them.
  */
 function kounselia_maybe_schedule_reflection_refresh( $user_id ) {
+    // How often it refreshes by itself is a plan benefit (0 = never).
+    $interval = KOUNSELIA_REFLECTION_REFRESH_INTERVAL;
+    if ( function_exists( 'kounselia_member_benefit' ) ) {
+        $days = (int) kounselia_member_benefit( $user_id, 'auto_reflection_days' );
+        if ( $days <= 0 ) {
+            return;
+        }
+        $interval = $days * DAY_IN_SECONDS;
+    }
+
     $last_date = get_user_meta( $user_id, 'kounselia_reflection_date', true );
-    $is_stale  = empty( $last_date ) || ( strtotime( $last_date ) < time() - KOUNSELIA_REFLECTION_REFRESH_INTERVAL );
+    $is_stale  = empty( $last_date ) || ( strtotime( $last_date ) < time() - $interval );
 
     if ( ! $is_stale ) {
         return;

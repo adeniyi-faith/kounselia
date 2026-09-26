@@ -153,6 +153,10 @@ add_action( 'wp_ajax_nopriv_kounselia_tts', 'kounselia_ajax_tts' );
  * ---------------------------------------------------------------------- */
 
 function kounselia_get_user_plan( $user_id ) {
+    // Paid subscribers AND admin-granted Pro members (see membership.php).
+    if ( function_exists( 'kounselia_member_tier' ) ) {
+        return kounselia_member_tier( $user_id );
+    }
     $plan = get_user_meta( $user_id, 'kounselia_plan', true );
     return ( 'pro' === $plan ) ? 'pro' : 'free';
 }

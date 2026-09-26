@@ -178,9 +178,21 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
         && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_paystack' ) ) {
 
         $secret_key = isset( $_POST['paystack_secret_key'] ) ? trim( (string) wp_unslash( $_POST['paystack_secret_key'] ) ) : '';
-        update_option( 'kounselia_paystack_secret_key', sanitize_text_field( $secret_key ) );
-        kounselia_admin_log( 'update_settings', 'settings' );
-        $kounselia_notice = $secret_key ? 'Paystack secret key saved.' : 'Paystack secret key cleared — subscriptions are disabled until a key is set.';
+        $public_key = isset( $_POST['paystack_public_key'] ) ? trim( (string) wp_unslash( $_POST['paystack_public_key'] ) ) : '';
+
+        if ( '' !== $secret_key && ! preg_match( '/^sk_(test|live)_\w+$/', $secret_key ) ) {
+            $kounselia_error = 'That secret key doesn\'t look right — Paystack secret keys start with sk_test_ or sk_live_.';
+        } elseif ( '' !== $public_key && ! preg_match( '/^pk_(test|live)_\w+$/', $public_key ) ) {
+            $kounselia_error = 'That public key doesn\'t look right — Paystack public keys start with pk_test_ or pk_live_.';
+        } else {
+            update_option( 'kounselia_paystack_secret_key', sanitize_text_field( $secret_key ) );
+            update_option( 'kounselia_paystack_public_key', sanitize_text_field( $public_key ) );
+            kounselia_admin_log( 'update_settings', 'settings' );
+            $kounselia_notice = $secret_key ? 'Paystack keys saved.' : 'Paystack secret key cleared — subscriptions are disabled until a key is set.';
+            if ( $secret_key && $public_key && ( 0 === strpos( $secret_key, 'sk_live_' ) ) !== ( 0 === strpos( $public_key, 'pk_live_' ) ) ) {
+                $kounselia_notice .= ' Warning: one key is a test key and the other is live — they must match.';
+            }
+        }
 
     // 11E. Currency & pricing
     } elseif ( 'save_currency_settings' === $kounselia_action
@@ -280,6 +292,7 @@ $active_rl_transients  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->opt
 $current_db_version    = get_option( 'kounselia_db_version', 'Unknown' );
 
 $kounselia_paystack_key = get_option( 'kounselia_paystack_secret_key', '' );
+$kounselia_paystack_public_key = get_option( 'kounselia_paystack_public_key', '' );
 $kounselia_awaiting_payouts = function_exists( 'kounselia_get_awaiting_payouts' ) ? kounselia_get_awaiting_payouts() : array();
 $kounselia_paystack_mode = $kounselia_paystack_key
     ? ( 0 === strpos( $kounselia_paystack_key, 'sk_live_' ) ? 'Live mode' : 'Test mode' )
@@ -476,6 +489,23 @@ $opt_booking_commission_percent = (float) get_option( 'kounselia_booking_commiss
   </div>
 
   <!-- ===============================================================
+       2B-2. EMAIL DELIVERY (full settings on their own page)
+  ================================================---------------- -->
+  <?php if ( current_user_can( 'administrator' ) && function_exists( 'kounselia_mail_settings' ) ) :
+      $kounselia_mail = kounselia_mail_settings(); ?>
+  <div class="panel">
+    <div class="panel-title">
+      Email Delivery
+      <span style="font-weight:400;color:var(--text3);font-size:12px;">Account emails: <?php echo 'brevo' === $kounselia_mail['account_provider'] ? 'Brevo' : 'default mail'; ?> · Newsletters: <?php echo 'brevo' === $kounselia_mail['newsletter_provider'] ? 'Brevo' : 'default mail'; ?></span>
+    </div>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px;line-height:1.55;max-width:64ch;">
+      Send emails through your server's default mailer or through Brevo, set Brevo's daily allowance (300/day on the free plan), send test emails and see the delivery log.
+    </p>
+    <a class="login-submit" style="display:inline-block;width:auto;padding:11px 22px;text-decoration:none;color:#fff;" href="/portal/admin/pages/email-delivery.php">Manage email delivery</a>
+  </div>
+  <?php endif; ?>
+
+  <!-- ===============================================================
        2C. PAYSTACK PAYMENTS
   ================================================---------------- -->
   <div class="panel">
@@ -490,6 +520,19 @@ $opt_booking_commission_percent = (float) get_option( 'kounselia_booking_commiss
       <?php wp_nonce_field( 'kounselia_settings_paystack' ); ?>
       <input type="hidden" name="kounselia_action" value="save_paystack_key">
       <div class="login-field">
+        <label for="paystack_public_key">Paystack public key <span style="font-weight:400;color:var(--text3)">(optional)</span></label>
+        <input
+          type="text"
+          id="paystack_public_key"
+          name="paystack_public_key"
+          autocomplete="off"
+          spellcheck="false"
+          style="width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:6px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;background:var(--bg);color:var(--text1);"
+          value="<?php echo esc_attr( $kounselia_paystack_public_key ); ?>"
+          placeholder="pk_test_...">
+        <p style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.5;">With a public key, members pay in a secure Paystack pop-up without leaving their dashboard. Without one, they're sent to Paystack's page and back. The public key is safe to show in the browser; the secret key never is.</p>
+      </div>
+      <div class="login-field">
         <label for="paystack_secret_key">Paystack secret key</label>
         <input
           type="password"
@@ -501,7 +544,7 @@ $opt_booking_commission_percent = (float) get_option( 'kounselia_booking_commiss
           value="<?php echo esc_attr( $kounselia_paystack_key ); ?>"
           placeholder="sk_test_...">
       </div>
-      <button type="submit" class="login-submit" style="width:auto;padding:11px 22px;">Save Key</button>
+      <button type="submit" class="login-submit" style="width:auto;padding:11px 22px;">Save Keys</button>
     </form>
 
     <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
