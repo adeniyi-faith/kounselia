@@ -28,6 +28,8 @@ export const colors = {
   siennaLight: '#F5EBE5',
   navy: '#162B4A',
   navyLight: '#E6EBF2',
+  // The navy of the campaign posters and the splash screen.
+  brandNavy: '#26446F',
 };
 
 export const radius = {
