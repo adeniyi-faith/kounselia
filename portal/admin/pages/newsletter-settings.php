@@ -48,7 +48,12 @@ $s = kounselia_newsletter_settings();
       <div class="panel-title">Tracking & delivery</div>
       <label class="check"><input type="checkbox" id="s-opens" <?php checked( $s['track_opens'] ); ?>> <span><b>Track opens</b><small>Adds an invisible image to each email.</small></span></label>
       <label class="check"><input type="checkbox" id="s-clicks" <?php checked( $s['track_clicks'] ); ?>> <span><b>Track link clicks</b><small>Links pass briefly through kounselia.com so we can count them.</small></span></label>
-      <div class="field"><label for="s-batch">Emails per batch</label><input type="number" id="s-batch" min="5" max="500" value="<?php echo (int) $s['batch_size']; ?>"><div class="hint">About one batch goes out every minute. Many shared hosts limit emails per hour — check yours before raising this. For large lists, connect a sending service (e.g. an SMTP plugin with Postmark, SendGrid or Amazon SES) so emails land in inboxes, not spam.</div></div>
+      <div class="field"><label for="s-batch">Emails per batch</label><input type="number" id="s-batch" min="5" max="500" value="<?php echo (int) $s['batch_size']; ?>"><div class="hint">About one batch goes out every minute. Many shared hosts limit emails per hour — check yours before raising this.</div></div>
+      <?php $kounselia_mail = function_exists( 'kounselia_mail_settings' ) ? kounselia_mail_settings() : null; ?>
+      <div class="hint" style="font-size:12.5px;background:var(--accent-light);padding:10px 12px;border-radius:var(--r-sm);color:var(--accent)">
+        Newsletters are currently sent by <b><?php echo $kounselia_mail && 'brevo' === $kounselia_mail['newsletter_provider'] ? 'Brevo' : 'your default mail'; ?></b>.
+        <?php if ( current_user_can( 'administrator' ) ) : ?><a href="/portal/admin/pages/email-delivery.php">Change email delivery</a><?php else : ?>A super admin can change this in Settings → Email delivery.<?php endif; ?>
+      </div>
     </div>
   </div>
   <button class="btn btn-primary" id="s-save"><i class="ti ti-device-floppy"></i> Save settings</button>

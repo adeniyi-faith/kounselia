@@ -52,6 +52,12 @@ $available_plans     = function_exists( 'kounselia_get_plans' ) ? kounselia_get_
 $user_subscription   = function_exists( 'kounselia_get_user_subscription' ) ? kounselia_get_user_subscription( $user->ID ) : null;
 $subscription_active = $user_subscription && strtotime( $user_subscription->current_period_end ) > current_time( 'timestamp' );
 
+// Pro members' discount on professional sessions (capped at the commission; see membership.php).
+$kounselia_session_discount = function_exists( 'kounselia_member_session_price' )
+    ? kounselia_member_session_price( $user->ID, 100, kounselia_booking_commission_percent() )['discount_percent']
+    : 0;
+$kounselia_reflection_allowance = function_exists( 'kounselia_reflection_allowance' ) ? kounselia_reflection_allowance( $user->ID ) : null;
+
 $imported_memory     = get_user_meta( $user->ID, 'kounselia_imported_memory', true );
 $memory_imported_at  = get_user_meta( $user->ID, 'kounselia_memory_imported_at', true );
 
@@ -433,6 +439,92 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .sub-cancel-btn{padding:10px 18px;border-radius:50px;border:1.5px solid rgba(0,0,0,0.12);background:#fff;color:var(--text2);font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;white-space:nowrap}
 .sub-cancel-btn:hover{border-color:var(--text3);color:var(--text)}
 .plans-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+/* Care team card (Home) */
+.care-card{display:flex;align-items:center;gap:18px;background:linear-gradient(135deg,var(--surface) 0%,var(--gold-light) 140%);border:1px solid var(--border);border-radius:var(--r);padding:20px 22px;margin-bottom:20px;box-shadow:var(--shadow-sm)}
+.care-card.has-next{background:linear-gradient(135deg,var(--accent-light) 0%,var(--surface) 70%);border-color:rgba(30,58,95,.14)}
+.care-date{width:58px;height:62px;border-radius:16px;background:var(--surface);border:1px solid var(--border);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;box-shadow:var(--shadow-sm)}
+.care-date-m{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--rose)}
+.care-date-d{font-family:'Cormorant Garamond',serif;font-size:28px;line-height:1;color:var(--text)}
+.care-meta{flex:1;min-width:0}
+.care-eyebrow{font-size:11px;font-weight:600;letter-spacing:1.2px;text-transform:uppercase;color:var(--gold);display:flex;align-items:center;gap:5px;margin-bottom:4px}
+.care-card h3{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:21px;line-height:1.2;margin:0 0 3px}
+.care-card p{font-size:13.5px;color:var(--text2);line-height:1.5;margin:0}
+.care-perk{color:var(--gold);font-weight:500}
+.care-actions{display:flex;gap:8px;flex-shrink:0}
+.care-stack{display:flex;flex-shrink:0}
+.care-av{width:42px;height:42px;border-radius:50%;background:var(--accent-light);color:var(--accent);border:2.5px solid var(--surface);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;overflow:hidden;margin-left:-12px}
+.care-av:first-child{margin-left:0}
+.care-av img{width:100%;height:100%;object-fit:cover}
+.care-av.icon{font-size:20px;background:var(--gold-light);color:var(--gold)}
+.talk-human{width:100%;display:flex;align-items:center;gap:14px;text-align:left;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;cursor:pointer;font-family:inherit;color:var(--text);box-shadow:var(--shadow-sm)}
+.talk-human-icon{width:44px;height:44px;border-radius:14px;background:var(--gold-light);color:var(--gold);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.talk-human-copy{flex:1}
+.talk-human-copy b{display:block;font-weight:600;font-size:15px}
+.talk-human-copy small{display:block;font-size:13px;color:var(--text2);margin-top:2px}
+.talk-human > .ti-chevron-right{color:var(--text3);font-size:20px}
+.reflection-allowance{font-size:12.5px;color:var(--text3);text-align:center;margin-top:10px}
+.reflection-allowance a{color:var(--gold);font-weight:500}
+/* My plan */
+.plan-hero{display:flex;align-items:center;gap:18px;border-radius:var(--r);padding:22px 24px;margin-bottom:18px;border:1px solid var(--border);background:var(--surface)}
+.plan-hero.state-active,.plan-hero.state-gifted{background:linear-gradient(135deg,var(--gold-light),var(--surface) 80%);border-color:rgba(176,125,58,.28)}
+.plan-hero.state-renewal_off{background:var(--surface2)}
+.plan-hero.state-payment_problem{background:var(--rose-light);border-color:rgba(139,58,82,.25)}
+.plan-hero-icon{width:50px;height:50px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:23px;color:var(--gold);flex-shrink:0;box-shadow:var(--shadow-sm)}
+.state-none .plan-hero-icon{color:var(--sage)}
+.state-payment_problem .plan-hero-icon{color:var(--rose)}
+.plan-hero-meta{flex:1;min-width:0}
+.plan-hero-meta h3{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:24px;line-height:1.2;margin:0 0 4px}
+.plan-hero-meta p{font-size:14px;color:var(--text2);line-height:1.55;margin:0}
+.plan-hero-actions{flex-shrink:0}
+.billing-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.billing-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:18px}
+.billing-label{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);margin-bottom:8px}
+.billing-card{display:flex;align-items:center;gap:8px;font-weight:500;font-size:15px;flex-wrap:wrap}
+.billing-card i{font-size:20px;color:var(--accent)}
+.billing-card span{font-size:12.5px;color:var(--text3);font-weight:400;width:100%;padding-left:28px}
+.billing-card.muted,.billing-big.muted{color:var(--text3)}
+.billing-big{font-family:'Cormorant Garamond',serif;font-size:28px;line-height:1.1}
+.billing-sub{font-size:13px;color:var(--text3);margin-top:2px}
+.link-btn{background:none;border:none;color:var(--rose);font-family:inherit;font-size:12.5px;cursor:pointer;padding:0;margin-top:10px;text-decoration:underline}
+.switch-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:18px}
+.switch-box label{display:block;font-size:13px;font-weight:500;margin-bottom:8px}
+.switch-row{display:flex;gap:8px}
+.switch-row select{flex:1;padding:11px 12px;border:1px solid var(--border);border-radius:12px;font-family:inherit;font-size:14px;background:var(--bg);min-width:0}
+.switch-row .btn-plan{width:auto;padding:11px 20px;margin:0}
+.switch-box p{font-size:12.5px;color:var(--text3);margin-top:8px}
+.compare{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.compare-row{display:grid;grid-template-columns:1fr 110px 110px;align-items:center;border-bottom:1px solid var(--border);font-size:14px}
+.compare-row:last-child{border-bottom:none}
+.compare-row > div{padding:13px 14px;text-align:center;color:var(--text2)}
+.compare-row > div.compare-label,.compare-row > div:first-child{text-align:left;color:var(--text)}
+.compare-row .you{background:rgba(176,125,58,.07)}
+.compare-head > div{font-weight:600;color:var(--text);font-size:14px}
+.compare-head .pro{color:var(--gold)}
+.compare-head small{display:block;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--gold);font-weight:600}
+.compare .ti-check{color:var(--sage);font-size:18px}
+.compare .no{color:var(--text3)}
+.usage-note{font-size:13px;color:var(--text2);margin-top:12px;display:flex;gap:6px;align-items:flex-start;line-height:1.5}
+.usage-note i{color:var(--gold);font-size:16px;margin-top:1px}
+.bill-list{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.bill-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid var(--border)}
+.bill-row:last-child{border-bottom:none}
+.bill-title{font-weight:500;font-size:14px}
+.bill-sub{font-size:12px;color:var(--text3);margin-top:2px}
+.bill-amt{font-weight:600;font-size:14.5px;text-align:right;display:flex;align-items:center;gap:10px}
+.bill-status{font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:50px;text-transform:uppercase;letter-spacing:.5px}
+.bill-status.success{background:var(--sage-light);color:var(--sage)}
+.bill-status.failed{background:var(--rose-light);color:var(--rose)}
+@media (max-width:640px){
+  .care-card{flex-wrap:wrap;padding:18px}
+  .care-actions{width:100%}
+  .care-actions .btn-rec{flex:1;text-align:center}
+  .plan-hero{flex-wrap:wrap}
+  .plan-hero-actions{width:100%}
+  .plan-hero-actions button{width:100%}
+  .billing-grid{grid-template-columns:1fr}
+  .compare-row{grid-template-columns:1fr 84px 84px;font-size:13px}
+  .compare-row > div{padding:11px 8px}
+}
 .plan-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r);padding:26px}
 .plan-card.pro{border-color:var(--gold);background:linear-gradient(180deg,var(--gold-light) 0%,var(--surface) 30%);position:relative}
 .plan-badge{position:absolute;top:-11px;right:22px;background:var(--gold);color:#fff;font-size:10.5px;font-weight:600;letter-spacing:1px;text-transform:uppercase;padding:4px 12px;border-radius:50px}
@@ -586,7 +678,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <button class="nav-link js-nav" id="desk-tab-professionals" onclick="switchTab('professionals')"><i class="ti ti-calendar-event"></i><span>Book a professional</span></button>
         <button class="nav-link js-nav" id="desk-tab-memory" onclick="switchTab('memory')"><i class="ti ti-brain"></i><span>Memory Profile</span></button>
         <button class="nav-link js-nav" id="desk-tab-settings" onclick="switchTab('settings')"><i class="ti ti-settings"></i><span>Settings</span></button>
-        <button class="nav-link js-nav" id="desk-tab-upgrade" onclick="switchTab('upgrade')"><i class="ti ti-sparkles"></i><span>Upgrade</span></button>
+        <button class="nav-link js-nav" id="desk-tab-upgrade" onclick="switchTab('upgrade')"><i class="ti ti-sparkles"></i><span>My plan</span></button>
         <a class="nav-link" href="/talk.php" style="margin-top:16px;"><i class="ti ti-message-2-plus"></i><span>Talk to someone</span></a>
       </nav>
     </div>
@@ -595,7 +687,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="side-av" id="side-av"><?php echo $avatar_url ? '<img src="' . esc_url( $avatar_url ) . '" alt="">' : esc_html( $initial ); ?></div>
         <div class="side-user-meta">
           <div class="side-user-name"><?php echo esc_html( $display_name ); ?></div>
-          <div class="side-user-plan">Free plan</div>
+          <div class="side-user-plan"><?php echo ( function_exists( 'kounselia_member_is_pro' ) && kounselia_member_is_pro( $user->ID ) ) ? 'Pro member' : 'Free plan'; ?></div>
         </div>
       </div>
       <button class="signout-btn" onclick="signOut()"><i class="ti ti-logout"></i> Sign out</button>
@@ -608,6 +700,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <img src="https://kounselia.com/img/Kounselia_Logo_IconMark_MidnightNavy.png" alt="Kounselia" style="max-height:24px; width:auto; object-fit:contain;" fetchpriority="high">
     </a>
     <div class="mobile-topbar-right">
+      <button class="mobile-signout" onclick="switchTab('professionals')" aria-label="Sessions with professionals" style="position:relative"><i class="ti ti-calendar-event"></i><?php if ( ! empty( $my_bookings ) ) : ?><span class="notif-dot" style="background:var(--gold)"></span><?php endif; ?></button>
       <button class="mobile-signout" id="notif-bell" onclick="openNotifications()" aria-label="Notifications" style="position:relative"><i class="ti ti-bell"></i><span class="notif-dot" id="notif-dot" style="display:none"></span></button>
       <button class="mobile-av" id="mobile-av" onclick="switchTab('settings')"><?php echo $avatar_url ? '<img src="' . esc_url( $avatar_url ) . '" alt="">' : esc_html( $initial ); ?></button>
       <button class="mobile-signout" onclick="signOut()" aria-label="Sign out"><i class="ti ti-logout"></i></button>
@@ -665,6 +758,8 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       </div>
     </section>
     <?php endif; ?>
+
+    <?php require __DIR__ . '/inc/dashboard-care-team.php'; ?>
 
     <section class="mood-card">
       <div class="mood-head">
@@ -753,6 +848,9 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
           <i class="ti ti-bulb"></i>
           <span>Generate Milestone Reflection</span>
         </button>
+        <?php if ( $kounselia_reflection_allowance && $kounselia_reflection_allowance['limit'] ) : ?>
+          <p class="reflection-allowance" id="reflection-allowance"><?php echo (int) $kounselia_reflection_allowance['remaining']; ?> of <?php echo (int) $kounselia_reflection_allowance['limit']; ?> left this month · <a href="javascript:void(0)" onclick="switchTab('upgrade')">Unlimited with Pro</a></p>
+        <?php endif; ?>
 
         <div id="insight-ui" class="insight-wrapper">
           <div class="insight-header">
@@ -883,7 +981,15 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
             <?php else : ?>
               <div class="tile-spec" style="margin-top:4px;color:var(--text3)">No reviews yet</div>
             <?php endif; ?>
-            <div class="tile-spec" style="margin-top:4px;font-weight:600;color:var(--accent)"><?php echo $pro->rate_amount ? '₦' . esc_html( number_format( (float) $pro->rate_amount ) ) . ' / session' : ''; ?></div>
+            <div class="tile-spec" style="margin-top:4px;font-weight:600;color:var(--accent)"><?php
+              if ( $pro->rate_amount ) {
+                  $kounselia_price = function_exists( 'kounselia_member_session_price' ) ? kounselia_member_session_price( $user->ID, $pro->rate_amount, kounselia_booking_commission_percent() ) : array( 'charged' => (float) $pro->rate_amount, 'discount' => 0 );
+                  echo '₦' . esc_html( number_format( $kounselia_price['charged'] ) ) . ' / session';
+                  if ( $kounselia_price['discount'] > 0 ) {
+                      echo ' <s style="color:var(--text3);font-weight:400">₦' . esc_html( number_format( (float) $pro->rate_amount ) ) . '</s> <span style="color:var(--gold);font-weight:500">Pro price</span>';
+                  }
+              }
+            ?></div>
           </a>
           <?php endforeach; ?>
         </div>
@@ -907,6 +1013,13 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         </a>
         <?php endforeach; ?>
       </div>
+    </section>
+    <section class="section">
+      <button type="button" class="talk-human" onclick="switchTab('professionals')">
+        <span class="talk-human-icon"><i class="ti ti-user-heart"></i></span>
+        <span class="talk-human-copy"><b>Prefer a real person?</b><small>Book a video session with a licensed professional<?php echo $kounselia_session_discount ? ' — ' . esc_html( rtrim( rtrim( number_format( (float) $kounselia_session_discount, 1 ), '0' ), '.' ) ) . '% off with Pro' : ''; ?>.</small></span>
+        <i class="ti ti-chevron-right"></i>
+      </button>
     </section>
   </div><!-- /view-talk -->
 
@@ -1031,66 +1144,8 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     </section>
   </div><!-- /view-memory -->
 
-  <!-- UPGRADE PANEL -->
-  <div class="view-panel" id="view-upgrade">
-    <section class="section">
-      <div class="section-head"><h2>Your plan</h2></div>
-
-      <?php if ( $user_subscription && $subscription_active ) : ?>
-      <div class="sub-status-card <?php echo 'cancelled' === $user_subscription->status ? 'ending' : ''; ?>">
-        <div class="sub-status-icon"><i class="ti <?php echo 'cancelled' === $user_subscription->status ? 'ti-clock-pause' : 'ti-sparkles'; ?>"></i></div>
-        <div class="sub-status-meta">
-          <h4>You're on <?php echo esc_html( $user_subscription->plan_name ); ?></h4>
-          <?php if ( 'cancelled' === $user_subscription->status ) : ?>
-            <p>Auto-renew is off — your access ends on <?php echo esc_html( date( 'F j, Y', strtotime( $user_subscription->current_period_end ) ) ); ?>.</p>
-          <?php else : ?>
-            <p>Renews on <?php echo esc_html( date( 'F j, Y', strtotime( $user_subscription->current_period_end ) ) ); ?>.</p>
-          <?php endif; ?>
-        </div>
-        <?php if ( 'active' === $user_subscription->status ) : ?>
-          <button class="sub-cancel-btn" id="sub-cancel-btn">Cancel auto-renew</button>
-        <?php endif; ?>
-      </div>
-      <?php endif; ?>
-
-      <div class="plans-grid">
-        <div class="plan-card">
-          <h3>Free</h3>
-          <p class="plan-price"><?php echo ( ! $user_subscription || ! $subscription_active ) ? 'Your current plan' : 'Included with every account'; ?></p>
-          <ul class="plan-list">
-            <li><i class="ti ti-check"></i> Unlimited conversations</li>
-            <li><i class="ti ti-check"></i> All counselor personas</li>
-            <li><i class="ti ti-check"></i> Sessions saved to your account</li>
-            <li><i class="ti ti-check"></i> 5 minute voice calls</li>
-          </ul>
-          <button class="btn-plan" disabled><?php echo ( ! $user_subscription || ! $subscription_active ) ? 'Current plan' : 'Free plan'; ?></button>
-        </div>
-
-        <?php foreach ( $available_plans as $plan ) :
-          $is_current_plan = $subscription_active && $user_subscription && $user_subscription->plan_id === $plan['id'];
-          $is_cancelled    = $is_current_plan && 'cancelled' === $user_subscription->status;
-        ?>
-        <div class="plan-card pro">
-          <?php if ( ! empty( $plan['is_popular'] ) ) : ?><span class="plan-badge">Popular</span><?php endif; ?>
-          <h3><?php echo esc_html( $plan['name'] ); ?></h3>
-          <p class="plan-price">₦<?php echo esc_html( number_format( (float) $plan['price_amount'] ) ); ?> / <?php echo 'yearly' === $plan['interval'] ? 'year' : 'month'; ?></p>
-          <ul class="plan-list">
-            <?php foreach ( (array) $plan['features'] as $feature ) : ?>
-              <li><i class="ti ti-check"></i> <?php echo esc_html( $feature ); ?></li>
-            <?php endforeach; ?>
-          </ul>
-          <?php if ( $is_current_plan && ! $is_cancelled ) : ?>
-            <button class="btn-plan" disabled>Current plan</button>
-          <?php else : ?>
-            <button class="btn-plan primary plan-subscribe-btn" data-plan-id="<?php echo esc_attr( $plan['id'] ); ?>">
-              <?php echo $is_cancelled ? 'Renew now' : 'Subscribe with Paystack'; ?>
-            </button>
-          <?php endif; ?>
-        </div>
-        <?php endforeach; ?>
-      </div>
-    </section>
-  </div><!-- /view-upgrade -->
+  <!-- MY PLAN PANEL (subscription, what's included, billing) -->
+  <?php require __DIR__ . '/inc/dashboard-my-plan.php'; ?>
 
   </main>
 
@@ -1099,9 +1154,8 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     <button class="mob-tab active" id="mob-tab-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span>Home</span></button>
     <button class="mob-tab" id="mob-tab-sessions" onclick="switchTab('sessions')"><i class="ti ti-history"></i><span>Sessions</span></button>
     <button class="tabbar-fab" onclick="switchTab('talk')" aria-label="Talk to someone"><i class="ti ti-message-2-plus"></i></button>
-    <button class="mob-tab" id="mob-tab-professionals" onclick="switchTab('professionals')"><i class="ti ti-calendar-event"></i><span>Book</span></button>
+    <button class="mob-tab" id="mob-tab-upgrade" onclick="switchTab('upgrade')"><i class="ti ti-sparkles"></i><span>My plan</span></button>
     <button class="mob-tab" id="mob-tab-settings" onclick="switchTab('settings')"><i class="ti ti-settings"></i><span>Settings</span></button>
-    <button class="mob-tab" id="mob-tab-upgrade" onclick="switchTab('upgrade')"><i class="ti ti-sparkles"></i><span>Upgrade</span></button>
   </nav>
 
 </div>
@@ -1481,58 +1535,7 @@ function saveJournal(sourceId,msgId){
   .catch(()=>showInline(msgId,'Could not save, please try again.',false));
 }
 
-document.querySelectorAll('.plan-subscribe-btn').forEach(function(btn){
-  btn.addEventListener('click', function(){
-    const planId = this.dataset.planId;
-    const originalText = this.textContent;
-    this.disabled = true;
-    this.textContent = 'Starting checkout...';
-    fetch(KOUNSELIA.ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:new URLSearchParams({action:'kounselia_init_subscription_payment',nonce:KOUNSELIA.nonce,plan_id:planId})})
-    .then(r=>r.json())
-    .then(res=>{
-      if(res.success && res.data.authorization_url){
-        window.location.href = res.data.authorization_url;
-      } else {
-        toast((res.data && res.data.message) ? res.data.message : 'Could not start checkout, please try again.', true);
-        this.disabled = false;
-        this.textContent = originalText;
-      }
-    })
-    .catch(()=>{
-      toast('Could not start checkout, please check your connection and try again.', true);
-      this.disabled = false;
-      this.textContent = originalText;
-    });
-  });
-});
-
-const subCancelBtn = document.getElementById('sub-cancel-btn');
-if(subCancelBtn){
-  subCancelBtn.addEventListener('click', function(){
-    if(!confirm('Cancel auto-renew? You will keep access until your current period ends.')) return;
-    this.disabled = true;
-    this.textContent = 'Cancelling...';
-    fetch(KOUNSELIA.ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-      body:new URLSearchParams({action:'kounselia_cancel_subscription',nonce:KOUNSELIA.nonce})})
-    .then(r=>r.json())
-    .then(res=>{
-      if(res.success){
-        toast(res.data.message || 'Subscription cancelled.');
-        setTimeout(()=>window.location.reload(), 900);
-      } else {
-        toast((res.data && res.data.message) ? res.data.message : 'Could not cancel, please try again.', true);
-        this.disabled = false;
-        this.textContent = 'Cancel auto-renew';
-      }
-    })
-    .catch(()=>{
-      toast('Could not cancel, please check your connection and try again.', true);
-      this.disabled = false;
-      this.textContent = 'Cancel auto-renew';
-    });
-  });
-}
+// Subscribe / cancel / manage-plan handlers live in inc/dashboard-my-plan.php.
 
 (function(){
   const params = new URLSearchParams(window.location.search);
@@ -1804,9 +1807,12 @@ function generateInsights() {
   .then(res => {
     if(res.success) {
       renderInsights(res.data.reflection, res.data.date);
+      const allowanceEl = document.getElementById('reflection-allowance');
+      if(allowanceEl && res.data.allowance && res.data.allowance.limit){ allowanceEl.firstChild.textContent = res.data.allowance.remaining + ' of ' + res.data.allowance.limit + ' left this month · '; }
       toast('Insights generated successfully!', false);
     } else {
       toast(res.data.message || 'Analysis failed. Have a few more conversations first!', true);
+      if(res.data && res.data.upgrade){ setTimeout(()=>switchTab('upgrade'), 1200); }
       if(btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-bulb"></i><span>Generate Milestone Reflection</span>'; }
     }
   })

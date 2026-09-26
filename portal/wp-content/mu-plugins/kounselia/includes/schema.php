@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.19.0'; // Bumped version: CMS pages, blog, newsletter subscribers/segments/campaigns
+    $current_version   = '1.20.0'; // Bumped version: email delivery log, subscription auto-renewal fields
 
     if ( $installed_version === $current_version ) {
         return;
@@ -328,6 +328,14 @@ function kounselia_install_tables() {
         currency VARCHAR(8) NOT NULL DEFAULT 'NGN',
         paystack_reference VARCHAR(100) NULL,
         paystack_customer_code VARCHAR(100) NULL,
+        authorization_code VARCHAR(100) NULL,
+        card_brand VARCHAR(32) NULL,
+        card_last4 VARCHAR(4) NULL,
+        card_exp VARCHAR(7) NULL,
+        pending_plan_id VARCHAR(64) NULL,
+        renewal_attempts TINYINT UNSIGNED NOT NULL DEFAULT 0,
+        last_renewal_attempt_at DATETIME NULL,
+        last_renewal_error VARCHAR(255) NULL,
         current_period_start DATETIME NULL,
         current_period_end DATETIME NULL,
         cancelled_at DATETIME NULL,
@@ -724,6 +732,24 @@ function kounselia_install_tables() {
         KEY claim (claim)
     ) {$charset_collate};";
 
+    // One row per email handed to a delivery provider (the site's
+    // default mailer or Brevo). Used for the delivery log in Admin →
+    // Email delivery and to count today's sends against a provider's
+    // daily limit (Brevo's free plan allows 300/day). Pruned after 30 days.
+    $sql_mail_log = "CREATE TABLE {$prefix}kounselia_mail_log (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        provider VARCHAR(16) NOT NULL,
+        channel VARCHAR(16) NOT NULL DEFAULT 'account',
+        recipient VARCHAR(191) NOT NULL,
+        subject VARCHAR(255) NULL,
+        status VARCHAR(16) NOT NULL,
+        error VARCHAR(255) NULL,
+        created_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        KEY provider_day (provider, created_at),
+        KEY created_at (created_at)
+    ) {$charset_collate};";
+
     dbDelta( $sql_sessions );
     dbDelta( $sql_messages );
     dbDelta( $sql_guest_limits );
@@ -759,6 +785,7 @@ function kounselia_install_tables() {
     dbDelta( $sql_segments );
     dbDelta( $sql_campaigns );
     dbDelta( $sql_campaign_recipients );
+    dbDelta( $sql_mail_log );
 
     if ( function_exists( 'kounselia_ensure_professional_docs_dir' ) ) {
         kounselia_ensure_professional_docs_dir();
