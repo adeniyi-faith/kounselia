@@ -40,6 +40,8 @@ $kounselia_messages = $wpdb->get_results( $wpdb->prepare(
     $kounselia_session_id
 ) );
 
+$kounselia_ratings = function_exists( 'kounselia_get_message_ratings' ) ? kounselia_get_message_ratings( wp_list_pluck( $kounselia_messages, 'id' ) ) : array();
+
 $kounselia_who     = kounselia_admin_session_who( $kounselia_session );
 $kounselia_avatar  = kounselia_admin_counselor_avatar( $kounselia_session->counselor_slug );
 
@@ -113,6 +115,10 @@ foreach ( $kounselia_messages as $i => $m ) {
     </div>
   </div>
 
+  <?php if ( 'cleared' === $kounselia_session->status ) : ?>
+    <div class="panel" style="margin-bottom:12px"><div class="empty-state">The member cleared this conversation from their chat<?php echo $kounselia_session->ended_at ? ' on ' . esc_html( $kounselia_session->ended_at ) : ''; ?>. It is hidden from them but kept here for safety review.</div></div>
+  <?php endif; ?>
+
   <?php if ( empty( $kounselia_messages ) ) : ?>
     <div class="panel"><div class="empty-state">No messages were ever sent in this session.</div></div>
   <?php else : ?>
@@ -128,6 +134,11 @@ foreach ( $kounselia_messages as $i => $m ) {
         <div class="t-row <?php echo $is_mine ? 'mine' : ''; ?> <?php echo $row['is_grouped'] ? 'grouped' : ''; ?>">
           <div class="t-bubble <?php echo $is_mine ? 'mine' : 'bot'; ?>"><?php echo nl2br( esc_html( $m->content ) ); ?></div>
         </div>
+        <?php if ( isset( $kounselia_ratings[ (int) $m->id ] ) ) : ?>
+          <div class="t-time left" style="color:<?php echo 'up' === $kounselia_ratings[ (int) $m->id ] ? '#2E5C3E' : '#8B3A52'; ?>">
+            <?php echo 'up' === $kounselia_ratings[ (int) $m->id ] ? '&#128077; Member rated this reply helpful' : '&#128078; Member rated this reply not helpful'; ?>
+          </div>
+        <?php endif; ?>
         <?php if ( $row['show_time'] ) : ?>
           <div class="t-time <?php echo $is_mine ? '' : 'left'; ?>"><?php echo esc_html( kounselia_admin_clock_label( $m->created_at ) ); ?></div>
         <?php endif; ?>

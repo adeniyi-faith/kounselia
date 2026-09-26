@@ -19,6 +19,7 @@ export interface ChatMessage {
   text: string;
   messageId?: number; // server-assigned id, needed for playback/feedback
   consulted?: string[]; // other counselors consulted for this reply, if any
+  rating?: 'up' | 'down' | null; // the member's saved thumbs up/down, if any
   createdAt: number;
 }
 
@@ -31,12 +32,14 @@ export interface SendMessageResult {
   messagesRemaining?: number;
   dailyLimit?: boolean;
   errorMessage?: string;
+  networkError?: boolean;
 }
 
 export interface HistoryMessage {
-  sender: 'user' | 'ai';
+  sender: 'user' | 'bot';
   content: string;
   id?: number;
+  rating?: 'up' | 'down' | null;
 }
 
 export interface KounseliaConfig {

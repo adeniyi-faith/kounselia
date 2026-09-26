@@ -52,7 +52,7 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
 
         $name         = isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( $_POST['name'] ) ) : '';
         $price_amount = isset( $_POST['price_amount'] ) ? (float) $_POST['price_amount'] : 0;
-        $currency     = isset( $_POST['currency'] ) ? sanitize_text_field( wp_unslash( $_POST['currency'] ) ) : 'NGN';
+        $price_usd    = isset( $_POST['price_usd'] ) && '' !== $_POST['price_usd'] ? max( 0, round( (float) $_POST['price_usd'], 2 ) ) : 0;
         $interval     = ( isset( $_POST['interval'] ) && 'yearly' === $_POST['interval'] ) ? 'yearly' : 'monthly';
         $raw_features = isset( $_POST['features'] ) ? (string) wp_unslash( $_POST['features'] ) : '';
         $features     = array_values( array_filter( array_map( 'trim', explode( "\n", str_replace( "\r", '', $raw_features ) ) ) ) );
@@ -82,7 +82,8 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
                 'id'           => $plan_id,
                 'name'         => $name,
                 'price_amount' => $price_amount,
-                'currency'     => $currency ?: 'NGN',
+                'price_usd'    => $price_usd,
+                'currency'     => 'NGN',
                 'interval'     => $interval,
                 'features'     => $features,
                 'is_active'    => $is_active,
@@ -119,7 +120,7 @@ $edit_plan    = ( $edit_plan_id && isset( $plans[ $edit_plan_id ] ) ) ? $plans[ 
 $form_id            = $edit_plan ? $edit_plan['id'] : '';
 $form_name          = $edit_plan ? $edit_plan['name'] : '';
 $form_price         = $edit_plan ? $edit_plan['price_amount'] : '';
-$form_currency      = $edit_plan ? $edit_plan['currency'] : 'NGN';
+$form_price_usd     = ( $edit_plan && ! empty( $edit_plan['price_usd'] ) ) ? $edit_plan['price_usd'] : '';
 $form_interval      = $edit_plan ? $edit_plan['interval'] : 'monthly';
 $form_features      = $edit_plan ? implode( "\n", (array) $edit_plan['features'] ) : '';
 $form_is_active     = $edit_plan ? ! empty( $edit_plan['is_active'] ) : true;
@@ -245,7 +246,7 @@ $form_sort_order    = $edit_plan ? $edit_plan['sort_order'] : ( count( $plans ) 
             <?php if ( ! empty( $plan['is_popular'] ) ) : ?><span class="plan-admin-badge">Popular</span><?php endif; ?>
             <h3><?php echo esc_html( $plan['name'] ); ?></h3>
             <div class="plan-admin-price">
-              ₦<?php echo esc_html( number_format( (float) $plan['price_amount'] ) ); ?> / <?php echo 'yearly' === $plan['interval'] ? 'year' : 'month'; ?>
+              <?php echo esc_html( kounselia_format_money( $plan['price_amount'], 'NGN' ) . ' · ' . kounselia_format_money( kounselia_plan_price( $plan, 'USD' ), 'USD' ) ); ?><?php echo empty( $plan['price_usd'] ) ? ' <span title="Converted from the naira price at the exchange rate in Settings">(converted)</span>' : ''; ?> / <?php echo 'yearly' === $plan['interval'] ? 'year' : 'month'; ?>
               · <?php echo empty( $plan['is_active'] ) ? 'Hidden from members' : 'Live'; ?>
             </div>
             <ul class="plan-admin-features">
@@ -283,6 +284,12 @@ $form_sort_order    = $edit_plan ? $edit_plan['sort_order'] : ( count( $plans ) 
         <div class="login-field">
           <label for="price_amount">Price (₦)</label>
           <input type="number" id="price_amount" name="price_amount" min="1" step="0.01" required value="<?php echo esc_attr( $form_price ); ?>" placeholder="4999">
+          <div style="font-size:12px;color:var(--text3);margin-top:4px;">What visitors in Nigeria pay.</div>
+        </div>
+        <div class="login-field">
+          <label for="price_usd">Price ($)</label>
+          <input type="number" id="price_usd" name="price_usd" min="0" step="0.01" value="<?php echo esc_attr( $form_price_usd ); ?>" placeholder="4.99">
+          <div style="font-size:12px;color:var(--text3);margin-top:4px;">What everyone else pays. Leave empty to convert the naira price at the exchange rate set in Settings.</div>
         </div>
         <div class="login-field">
           <label for="interval">Billing interval</label>

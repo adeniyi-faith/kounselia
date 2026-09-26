@@ -28,6 +28,12 @@ $kp_date     = function ( $mysql ) {
     return date_i18n( 'F j, Y', strtotime( $mysql ) );
 };
 $kp_public_key = function_exists( 'kounselia_paystack_public_key' ) ? kounselia_paystack_public_key() : '';
+// Plan prices are shown in the visitor's currency (naira or dollars, see
+// currency.php); a subscriber's renewal price stays in the currency they pay in.
+$kp_viewer_currency = function_exists( 'kounselia_viewer_currency' ) ? kounselia_viewer_currency() : 'NGN';
+$kp_price = function ( $plan, $currency ) {
+    return function_exists( 'kounselia_plan_price' ) ? kounselia_plan_price( $plan, $currency ) : (float) $plan['price_amount'];
+};
 ?>
 <div class="view-panel" id="view-upgrade">
   <section class="section">
@@ -102,7 +108,7 @@ $kp_public_key = function_exists( 'kounselia_paystack_public_key' ) ? kounselia_
           <div class="switch-row">
             <select id="switch-plan">
               <?php foreach ( $available_plans as $kp_plan ) : ?>
-                <option value="<?php echo esc_attr( $kp_plan['id'] ); ?>" <?php selected( $kp_sub->pending_plan_id ? $kp_sub->pending_plan_id : $kp_sub->plan_id, $kp_plan['id'] ); ?>><?php echo esc_html( $kp_plan['name'] . ' — ' . $kp_money( $kp_plan['price_amount'], $kp_plan['currency'] ) . ' / ' . ( 'yearly' === $kp_plan['interval'] ? 'year' : 'month' ) ); ?></option>
+                <option value="<?php echo esc_attr( $kp_plan['id'] ); ?>" <?php selected( $kp_sub->pending_plan_id ? $kp_sub->pending_plan_id : $kp_sub->plan_id, $kp_plan['id'] ); ?>><?php echo esc_html( $kp_plan['name'] . ' — ' . $kp_money( $kp_price( $kp_plan, $kp_summary['currency'] ), $kp_summary['currency'] ) . ' / ' . ( 'yearly' === $kp_plan['interval'] ? 'year' : 'month' ) ); ?></option>
               <?php endforeach; ?>
             </select>
             <button class="btn-plan" id="switch-plan-btn">Save</button>
@@ -177,7 +183,7 @@ $kp_public_key = function_exists( 'kounselia_paystack_public_key' ) ? kounselia_
           <div class="plan-card pro">
             <?php if ( ! empty( $plan['is_popular'] ) ) : ?><span class="plan-badge">Popular</span><?php endif; ?>
             <h3><?php echo esc_html( $plan['name'] ); ?></h3>
-            <p class="plan-price"><?php echo esc_html( $kp_money( $plan['price_amount'], $plan['currency'] ) ); ?> / <?php echo 'yearly' === $plan['interval'] ? 'year' : 'month'; ?></p>
+            <p class="plan-price"><?php echo esc_html( $kp_money( $kp_price( $plan, $kp_viewer_currency ), $kp_viewer_currency ) ); ?> / <?php echo 'yearly' === $plan['interval'] ? 'year' : 'month'; ?></p>
             <ul class="plan-list">
               <?php foreach ( (array) $plan['features'] as $feature ) : ?>
                 <li><i class="ti ti-check"></i> <?php echo esc_html( $feature ); ?></li>

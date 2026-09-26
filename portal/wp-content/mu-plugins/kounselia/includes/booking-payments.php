@@ -38,6 +38,18 @@ function kounselia_booking_commission_percent() {
     return (float) get_option( 'kounselia_booking_commission_percent', 15 );
 }
 
+/**
+ * Platform fee and professional share for one session, both in naira
+ * (the payout currency) whatever currency the client paid in.
+ */
+function kounselia_booking_payout_split( $rate_ngn ) {
+    $platform_fee_amount = round( (float) $rate_ngn * kounselia_booking_commission_percent() / 100, 2 );
+    return array(
+        'platform_fee_amount' => $platform_fee_amount,
+        'professional_amount' => round( (float) $rate_ngn - $platform_fee_amount, 2 ),
+    );
+}
+
 /* -------------------------------------------------------------------------
  * CHARGE — collecting payment for a booking
  * ---------------------------------------------------------------------- */
@@ -63,30 +75,40 @@ function kounselia_init_booking_payment( $booking_id ) {
         return new WP_Error( 'not_found', 'Booking not found.' );
     }
 
-    $amount = (float) $professional->rate_amount;
+    $rate_ngn = (float) $professional->rate_amount;
+    if ( $rate_ngn <= 0 ) {
+        return new WP_Error( 'invalid_amount', 'This professional has not set a rate yet.' );
+    }
+
+    // The client pays in their own currency; the professional's share is
+    // always worked out from their naira rate, since payouts are in naira.
+    $currency = kounselia_viewer_currency();
+    $amount   = kounselia_convert_ngn( $rate_ngn, $currency );
     if ( $amount <= 0 ) {
         return new WP_Error( 'invalid_amount', 'This professional has not set a rate yet.' );
     }
 
-    $commission_percent  = kounselia_booking_commission_percent();
-    $platform_fee_amount = round( $amount * $commission_percent / 100, 2 );
-    $professional_amount = round( $amount - $platform_fee_amount, 2 );
+    $split               = kounselia_booking_payout_split( $rate_ngn );
+    $platform_fee_amount = $split['platform_fee_amount'];
+    $professional_amount = $split['professional_amount'];
 
-    // Pro members' discount comes out of Kounselia's commission, never
-    // the professional's share (see kounselia_member_session_price()).
+    // Pro members' discount comes out of Kounselia's commission, never the
+    // professional's naira share (see kounselia_member_session_price()).
+    // It's applied to what the client pays (in their currency) and taken
+    // off the platform fee (in naira).
     if ( function_exists( 'kounselia_member_session_price' ) ) {
-        $price               = kounselia_member_session_price( $booking->client_user_id, $amount, $commission_percent );
-        $amount              = $price['charged'];
-        $platform_fee_amount = $price['platform_fee'];
-        $professional_amount = $price['professional_amount'];
+        $price = kounselia_member_session_price( $booking->client_user_id, $rate_ngn, kounselia_booking_commission_percent() );
+        if ( $price['discount_percent'] > 0 ) {
+            $amount              = round( $amount * ( 1 - $price['discount_percent'] / 100 ), 2 );
+            $platform_fee_amount = $price['platform_fee'];
+        }
     }
-    $currency            = $professional->rate_currency ? $professional->rate_currency : 'NGN';
 
     $reference = 'KOUNSELIA-BOOKING-' . $booking_id . '-' . time() . '-' . wp_generate_password( 6, false );
 
     $result = kounselia_paystack_request( 'POST', '/transaction/initialize', array(
         'email'        => $client->user_email,
-        'amount'       => (int) round( $amount * 100 ), // Paystack expects kobo.
+        'amount'       => (int) round( $amount * 100 ), // Paystack expects the smallest unit: kobo / cents.
         'currency'     => $currency,
         'reference'    => $reference,
         'callback_url' => home_url( '/booking-payment-callback.php' ),
@@ -106,6 +128,8 @@ function kounselia_init_booking_payment( $booking_id ) {
         'currency'            => $currency,
         'platform_fee_amount' => $platform_fee_amount,
         'professional_amount' => $professional_amount,
+        'payout_currency'     => 'NGN',
+        'exchange_rate'       => 'NGN' === $currency ? null : kounselia_usd_ngn_rate(),
         'reference'           => $reference,
         'status'              => 'pending',
         'created_at'          => $now,
@@ -146,9 +170,10 @@ function kounselia_complete_booking_payment( $reference ) {
 
     // Verified amount must match what we asked for — guards against a
     // tampered client-side amount ever mattering.
-    $verified_kobo = (int) ( $result['data']['amount'] ?? 0 );
-    $expected_kobo = (int) round( (float) $payment->amount * 100 );
-    if ( $verified_kobo !== $expected_kobo ) {
+    $verified_kobo     = (int) ( $result['data']['amount'] ?? 0 );
+    $expected_kobo     = (int) round( (float) $payment->amount * 100 );
+    $verified_currency = strtoupper( (string) ( $result['data']['currency'] ?? $payment->currency ) );
+    if ( $verified_kobo !== $expected_kobo || $verified_currency !== strtoupper( $payment->currency ) ) {
         $wpdb->update( $table, array(
             'status'           => 'failed',
             'gateway_response' => wp_json_encode( $result['data'] ),
@@ -158,11 +183,16 @@ function kounselia_complete_booking_payment( $reference ) {
     }
 
     $now = current_time( 'mysql' );
-    $wpdb->update( $table, array(
-        'status'           => 'success',
-        'gateway_response' => wp_json_encode( $result['data'] ),
-        'updated_at'       => $now,
-    ), array( 'id' => $payment->id ) );
+
+    // The browser redirect and the Paystack webhook can land at the same
+    // moment — only whichever one flips the row first confirms the booking.
+    $claimed = $wpdb->query( $wpdb->prepare(
+        "UPDATE {$table} SET status = 'success', gateway_response = %s, updated_at = %s WHERE id = %d AND status != 'success'",
+        wp_json_encode( $result['data'] ), $now, $payment->id
+    ) );
+    if ( ! $claimed ) {
+        return array( 'success' => true, 'message' => 'Payment already confirmed.', 'booking_id' => (int) $payment->booking_id );
+    }
 
     $booking = $wpdb->get_row( $wpdb->prepare(
         "SELECT * FROM {$wpdb->prefix}kounselia_bookings WHERE id = %d",
@@ -211,6 +241,17 @@ function kounselia_complete_booking_payment( $reference ) {
         if ( function_exists( 'kounselia_maybe_save_series_authorization' ) ) {
             kounselia_maybe_save_series_authorization( (int) $payment->booking_id, $result['data'] );
         }
+    } elseif ( ! $booking || ! in_array( $booking->status, array( 'confirmed', 'payment_conflict' ), true ) ) {
+        // Paid (e.g. confirmed late by the webhook) for a booking that was
+        // since cancelled or removed — the money is real, so a human must
+        // refund or rebook it rather than it silently sitting there.
+        kounselia_notify_admins_booking_conflict( (int) $payment->booking_id );
+        return array(
+            'success'    => false,
+            'conflict'   => true,
+            'message'    => 'Your payment went through, but this booking is no longer active. Our support team will be in touch to reschedule or refund you.',
+            'booking_id' => (int) $payment->booking_id,
+        );
     }
 
     return array( 'success' => true, 'message' => 'Payment confirmed.', 'booking_id' => (int) $payment->booking_id );

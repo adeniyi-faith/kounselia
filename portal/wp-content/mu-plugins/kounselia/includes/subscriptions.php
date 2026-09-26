@@ -70,8 +70,8 @@ function kounselia_subscription_summary( $user_id ) {
         'auto_renews'  => 'active' === $sub->status && ! empty( $sub->authorization_code ),
         'has_card'     => ! empty( $sub->authorization_code ),
         'next_plan'    => $next_plan,
-        'renew_amount' => $renew_plan ? (float) $renew_plan['price_amount'] : (float) $sub->amount,
-        'currency'     => $renew_plan ? $renew_plan['currency'] : $sub->currency,
+        'renew_amount' => ( $renew_plan && function_exists( 'kounselia_plan_price' ) ) ? kounselia_plan_price( $renew_plan, kounselia_subscription_currency( $sub ) ) : (float) $sub->amount,
+        'currency'     => kounselia_subscription_currency( $sub ),
     );
 }
 
@@ -112,6 +112,16 @@ function kounselia_process_renewals() {
 }
 
 /**
+ * The currency a subscription renews in: whatever the member first paid
+ * in (naira or dollars — see currency.php), so a renewal never switches
+ * currency on them.
+ */
+function kounselia_subscription_currency( $sub ) {
+    $supported = function_exists( 'kounselia_supported_currencies' ) ? kounselia_supported_currencies() : array( 'NGN' );
+    return in_array( strtoupper( (string) $sub->currency ), $supported, true ) ? strtoupper( $sub->currency ) : 'NGN';
+}
+
+/**
  * Tries to charge one subscription's saved card for the next period.
  * Returns true on success.
  */
@@ -129,9 +139,8 @@ function kounselia_renew_subscription( $sub ) {
         $plan_id = $sub->plan_id;
         $plan    = kounselia_get_plan( $plan_id );
     }
-    $amount   = $plan ? (float) $plan['price_amount'] : (float) $sub->amount;
-    $currency = $plan ? $plan['currency'] : $sub->currency;
-    $interval = $plan ? $plan['interval'] : 'monthly';
+    $currency = kounselia_subscription_currency( $sub );
+    $amount   = $plan ? ( function_exists( 'kounselia_plan_price' ) ? kounselia_plan_price( $plan, $currency ) : (float) $plan['price_amount'] ) : (float) $sub->amount;
     $name     = $plan ? $plan['name'] : $sub->plan_name;
 
     $now       = current_time( 'mysql' );
@@ -148,6 +157,9 @@ function kounselia_renew_subscription( $sub ) {
     ) );
     $payment_id = (int) $wpdb->insert_id;
 
+    // Mark the attempt before charging, so an overlapping run can't charge twice.
+    $wpdb->update( $wpdb->prefix . 'kounselia_subscriptions', array( 'last_renewal_attempt_at' => $now ), array( 'id' => $sub->id ) );
+
     $result = kounselia_paystack_request( 'POST', '/transaction/charge_authorization', array(
         'authorization_code' => $sub->authorization_code,
         'email'              => $user->user_email,
@@ -160,41 +172,22 @@ function kounselia_renew_subscription( $sub ) {
     $paid = $result['ok'] && isset( $result['data']['status'] ) && 'success' === $result['data']['status']
         && (int) ( $result['data']['amount'] ?? 0 ) === (int) round( $amount * 100 );
 
+    if ( $paid ) {
+        kounselia_apply_renewal_success( $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}kounselia_payments WHERE id = %d", $payment_id ) ), $result['data'] );
+        return true;
+    }
+
+    // Still processing at Paystack (e.g. a bank needs a moment): leave the
+    // payment pending — the webhook or the pending-charge sweep finishes it.
+    if ( $result['ok'] && isset( $result['data']['status'] ) && in_array( $result['data']['status'], array( 'pending', 'ongoing', 'processing' ), true ) ) {
+        return false;
+    }
+
     $wpdb->update( $wpdb->prefix . 'kounselia_payments', array(
-        'status'           => $paid ? 'success' : 'failed',
+        'status'           => 'failed',
         'gateway_response' => wp_json_encode( $result['data'] ),
         'updated_at'       => current_time( 'mysql' ),
     ), array( 'id' => $payment_id ) );
-
-    if ( $paid ) {
-        // The new period starts where the old one ends (or now, if it had already lapsed).
-        $from = max( current_time( 'timestamp' ), strtotime( $sub->current_period_end ) );
-        $end  = kounselia_subscription_period_end( $interval, $from );
-        $wpdb->update( $wpdb->prefix . 'kounselia_subscriptions', array_merge( array(
-            'plan_id'                 => $plan_id,
-            'plan_name'               => $name,
-            'amount'                  => $amount,
-            'currency'                => $currency,
-            'status'                  => 'active',
-            'paystack_reference'      => $reference,
-            'current_period_start'    => date( 'Y-m-d H:i:s', $from ),
-            'current_period_end'      => $end,
-            'pending_plan_id'         => null,
-            'renewal_attempts'        => 0,
-            'last_renewal_attempt_at' => current_time( 'mysql' ),
-            'last_renewal_error'      => null,
-            'updated_at'              => current_time( 'mysql' ),
-        ), kounselia_subscription_card_fields( $result['data']['authorization'] ?? array() ) ), array( 'id' => $sub->id ) );
-
-        kounselia_notify_user( $sub->user_id, 'subscription_renewed', 'Your ' . $name . ' plan renewed', 'Thank you — your membership continues until ' . date_i18n( 'F j, Y', strtotime( $end ) ) . '.', '/dashboard.php?tab=upgrade', array(
-            'subject'      => 'Your Kounselia ' . $name . ' plan has renewed',
-            'headline'     => 'Thank you for staying with us',
-            'content_html' => '<p style="margin-bottom:18px;">We charged ' . esc_html( kounselia_money( $amount, $currency ) ) . ' to your ' . esc_html( trim( $sub->card_brand . ' card ending ' . $sub->card_last4 ) ) . '. Your ' . esc_html( $name ) . ' membership now runs until <strong>' . esc_html( date_i18n( 'F j, Y', strtotime( $end ) ) ) . '</strong>.</p><p>You can change plan, turn off auto-renew or remove your card any time from your dashboard.</p>',
-            'btn_text'     => 'Manage my plan',
-            'btn_url'      => kounselia_site_url( '/dashboard.php?tab=upgrade' ),
-        ) );
-        return true;
-    }
 
     $attempts = (int) $sub->renewal_attempts + 1;
     $error    = mb_substr( $result['data']['gateway_response'] ?? ( $result['message'] ?: 'The card was declined.' ), 0, 250 );
@@ -220,7 +213,91 @@ function kounselia_renew_subscription( $sub ) {
     return false;
 }
 
+/**
+ * Applies a successful renewal payment: extends the subscription by one
+ * period from where it ended. Safe to call from several places (our own
+ * charge response, Paystack's webhook, the pending-charge sweep): only
+ * the first caller to flip the payment to 'success' extends anything.
+ */
+function kounselia_apply_renewal_success( $payment, $data ) {
+    global $wpdb;
+    if ( ! $payment ) {
+        return false;
+    }
+    $claimed = $wpdb->query( $wpdb->prepare(
+        "UPDATE {$wpdb->prefix}kounselia_payments SET status = 'success', gateway_response = %s, updated_at = %s WHERE id = %d AND status != 'success'",
+        wp_json_encode( $data ), current_time( 'mysql' ), $payment->id
+    ) );
+    if ( ! $claimed ) {
+        return false;
+    }
+
+    $sub  = kounselia_get_user_subscription( $payment->user_id );
+    $plan = kounselia_get_plan( $payment->plan_id );
+    if ( ! $sub ) {
+        return false;
+    }
+    $interval = $plan ? $plan['interval'] : 'monthly';
+    $name     = $plan ? $plan['name'] : $sub->plan_name;
+
+    // The new period starts where the old one ends (or now, if it had already lapsed).
+    $from = max( current_time( 'timestamp' ), strtotime( $sub->current_period_end ) );
+    $end  = kounselia_subscription_period_end( $interval, $from );
+    $wpdb->update( $wpdb->prefix . 'kounselia_subscriptions', array_merge( array(
+        'plan_id'                 => $payment->plan_id,
+        'plan_name'               => $name,
+        'amount'                  => $payment->amount,
+        'currency'                => $payment->currency,
+        'status'                  => 'active',
+        'paystack_reference'      => $payment->reference,
+        'current_period_start'    => date( 'Y-m-d H:i:s', $from ),
+        'current_period_end'      => $end,
+        'pending_plan_id'         => null,
+        'renewal_attempts'        => 0,
+        'last_renewal_attempt_at' => current_time( 'mysql' ),
+        'last_renewal_error'      => null,
+        'updated_at'              => current_time( 'mysql' ),
+    ), kounselia_subscription_card_fields( isset( $data['authorization'] ) ? $data['authorization'] : array() ) ), array( 'id' => $sub->id ) );
+
+    kounselia_notify_user( $payment->user_id, 'subscription_renewed', 'Your ' . $name . ' plan renewed', 'Thank you — your membership continues until ' . date_i18n( 'F j, Y', strtotime( $end ) ) . '.', '/dashboard.php?tab=upgrade', array(
+        'subject'      => 'Your Kounselia ' . $name . ' plan has renewed',
+        'headline'     => 'Thank you for staying with us',
+        'content_html' => '<p style="margin-bottom:18px;">We charged ' . esc_html( kounselia_money( $payment->amount, $payment->currency ) ) . ' to your ' . esc_html( trim( $sub->card_brand . ' card ending ' . $sub->card_last4 ) ) . '. Your ' . esc_html( $name ) . ' membership now runs until <strong>' . esc_html( date_i18n( 'F j, Y', strtotime( $end ) ) ) . '</strong>.</p><p>You can change plan, turn off auto-renew or remove your card any time from your dashboard.</p>',
+        'btn_text'     => 'Manage my plan',
+        'btn_url'      => kounselia_site_url( '/dashboard.php?tab=upgrade' ),
+    ) );
+    return true;
+}
+
+/**
+ * Finishes a renewal reported by Paystack's webhook or found pending by
+ * the sweep: verifies it with Paystack first (never trusting the report
+ * alone), then applies it once.
+ */
+function kounselia_complete_renewal_reference( $reference ) {
+    global $wpdb;
+    $payment = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}kounselia_payments WHERE reference = %s", $reference ) );
+    if ( ! $payment ) {
+        return array( 'success' => false, 'message' => 'Unknown payment reference.' );
+    }
+    if ( 'success' === $payment->status ) {
+        return array( 'success' => true, 'message' => 'Payment already confirmed.' );
+    }
+    $result = kounselia_paystack_request( 'GET', '/transaction/verify/' . rawurlencode( $reference ) );
+    $ok     = $result['ok'] && 'success' === ( $result['data']['status'] ?? '' )
+        && (int) ( $result['data']['amount'] ?? 0 ) === (int) round( (float) $payment->amount * 100 )
+        && strtoupper( (string) ( $result['data']['currency'] ?? $payment->currency ) ) === strtoupper( $payment->currency );
+    if ( ! $ok ) {
+        return array( 'success' => false, 'message' => 'Renewal payment not confirmed.' );
+    }
+    kounselia_apply_renewal_success( $payment, $result['data'] );
+    return array( 'success' => true, 'message' => 'Renewal confirmed.' );
+}
+
 function kounselia_money( $amount, $currency ) {
+    if ( function_exists( 'kounselia_format_money' ) && in_array( $currency, array( 'NGN', 'USD' ), true ) ) {
+        return kounselia_format_money( $amount, $currency );
+    }
     $symbols = array( 'NGN' => '₦', 'USD' => '$', 'GBP' => '£', 'EUR' => '€', 'GHS' => 'GH₵', 'KES' => 'KSh ', 'ZAR' => 'R' );
     $symbol  = isset( $symbols[ $currency ] ) ? $symbols[ $currency ] : $currency . ' ';
     return $symbol . number_format_i18n( (float) $amount, ( (float) $amount == (int) $amount ) ? 0 : 2 );
