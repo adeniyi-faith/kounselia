@@ -67,8 +67,10 @@ require_once KOUNSELIA_CORE_DIR . '/includes/memory.php';            // 18. Stru
 require_once KOUNSELIA_CORE_DIR . '/includes/check-ins.php';         // 18B. Smart Check-ins: dated events extracted from memory synthesis
 require_once KOUNSELIA_CORE_DIR . '/includes/professionals.php';     // 18C. Professional marketplace: applications, verification, private docs
 require_once KOUNSELIA_CORE_DIR . '/includes/bookings.php';          // 18E. Booking calendar: availability + confirmed sessions
+require_once KOUNSELIA_CORE_DIR . '/includes/currency.php';          // 18D-0. Naira vs dollar pricing by visitor location
 require_once KOUNSELIA_CORE_DIR . '/includes/payments.php';          // 18D. Paystack subscriptions: plans, checkout, cancellation
 require_once KOUNSELIA_CORE_DIR . '/includes/booking-payments.php';  // 18F. Booking checkout + professional payouts
+require_once KOUNSELIA_CORE_DIR . '/includes/payment-reconciliation.php'; // 18F-2. Paystack webhook, pending-charge sweep, payout follow-up
 require_once KOUNSELIA_CORE_DIR . '/includes/booking-series.php';    // 18G. Recurring weekly sessions
 require_once KOUNSELIA_CORE_DIR . '/includes/booking-reminders.php'; // 18H. "Starts soon" reminders (WP-Cron)
 require_once KOUNSELIA_CORE_DIR . '/includes/reviews.php';           // 18I. Session ratings & reviews

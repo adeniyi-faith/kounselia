@@ -393,6 +393,9 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="form-field">
           <label>Your rate per session</label>
           <div class="rate-prefix"><span>₦</span><input type="number" name="rate_amount" id="pro-rate" min="0" step="0.01" value="<?php echo esc_attr( $application->rate_amount ); ?>"></div>
+          <?php if ( function_exists( 'kounselia_usd_ngn_rate' ) && $application->rate_amount ) : ?>
+            <div class="section-sub" style="margin-top:6px">Clients outside Nigeria see about <?php echo esc_html( kounselia_format_money( kounselia_convert_ngn( $application->rate_amount, 'USD' ), 'USD' ) ); ?>. You are always paid in naira.</div>
+          <?php endif; ?>
         </div>
 
         <button type="submit" class="pro-submit" id="pro-save-btn">Save changes</button>
