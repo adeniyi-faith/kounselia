@@ -10,10 +10,11 @@
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Linking, Modal, Platform, Pressable, Share, Text, View } from 'react-native';
+import { Linking, Modal, Platform, Pressable, Share, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { TablerIcon } from '@/components/TablerIcon';
 import { fonts, makeStyles, useColors } from '@/theme';
+import { PageSkeleton } from '@/components/Skeleton';
 import { WebFrame, type NavState, type WebFrameHandle } from './WebFrame';
 
 interface OpenOptions {
@@ -215,8 +216,8 @@ function InAppBrowser({
           onFail={() => setFailed(true)}
         />
         {progress === 0 && !failed && (
-          <View style={styles.cover} pointerEvents="none">
-            <ActivityIndicator color={colors.accentText} />
+          <View style={styles.pageCover} pointerEvents="none">
+            <PageSkeleton />
           </View>
         )}
         {failed && (
@@ -286,6 +287,7 @@ const useStyles = makeStyles((colors) => ({
   progressBar: { height: 2, backgroundColor: colors.accent, borderRadius: 1 },
   body: { flex: 1 },
   web: { flex: 1, backgroundColor: colors.surface },
+  pageCover: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.surface },
   cover: {
     position: 'absolute',
     top: 0,

@@ -1,7 +1,7 @@
 import { dismissCheckin, fetchBlog, fetchHome, saveMood, type BlogCard, type HomeData } from '@kounselia/core';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArticleCard } from '@/components/articles/ArticleCard';
 import { Button } from '@/components/Button';
@@ -18,6 +18,7 @@ import { Toast, useToast } from '@/components/chat/Toast';
 import { useCounselors } from '@/counselors';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors } from '@/theme';
+import { HomeSkeleton } from '@/components/Skeleton';
 
 // The website dashboard's Home, in the same order: welcome, mood,
 // numbers, a suggested counselor, and today's private reflection (with a
@@ -108,7 +109,9 @@ export default function Home() {
               <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
-            <ActivityIndicator color={colors.accentText} style={styles.loading} />
+            <View style={styles.loading}>
+              <HomeSkeleton />
+            </View>
           )
         ) : (
           <>
@@ -171,7 +174,7 @@ const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 40 },
   gap: { height: 20 },
-  loading: { marginTop: 40 },
+  loading: { marginTop: 4 },
   center: { marginTop: 32, gap: 16 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
   // Runs edge to edge so cards slide in from the side of the screen.

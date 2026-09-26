@@ -12,6 +12,7 @@ import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, useColors } from '@/theme';
 import { showDialog } from '@/components/Dialog';
+import { DetailSkeleton } from '@/components/Skeleton';
 
 interface Slot {
   value: string; // site time, sent back to the server
@@ -191,8 +192,10 @@ export default function BookProfessional() {
 
   if (!slots) {
     return (
-      <SafeAreaView style={[styles.safe, styles.center]}>
-        <ActivityIndicator color={colors.accentText} />
+      <SafeAreaView style={styles.safe}>
+        <View style={{ padding: 16 }}>
+          <DetailSkeleton />
+        </View>
       </SafeAreaView>
     );
   }
