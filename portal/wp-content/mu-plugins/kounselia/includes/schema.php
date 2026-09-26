@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.18.0'; // Bumped version: reviews, reschedule, recurring series, reminders, notification center
+    $current_version   = '1.19.0'; // Bumped version: CMS pages, blog, newsletter subscribers/segments/campaigns
 
     if ( $installed_version === $current_version ) {
         return;
@@ -572,6 +572,158 @@ function kounselia_install_tables() {
         KEY user_id (user_id)
     ) {$charset_collate};";
 
+    // Editable content pages (the footer links: "Our mission", "Research",
+    // ...). Content is rich HTML from the admin editor, already run
+    // through kounselia_content_kses() on save. previous_slugs keeps old
+    // URLs working (301) after a page is renamed.
+    $sql_pages = "CREATE TABLE {$prefix}kounselia_pages (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        slug VARCHAR(191) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        eyebrow VARCHAR(120) NULL,
+        subtitle TEXT NULL,
+        content LONGTEXT NULL,
+        hero_image VARCHAR(500) NULL,
+        meta_description VARCHAR(320) NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'draft',
+        previous_slugs TEXT NULL,
+        updated_by BIGINT UNSIGNED NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY slug (slug),
+        KEY status (status)
+    ) {$charset_collate};";
+
+    // Blog posts. tag_slugs is stored as ",a,b," so "posts tagged x" is a
+    // simple indexed-enough LIKE '%,x,%' without a separate join table.
+    // A post is publicly visible when status = 'published' AND
+    // published_at <= now, which is also how scheduling works.
+    $sql_posts = "CREATE TABLE {$prefix}kounselia_posts (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        slug VARCHAR(191) NOT NULL,
+        title VARCHAR(255) NOT NULL,
+        subtitle VARCHAR(500) NULL,
+        excerpt TEXT NULL,
+        content LONGTEXT NULL,
+        cover_image VARCHAR(500) NULL,
+        cover_caption VARCHAR(255) NULL,
+        author_id BIGINT UNSIGNED NULL,
+        tags VARCHAR(500) NULL,
+        tag_slugs VARCHAR(600) NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'draft',
+        featured TINYINT(1) NOT NULL DEFAULT 0,
+        meta_description VARCHAR(320) NULL,
+        reading_minutes SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+        views INT UNSIGNED NOT NULL DEFAULT 0,
+        previous_slugs TEXT NULL,
+        notify_campaign_id BIGINT UNSIGNED NULL,
+        published_at DATETIME NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY slug (slug),
+        KEY status_published (status, published_at),
+        KEY featured (featured)
+    ) {$charset_collate};";
+
+    // Every email contact: newsletter sign-ups from the website AND
+    // members (linked by user_id). Two separate consents: the newsletter
+    // and "new blog post" emails. status is the master switch —
+    // 'unsubscribed' stops everything; 'pending' waits on double opt-in.
+    $sql_subscribers = "CREATE TABLE {$prefix}kounselia_subscribers (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        email VARCHAR(191) NOT NULL,
+        name VARCHAR(191) NULL,
+        user_id BIGINT UNSIGNED NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'subscribed',
+        list_newsletter TINYINT(1) NOT NULL DEFAULT 1,
+        list_blog TINYINT(1) NOT NULL DEFAULT 1,
+        source VARCHAR(32) NOT NULL DEFAULT 'website',
+        tags VARCHAR(500) NULL,
+        token VARCHAR(64) NOT NULL,
+        ip_address VARCHAR(64) NULL,
+        confirmed_at DATETIME NULL,
+        unsubscribed_at DATETIME NULL,
+        last_emailed_at DATETIME NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY email (email),
+        UNIQUE KEY token (token),
+        KEY user_id (user_id),
+        KEY status (status)
+    ) {$charset_collate};";
+
+    // Saved audiences ("Pro members inactive 30 days"). rules is JSON —
+    // see kounselia_newsletter_segment_where() for the supported keys.
+    $sql_segments = "CREATE TABLE {$prefix}kounselia_segments (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        name VARCHAR(191) NOT NULL,
+        description VARCHAR(500) NULL,
+        rules LONGTEXT NOT NULL,
+        created_by BIGINT UNSIGNED NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id)
+    ) {$charset_collate};";
+
+    // One email send (a newsletter, or an automatic "new blog post").
+    // Recipients are resolved from the audience at send time, then
+    // delivered in small batches by WP-Cron (see newsletter.php).
+    $sql_campaigns = "CREATE TABLE {$prefix}kounselia_campaigns (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        type VARCHAR(16) NOT NULL DEFAULT 'newsletter',
+        name VARCHAR(191) NOT NULL,
+        subject VARCHAR(255) NOT NULL,
+        preheader VARCHAR(255) NULL,
+        headline VARCHAR(255) NULL,
+        content LONGTEXT NULL,
+        btn_text VARCHAR(120) NULL,
+        btn_url VARCHAR(500) NULL,
+        list_key VARCHAR(16) NOT NULL DEFAULT 'newsletter',
+        segment_id BIGINT UNSIGNED NULL,
+        rules LONGTEXT NULL,
+        post_id BIGINT UNSIGNED NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'draft',
+        scheduled_at DATETIME NULL,
+        started_at DATETIME NULL,
+        finished_at DATETIME NULL,
+        recipients_total INT UNSIGNED NOT NULL DEFAULT 0,
+        sent_count INT UNSIGNED NOT NULL DEFAULT 0,
+        failed_count INT UNSIGNED NOT NULL DEFAULT 0,
+        open_count INT UNSIGNED NOT NULL DEFAULT 0,
+        click_count INT UNSIGNED NOT NULL DEFAULT 0,
+        created_by BIGINT UNSIGNED NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        KEY status (status),
+        KEY post_id (post_id)
+    ) {$charset_collate};";
+
+    // The per-person delivery queue for a campaign, and its tracking
+    // (first open / first click). UNIQUE (campaign_id, subscriber_id)
+    // is what guarantees nobody is ever emailed twice by one campaign.
+    $sql_campaign_recipients = "CREATE TABLE {$prefix}kounselia_campaign_recipients (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        campaign_id BIGINT UNSIGNED NOT NULL,
+        subscriber_id BIGINT UNSIGNED NOT NULL,
+        email VARCHAR(191) NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'queued',
+        claim VARCHAR(32) NULL,
+        token VARCHAR(40) NOT NULL,
+        error VARCHAR(255) NULL,
+        sent_at DATETIME NULL,
+        opened_at DATETIME NULL,
+        clicked_at DATETIME NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY campaign_subscriber (campaign_id, subscriber_id),
+        UNIQUE KEY token (token),
+        KEY campaign_status (campaign_id, status),
+        KEY claim (claim)
+    ) {$charset_collate};";
+
     dbDelta( $sql_sessions );
     dbDelta( $sql_messages );
     dbDelta( $sql_guest_limits );
@@ -601,6 +753,12 @@ function kounselia_install_tables() {
     dbDelta( $sql_booking_series );
     dbDelta( $sql_notifications );
     dbDelta( $sql_push_tokens );
+    dbDelta( $sql_pages );
+    dbDelta( $sql_posts );
+    dbDelta( $sql_subscribers );
+    dbDelta( $sql_segments );
+    dbDelta( $sql_campaigns );
+    dbDelta( $sql_campaign_recipients );
 
     if ( function_exists( 'kounselia_ensure_professional_docs_dir' ) ) {
         kounselia_ensure_professional_docs_dir();
@@ -612,6 +770,13 @@ function kounselia_install_tables() {
     kounselia_backfill_tts_voices();
     kounselia_cleanup_message_slashes();
     kounselia_backfill_memory_tables();
+
+    if ( function_exists( 'kounselia_content_seed_defaults' ) ) {
+        kounselia_content_seed_defaults();
+    }
+    if ( function_exists( 'kounselia_newsletter_backfill_members' ) ) {
+        kounselia_newsletter_backfill_members();
+    }
 }
 add_action( 'init', 'kounselia_install_tables' );
 

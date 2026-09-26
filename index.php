@@ -78,6 +78,7 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
 <?php require __DIR__ . '/inc/kounselia-styles.php'; ?>
+<?php require __DIR__ . '/inc/kounselia-content-styles.php'; ?>
 <?php wp_head(); ?>
 </head>
 <body>
@@ -100,6 +101,7 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
             <button class="btn-ghost" onclick="logout()" style="padding: 7px 16px;">Sign out</button>
           </div>
         <?php else : ?>
+          <a class="btn-ghost k-nav-btn k-hide-xs" href="/blog/" style="border-color:transparent">Journal</a>
           <button class="btn-ghost" onclick="openModal('login')">Sign in</button>
           <button class="btn-nav-primary" onclick="openModal('register')">Start free</button>
         <?php endif; ?>
@@ -371,64 +373,8 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
     </div>
   </div>
 
-  <!-- FOOTER -->
-  <footer class="footer">
-    <div class="container">
-      <div class="footer-top" style="display: flex; flex-wrap: wrap; gap: 48px; justify-content: space-between; margin-bottom: 48px;">
-        <div style="flex: 1; min-width: 280px;">
-          <a href="/" class="footer-logo-link">
-            <img src="https://kounselia.com/img/Kounselia_Logo_IconMark_ChampagneGold.png" alt="Kounselia" class="footer-site-logo" loading="lazy">
-          </a>
-          <div class="footer-tagline">A global mental wellness initiative. Making support accessible to anyone, anywhere, at any time.</div>
-
-          <div class="footer-social">
-            <div class="social-btn"><i class="ti ti-brand-twitter"></i></div>
-            <div class="social-btn"><i class="ti ti-brand-linkedin"></i></div>
-            <div class="social-btn"><i class="ti ti-brand-instagram"></i></div>
-            <div class="social-btn"><i class="ti ti-mail"></i></div>
-          </div>
-        </div>
-
-        <div class="footer-grid" style="display: flex; gap: 64px; flex-wrap: wrap;">
-          <div>
-            <div class="footer-col-title">Platform</div>
-            <div class="footer-links">
-              <span class="footer-link" onclick="smoothTo('counselors-anchor')">Our counselors</span>
-              <span class="footer-link" onclick="openModal('register')">Create account</span>
-              <span class="footer-link">Pro plans</span>
-              <span class="footer-link">30 day programs</span>
-              <span class="footer-link">Safety resources</span>
-            </div>
-          </div>
-          <div>
-            <div class="footer-col-title">Organisation</div>
-            <div class="footer-links">
-              <span class="footer-link">Our mission</span>
-              <span class="footer-link">Research</span>
-              <span class="footer-link">Partnerships</span>
-              <span class="footer-link">Grant enquiries</span>
-              <span class="footer-link">Press</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="footer-divider"></div>
-
-      <div class="footer-badges">
-        <div class="footer-badge"><i class="ti ti-shield-check"></i> GDPR aligned</div>
-        <div class="footer-badge"><i class="ti ti-lock"></i> Encrypted</div>
-        <div class="footer-badge"><i class="ti ti-accessible"></i> Accessible</div>
-        <div class="footer-badge"><i class="ti ti-certificate"></i> Evidence informed</div>
-        <div class="footer-badge"><i class="ti ti-heart-handshake"></i> Crisis safe</div>
-      </div>
-
-      <div class="footer-bottom">
-        &copy; 2026 Kounselia. All rights reserved.<br><br>
-        Kounselia is a supportive wellness platform. It is not a substitute for clinical therapy or medical advice. If you are in crisis please contact your local emergency services or a licensed mental health professional.
-      </div>
-    </div>
-  </footer>
+  <!-- FOOTER (links, social profiles and newsletter box are edited in Admin → Pages → Footer) -->
+  <?php require __DIR__ . '/inc/kounselia-footer.php'; ?>
 
 </div>
 
@@ -437,7 +383,13 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
 <script>
 document.addEventListener('DOMContentLoaded',function(){
   const slug=(location.hash||'').replace('#','');
-  if(slug&&C[slug]){
+  // Content pages (/page/..., /blog/...) link here with ?auth=login or
+  // ?auth=register to open the sign-in / sign-up box.
+  const auth=new URLSearchParams(location.search).get('auth');
+  if(auth==='login'||auth==='register'){
+    if(loggedIn){ window.location.href='/dashboard.php'; return; }
+    openModal(auth);
+  } else if(slug&&C[slug]){
     startChat(slug);
   } else if(loggedIn && !new URLSearchParams(location.search).has('browse')){
     // A signed-in member landing on the bare homepage (no hash, no

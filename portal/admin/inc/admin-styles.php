@@ -72,7 +72,8 @@ a:hover{color:#6E2E41}
 .admin-site-logo{height:24px;width:auto;object-fit:contain;}
 .admin-logo small{font-family:'Outfit',sans-serif;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:600;padding-left:8px;border-left:1px solid var(--border);margin-top:2px;}
 
-.admin-nav{display:flex;gap:2px;align-items:center}
+.admin-nav{display:flex;gap:2px;align-items:center;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 94%,transparent);mask-image:linear-gradient(90deg,#000 94%,transparent)}
+.admin-nav::-webkit-scrollbar{display:none}
 .admin-nav a,.admin-nav .disabled{
   font-size:13.5px;padding:8px 14px;border-radius:var(--r-full);
   color:var(--text2);white-space:nowrap;transition:background .15s var(--ease),color .15s var(--ease);
@@ -95,6 +96,7 @@ a:hover{color:#6E2E41}
   .admin-logo small{display:none} /* Hides the "Admin" badge on mobile to save space */
   .nav-toggle{display:block}
   .admin-nav{
+    -webkit-mask-image:none;mask-image:none;overflow:visible;
     display:none;position:absolute;top:100%;left:0;right:0;
     background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--sh-md);
     flex-direction:column;align-items:stretch;padding:8px;gap:2px;

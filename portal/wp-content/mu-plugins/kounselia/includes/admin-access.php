@@ -44,6 +44,24 @@ function kounselia_user_is_admin( $user_id = 0 ) {
     return user_can( $user_id, 'kounselia_admin' );
 }
 
+/**
+ * True if this admin may use one area of the admin panel (the same
+ * slugs the Team page grants: 'members', 'blog', 'pages', 'broadcasts'
+ * ...). Super admins can do everything; staff only what they were given.
+ * Server-side twin of the nav-link hiding in admin-nav.php.
+ */
+function kounselia_admin_can( $permission, $user_id = 0 ) {
+    $user_id = $user_id ? $user_id : get_current_user_id();
+    if ( ! kounselia_user_is_admin( $user_id ) ) {
+        return false;
+    }
+    if ( user_can( $user_id, 'administrator' ) ) {
+        return true;
+    }
+    $perms = json_decode( (string) get_user_meta( $user_id, 'kounselia_permissions', true ), true );
+    return is_array( $perms ) && in_array( $permission, $perms, true );
+}
+
 function kounselia_admin_log( $action, $target_type = '', $target_id = 0 ) {
     global $wpdb;
     $suppress = $wpdb->suppress_errors();
@@ -212,46 +230,8 @@ add_action( 'wp_ajax_kounselia_admin_force_password', 'kounselia_ajax_admin_forc
 
 /* -------------------------------------------------------------------------
  * ADMIN: BROADCASTS & NEWSLETTERS
+ * Moved to newsletter.php (segments, batched sending, unsubscribes).
  * ---------------------------------------------------------------------- */
-
-function kounselia_ajax_admin_send_broadcast() {
-    check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
-    if ( ! kounselia_user_is_admin() ) {
-        kounselia_send_pure_json_error( array( 'message' => 'Unauthorized access.' ), 403 );
-    }
-
-    $subject  = isset( $_POST['subject'] ) ? sanitize_text_field( wp_unslash( $_POST['subject'] ) ) : '';
-    $headline = isset( $_POST['headline'] ) ? sanitize_text_field( wp_unslash( $_POST['headline'] ) ) : '';
-    $body     = isset( $_POST['body'] ) ? wp_kses_post( wp_unslash( $_POST['body'] ) ) : '';
-    $btn_text = isset( $_POST['btn_text'] ) ? sanitize_text_field( wp_unslash( $_POST['btn_text'] ) ) : '';
-    $btn_url  = isset( $_POST['btn_url'] ) ? esc_url_raw( wp_unslash( $_POST['btn_url'] ) ) : '';
-
-    if ( empty( $subject ) || empty( $headline ) || empty( $body ) ) {
-        kounselia_send_pure_json_error( array( 'message' => 'Subject, headline, and body are required.' ), 400 );
-    }
-
-    $members = get_users( array( 'role' => 'subscriber', 'fields' => array( 'ID', 'user_email', 'display_name' ) ) );
-    if ( empty( $members ) ) kounselia_send_pure_json_error( array( 'message' => 'No active members found to send to.' ), 400 );
-
-    $formatted_body = str_replace( '<p>', '<p style="margin-bottom: 18px;">', wpautop( $body ) );
-    $sent_count = 0;
-
-    foreach ( $members as $member ) {
-        $first_name = explode( ' ', trim( $member->display_name ) )[0];
-        if ( empty( $first_name ) ) $first_name = 'there';
-        
-        $personal_headline = str_replace( '{name}', $first_name, $headline );
-        $personal_body     = str_replace( '{name}', $first_name, $formatted_body );
-
-        if ( function_exists('kounselia_send_html_email') && kounselia_send_html_email( $member->user_email, $subject, $personal_headline, $personal_body, $btn_text, $btn_url ) ) {
-            $sent_count++;
-        }
-    }
-
-    kounselia_admin_log( 'sent_broadcast', 'newsletter', $sent_count );
-    kounselia_send_pure_json_success( array( 'message' => "Successfully sent broadcast to {$sent_count} members." ) );
-}
-add_action( 'wp_ajax_kounselia_admin_send_broadcast', 'kounselia_ajax_admin_send_broadcast' );
 
 /* -------------------------------------------------------------------------
  * ADMIN: COUNSELOR STUDIO (NO-CODE EDITOR)
