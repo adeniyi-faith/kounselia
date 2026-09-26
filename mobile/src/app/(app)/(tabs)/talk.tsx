@@ -1,16 +1,18 @@
 import type { CounselorSummary } from '@kounselia/core';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { CounselorAvatar } from '@/components/CounselorAvatar';
 import { useCounselors } from '@/counselors';
-import { colors, fonts, radius, shadows } from '@/theme';
+import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 
 // The dashboard's "Talk to someone" grid (.counselor-grid): two tiles per
 // row, each opening a conversation with that counselor.
 export default function Talk() {
+  const styles = useStyles();
+  const colors = useColors();
   const { status, counselors, reload } = useCounselors();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -33,7 +35,7 @@ export default function Talk() {
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         {header}
-        <ActivityIndicator color={colors.accent} style={styles.center} />
+        <ActivityIndicator color={colors.accentText} style={styles.center} />
       </SafeAreaView>
     );
   }
@@ -59,7 +61,7 @@ export default function Talk() {
         ListHeaderComponent={header}
         columnWrapperStyle={styles.row}
         contentContainerStyle={styles.list}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
         renderItem={({ item }) => <CounselorTile counselor={item} />}
       />
     </SafeAreaView>
@@ -67,6 +69,7 @@ export default function Talk() {
 }
 
 function CounselorTile({ counselor }: { counselor: CounselorSummary }) {
+  const styles = useStyles();
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/chat/[slug]', params: { slug: counselor.slug } })}
@@ -82,7 +85,7 @@ function CounselorTile({ counselor }: { counselor: CounselorSummary }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   list: { paddingHorizontal: 20, paddingBottom: 32 },
   head: { paddingTop: 20, paddingBottom: 18 },
@@ -107,4 +110,4 @@ const styles = StyleSheet.create({
   tileSpec: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, color: colors.text3, textAlign: 'center' },
   center: { flex: 1, justifyContent: 'center', gap: 16, paddingHorizontal: 20 },
   errorText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
-});
+}));

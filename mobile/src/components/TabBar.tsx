@@ -4,9 +4,9 @@
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from './TablerIcon';
 
 const ICONS: Record<string, string> = { index: 'home', sessions: 'history', book: 'calendar-event', settings: 'settings' };
@@ -14,6 +14,8 @@ const LABELS: Record<string, string> = { index: 'Home', sessions: 'Sessions', bo
 const CENTRE = 'talk';
 
 export function TabBar({ state, navigation, descriptors }: BottomTabBarProps) {
+  const styles = useStyles();
+  const colors = useColors();
   const insets = useSafeAreaInsets();
 
   return (
@@ -65,12 +67,12 @@ export function TabBar({ state, navigation, descriptors }: BottomTabBarProps) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-evenly',
-    backgroundColor: 'rgba(255,255,255,0.97)',
+    backgroundColor: colors.glass,
     borderTopWidth: 1,
     borderTopColor: colors.border,
   },
@@ -90,4 +92,4 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabInner: { flex: 1, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
-});
+}));

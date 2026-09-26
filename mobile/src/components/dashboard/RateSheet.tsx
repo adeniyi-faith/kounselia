@@ -3,9 +3,9 @@
 import { submitReview, type KounseliaConfig } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles, useColors } from '@/theme';
 import { Button } from '../Button';
 import { FormMessage } from '../FormMessage';
 import { TablerIcon } from '../TablerIcon';
@@ -17,6 +17,8 @@ interface Props {
 }
 
 export function RateSheet({ config, booking, onClose }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState('');
@@ -82,8 +84,8 @@ export function RateSheet({ config, booking, onClose }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: 'rgba(24,22,15,0.45)' },
+const useStyles = makeStyles((colors) => ({
+  backdrop: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: colors.backdrop },
   sheetWrap: { flex: 1, justifyContent: 'flex-end' },
   sheet: { backgroundColor: colors.surface, borderTopLeftRadius: 28, borderTopRightRadius: 28, padding: 24, gap: 14 },
   handle: { alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, marginBottom: 6 },
@@ -101,4 +103,4 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.text,
   },
-});
+}));

@@ -5,9 +5,9 @@
 import type { KounseliaConfig } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 import { useDictation } from '@/audio/useDictation';
-import { colors, fonts, shadows } from '@/theme';
+import { fonts, makeStyles, shadows, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 
 const GREEN = '#00A884';
@@ -20,6 +20,8 @@ interface Props {
 }
 
 export function Composer({ config, busy, onSend, onNotify }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
 
@@ -45,7 +47,7 @@ export function Composer({ config, busy, onSend, onNotify }: Props) {
   }
 
   const disabled = transcribing || (hasText && busy);
-  const background = recording ? colors.rose : hasText ? colors.accent : GREEN;
+  const background = recording ? colors.roseFill : hasText ? colors.accent : GREEN;
   const label = recording ? 'Stop recording' : hasText ? 'Send' : 'Speak your message';
 
   return (
@@ -88,7 +90,7 @@ export function Composer({ config, busy, onSend, onNotify }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   area: { flexDirection: 'row', alignItems: 'flex-end', gap: 12, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 },
   pill: {
     flex: 1,
@@ -106,10 +108,10 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 16,
     lineHeight: 22,
-    color: '#1E293B',
+    color: colors.chatText,
     maxHeight: 120,
     paddingTop: 6,
     paddingBottom: 6,
   },
   fab: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
-});
+}));

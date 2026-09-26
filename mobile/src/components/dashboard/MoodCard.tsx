@@ -2,8 +2,8 @@
 // a row of dots for the last seven days, coloured by that day's mood.
 import type { HomeData } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, counselorColors, fonts } from '@/theme';
+import { Pressable, Text, View } from 'react-native';
+import { counselorColors, fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 import { Card } from './Card';
 
@@ -20,6 +20,8 @@ function dayLetter(date: string): string {
 }
 
 export function MoodCard({ mood, saving, onPick }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const colorOf = (key: string | null) => mood.options.find((o) => o.key === key)?.color;
   const shown = saving ?? mood.today;
 
@@ -37,7 +39,7 @@ export function MoodCard({ mood, saving, onPick }: Props) {
       <View style={styles.options} accessibilityRole="radiogroup">
         {mood.options.map((o) => {
           const selected = shown === o.key;
-          const { fg, bg } = counselorColors(o.color);
+          const { fg, bg } = counselorColors(o.color, colors);
           return (
             <Pressable
               key={o.key}
@@ -67,7 +69,7 @@ export function MoodCard({ mood, saving, onPick }: Props) {
           const color = colorOf(day.mood);
           return (
             <View key={day.date} style={styles.day}>
-              <View style={[styles.dot, color ? { backgroundColor: counselorColors(color).fg, borderColor: 'transparent' } : null]} />
+              <View style={[styles.dot, color ? { backgroundColor: counselorColors(color, colors).fg, borderColor: 'transparent' } : null]} />
               <Text style={styles.dayLetter}>{dayLetter(day.date)}</Text>
             </View>
           );
@@ -77,7 +79,7 @@ export function MoodCard({ mood, saving, onPick }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 },
   title: { fontFamily: fonts.serifMedium, fontSize: 20, color: colors.text, flexShrink: 1 },
   saved: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.sageLight, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 50 },
@@ -99,4 +101,4 @@ const styles = StyleSheet.create({
   day: { alignItems: 'center', gap: 7 },
   dot: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.surface3, borderWidth: 1.5, borderColor: colors.border },
   dayLetter: { fontFamily: fonts.medium, fontSize: 11, color: colors.text3 },
-});
+}));

@@ -3,12 +3,13 @@
 // reply may be checked with other counselors first.
 import type { CounselorSummary } from '@kounselia/core';
 import { useEffect, useState } from 'react';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '@/theme';
+import { Animated, Easing, Text, View } from 'react-native';
+import { fonts, makeStyles, useColors } from '@/theme';
 import { CounselorAvatar } from '../CounselorAvatar';
 import { TablerIcon } from '../TablerIcon';
 
 function Dot({ delay, color }: { delay: number; color: string }) {
+  const styles = useStyles();
   const [lift] = useState(() => new Animated.Value(0));
   useEffect(() => {
     const loop = Animated.loop(
@@ -28,6 +29,8 @@ function Dot({ delay, color }: { delay: number; color: string }) {
 }
 
 export function TypingIndicator({ counselor }: { counselor: CounselorSummary }) {
+  const styles = useStyles();
+  const colors = useColors();
   const [consulting, setConsulting] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setConsulting(true), 3500);
@@ -53,7 +56,7 @@ export function TypingIndicator({ counselor }: { counselor: CounselorSummary }) 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   row: { flexDirection: 'row', alignItems: 'flex-end', gap: 10 },
   bubble: {
     flexDirection: 'row',
@@ -63,10 +66,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 20,
     borderBottomLeftRadius: 4,
-    backgroundColor: '#F0F4F8',
+    backgroundColor: colors.chatBubble,
     borderWidth: 1,
-    borderColor: '#DCE4EC',
+    borderColor: colors.chatBubbleBorder,
   },
   dot: { width: 7, height: 7, borderRadius: 3.5 },
   consulting: { fontFamily: fonts.semibold, fontSize: 11, letterSpacing: 0.5, textTransform: 'uppercase', color: colors.gold, marginRight: 2 },
-});
+}));

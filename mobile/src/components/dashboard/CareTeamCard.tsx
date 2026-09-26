@@ -3,8 +3,8 @@
 // or, with nothing booked, a few professionals' faces and an invitation.
 import type { CareTeam } from '@kounselia/core';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts, radius, shadows } from '@/theme';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 import { ProfessionalAvatar } from './ProfessionalAvatar';
 
@@ -28,6 +28,8 @@ function dayWord(d: Date): string {
 }
 
 export function CareTeamCard({ care, joining, onJoin, onManage }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const next = care.next;
   const discount = care.discount_percent ? `${Number(care.discount_percent.toFixed(1))}%` : null;
 
@@ -106,9 +108,9 @@ export function CareTeamCard({ care, joining, onJoin, onManage }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: { borderRadius: radius.r, borderWidth: 1, borderColor: colors.border, padding: 18, gap: 14, marginBottom: 16, ...shadows.soft },
-  hasNext: { borderColor: 'rgba(30,58,95,0.14)' },
+  hasNext: { borderColor: colors.accentBorder },
   row: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   date: {
     width: 58,
@@ -137,4 +139,4 @@ const styles = StyleSheet.create({
   stack: { flexDirection: 'row' },
   face: { borderRadius: 21, borderWidth: 2.5, borderColor: colors.surface },
   faceIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.goldLight },
-});
+}));

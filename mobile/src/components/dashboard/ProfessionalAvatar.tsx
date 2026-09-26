@@ -1,11 +1,12 @@
 import type { Professional } from '@kounselia/core';
 import { Image } from 'expo-image';
-import { StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '@/theme';
+import { Text, View } from 'react-native';
+import { fonts, makeStyles } from '@/theme';
 
 // A professional's photo, or the first letter of their name if they
 // haven't added one (like the website's tiles).
 export function ProfessionalAvatar({ pro, size }: { pro: Pick<Professional, 'name' | 'avatar_url'>; size: number }) {
+  const styles = useStyles();
   return (
     <View style={[styles.proAv, { width: size, height: size, borderRadius: size / 2 }]}>
       {pro.avatar_url ? (
@@ -17,7 +18,7 @@ export function ProfessionalAvatar({ pro, size }: { pro: Pick<Professional, 'nam
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   proAv: { backgroundColor: colors.accentLight, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  proInitial: { fontFamily: fonts.semibold, color: colors.accent },
-});
+  proInitial: { fontFamily: fonts.semibold, color: colors.accentText },
+}));

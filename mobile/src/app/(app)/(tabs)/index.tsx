@@ -1,7 +1,7 @@
 import { dismissCheckin, fetchBlog, fetchHome, saveMood, type BlogCard, type HomeData } from '@kounselia/core';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArticleCard } from '@/components/articles/ArticleCard';
 import { Button } from '@/components/Button';
@@ -17,12 +17,14 @@ import { WelcomeBanner } from '@/components/dashboard/WelcomeBanner';
 import { Toast, useToast } from '@/components/chat/Toast';
 import { useCounselors } from '@/counselors';
 import { useSession } from '@/session';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles, useColors } from '@/theme';
 
 // The website dashboard's Home, in the same order: welcome, mood,
 // numbers, a suggested counselor, and today's private reflection (with a
 // link to past entries), then the newest articles from the blog.
 export default function Home() {
+  const styles = useStyles();
+  const colors = useColors();
   const { user, config } = useSession();
   const { bySlug } = useCounselors();
   const [home, setHome] = useState<HomeData | null>(null);
@@ -36,7 +38,7 @@ export default function Home() {
   const load = useCallback(async () => {
     // The articles are a bonus: if they don't load, Home still does.
     fetchBlog(config).then((blog) => {
-      if (blog.ok) setArticles(blog.data.posts.slice(0, 5));
+      if (blog.ok) setArticles((blog.data.posts ?? []).slice(0, 5));
     });
     const res = await fetchHome(config);
     if (res.ok) {
@@ -93,7 +95,7 @@ export default function Home() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="interactive"
       >
@@ -106,7 +108,7 @@ export default function Home() {
               <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
-            <ActivityIndicator color={colors.accent} style={styles.loading} />
+            <ActivityIndicator color={colors.accentText} style={styles.loading} />
           )
         ) : (
           <>
@@ -165,7 +167,7 @@ export default function Home() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 40 },
   gap: { height: 20 },
@@ -175,4 +177,4 @@ const styles = StyleSheet.create({
   // Runs edge to edge so cards slide in from the side of the screen.
   articles: { marginHorizontal: -16 },
   articlesRow: { gap: 12, paddingHorizontal: 16, paddingBottom: 6 },
-});
+}));

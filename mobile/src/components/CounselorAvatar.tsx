@@ -1,11 +1,13 @@
-import { StyleSheet, View } from 'react-native';
-import { counselorColors } from '@/theme';
+import { View } from 'react-native';
+import { counselorColors, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from './TablerIcon';
 
 // The coloured rounded square with the counselor's icon (.tile-av,
 // .chat-av-sm and .msg-av on the website — same look, different sizes).
 export function CounselorAvatar({ icon, color, size }: { icon: string; color: string; size: number }) {
-  const { fg, bg } = counselorColors(color);
+  const styles = useStyles();
+  const colors = useColors();
+  const { fg, bg } = counselorColors(color, colors);
   return (
     <View
       style={[styles.box, { width: size, height: size, borderRadius: Math.round(size * 0.3), backgroundColor: bg }]}
@@ -17,6 +19,6 @@ export function CounselorAvatar({ icon, color, size }: { icon: string; color: st
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   box: { alignItems: 'center', justifyContent: 'center' },
-});
+}));

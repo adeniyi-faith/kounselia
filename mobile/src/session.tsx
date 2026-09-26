@@ -111,9 +111,22 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   // website, signed out by an admin). Any request that finds out sends the
   // member back to the welcome screen, with one explanation.
   const expired = useRef(false);
-  const onSignedOut = useCallback(() => {
-    if (expired.current) return;
+  //
+  // WordPress gives the same bare "0" reply for "you're signed out" and for
+  // an action it doesn't know (e.g. an app newer than the website), so we
+  // double-check with the server before signing anyone out.
+  const tokenRef = useRef<string | null>(null);
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+  const onSignedOut = useCallback(async () => {
+    if (expired.current || !tokenRef.current) return;
     expired.current = true;
+    const check = await fetchAppUser(makeConfig(tokenRef.current));
+    if (check.status !== 'signed-out') {
+      expired.current = false; // Still signed in; that request just failed.
+      return;
+    }
     forget();
     Alert.alert('Please sign in again', 'You were signed out of Kounselia on this phone. This happens if your password was changed.');
   }, []);

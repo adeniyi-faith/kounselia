@@ -1,11 +1,13 @@
 import type { CounselorSummary } from '@kounselia/core';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '@/theme';
+import { Pressable, Text, View } from 'react-native';
+import { fonts, makeStyles, useColors } from '@/theme';
 import { CounselorAvatar } from '../CounselorAvatar';
 import { Card } from './Card';
 
 // "Recommended for you" (.rec-card).
 export function RecommendedCard({ counselor, reason, onStart }: { counselor: CounselorSummary; reason: string; onStart: () => void }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <Card style={styles.card}>
       <View style={styles.top}>
@@ -23,7 +25,7 @@ export function RecommendedCard({ counselor, reason, onStart }: { counselor: Cou
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: { gap: 12 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   meta: { flex: 1 },
@@ -32,4 +34,4 @@ const styles = StyleSheet.create({
   reason: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.text2 },
   btn: { alignSelf: 'flex-start', paddingVertical: 11, paddingHorizontal: 20, borderRadius: 50, backgroundColor: colors.accent },
   btnText: { fontFamily: fonts.medium, fontSize: 14, color: '#fff' },
-});
+}));
