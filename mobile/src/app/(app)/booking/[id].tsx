@@ -30,6 +30,8 @@ export default function BookingMessages() {
   }, [config, bookingId]);
 
   useEffect(() => {
+    // Loading from the server when the screen opens is what this effect is for.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     const timer = setInterval(load, 15000);
     return () => clearInterval(timer);
@@ -112,7 +114,7 @@ export default function BookingMessages() {
           </Pressable>
         </View>
       </KeyboardAvoidingView>
-      <Toast message={toast.message} />
+      <Toast note={toast.note} />
     </SafeAreaView>
   );
 }

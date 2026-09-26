@@ -53,7 +53,15 @@
         }
       ],
       "expo-web-browser",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Kounselia lets you choose a photo from your library for your profile picture.",
+          "cameraPermission": false,
+          "microphonePermission": "Kounselia uses your microphone so you can talk to your counselor and speak your messages instead of typing them."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

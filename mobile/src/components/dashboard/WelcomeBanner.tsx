@@ -2,7 +2,7 @@
 // breathing gold glow, "Your space", the greeting with the first name in
 // italic gold, and the two buttons.
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, fonts } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
@@ -23,7 +23,7 @@ interface Props {
 }
 
 export function WelcomeBanner({ firstName, onTalk, onSessions }: Props) {
-  const breathe = useRef(new Animated.Value(0)).current;
+  const [breathe] = useState(() => new Animated.Value(0));
   useEffect(() => {
     let loop: Animated.CompositeAnimation | undefined;
     // Respect "reduce motion", as the website does.

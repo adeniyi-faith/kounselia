@@ -2,14 +2,14 @@
 // explains the wait ("Consulting team"), as the web chat does, since a
 // reply may be checked with other counselors first.
 import type { CounselorSummary } from '@kounselia/core';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { colors, fonts } from '@/theme';
 import { CounselorAvatar } from '../CounselorAvatar';
 import { TablerIcon } from '../TablerIcon';
 
 function Dot({ delay, color }: { delay: number; color: string }) {
-  const lift = useRef(new Animated.Value(0)).current;
+  const [lift] = useState(() => new Animated.Value(0));
   useEffect(() => {
     const loop = Animated.loop(
       Animated.sequence([

@@ -567,10 +567,12 @@ function kounselia_ajax_admin_revoke_session() {
             // "Sign out all other sessions" must never end the very
             // session that's asking for it.
             $manager->destroy_others( wp_get_session_token() );
+            kounselia_revoke_app_tokens( $target_id ); // and the mobile app
             kounselia_admin_log( 'revoked_own_sessions', 'user', $target_id );
             kounselia_send_pure_json_success( array( 'message' => 'Every other session on your account was signed out.' ) );
         }
         $manager->destroy_all();
+        kounselia_revoke_app_tokens( $target_id ); // and the mobile app
         kounselia_admin_log( 'revoked_all_sessions', 'user', $target_id );
         kounselia_send_pure_json_success( array( 'message' => 'All sessions on that account were signed out.' ) );
     }

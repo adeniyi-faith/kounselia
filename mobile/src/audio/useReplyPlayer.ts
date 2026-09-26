@@ -15,7 +15,9 @@ export function useReplyPlayer(config: KounseliaConfig, onError: (message: strin
   const source = useRef<AudioBufferSourceNode | null>(null);
   const request = useRef(0);
   const latest = useRef({ config, onError });
-  latest.current = { config, onError };
+  useEffect(() => {
+    latest.current = { config, onError };
+  });
 
   const stop = useCallback(() => {
     request.current += 1;

@@ -17,11 +17,15 @@ const MAX_SECONDS = 180;
 export function useDictation(config: KounseliaConfig, onText: (text: string) => void, onError: (message: string) => void) {
   const [state, setState] = useState<DictationState>('idle');
   const recorder = useRef<AudioRecorder | null>(null);
+  const starting = useRef(false);
+  const closed = useRef(false);
   const limitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Kept in refs so `finish` never changes: the clean-up below must only
   // run when the screen closes, not every time the chat redraws.
   const latest = useRef({ config, onText, onError });
-  latest.current = { config, onText, onError };
+  useEffect(() => {
+    latest.current = { config, onText, onError };
+  });
 
   const finish = useCallback(
     async (send: boolean) => {
@@ -63,7 +67,7 @@ export function useDictation(config: KounseliaConfig, onText: (text: string) => 
     [],
   );
 
-  const start = useCallback(async () => {
+  const begin = useCallback(async () => {
     if (!(await micAllowed())) {
       latest.current.onError('Kounselia needs microphone access to hear you. You can allow it in your phone’s Settings.');
       return;
@@ -77,10 +81,28 @@ export function useDictation(config: KounseliaConfig, onText: (text: string) => 
       latest.current.onError("Couldn't start recording. Please try again.");
       return;
     }
+    if (closed.current) {
+      // The screen closed while the microphone was starting.
+      await rec.stop();
+      await releaseSound();
+      return;
+    }
     recorder.current = rec;
     setState('recording');
     limitTimer.current = setTimeout(() => finish(true), MAX_SECONDS * 1000);
   }, [finish]);
+
+  const start = useCallback(async () => {
+    // A quick double tap mustn't start two recorders.
+    if (starting.current || recorder.current) return;
+    starting.current = true;
+    try {
+      await begin();
+    } finally {
+      starting.current = false;
+    }
+  }, [begin]);
+
 
   const toggle = useCallback(() => {
     if (state === 'idle') start();
@@ -88,7 +110,13 @@ export function useDictation(config: KounseliaConfig, onText: (text: string) => 
   }, [finish, start, state]);
 
   // Leaving the screen mid-recording throws the recording away.
-  useEffect(() => () => void finish(false), [finish]);
+  useEffect(
+    () => () => {
+      closed.current = true;
+      void finish(false);
+    },
+    [finish],
+  );
 
   return { state, toggle, cancel: () => finish(false) };
 }

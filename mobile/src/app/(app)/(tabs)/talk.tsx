@@ -43,7 +43,7 @@ export default function Talk() {
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         {header}
         <View style={styles.center}>
-          <Text style={styles.errorText}>We couldn't load the counselors. Please check your internet connection.</Text>
+          <Text style={styles.errorText}>We couldn’t load the counselors. Please check your internet connection.</Text>
           <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
         </View>
       </SafeAreaView>

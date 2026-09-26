@@ -64,6 +64,9 @@ export interface KounseliaConfig {
   // 'app' marks requests as coming from the mobile app (see http.ts).
   client?: 'web' | 'app';
   authToken?: string | null;
+  // App only: called when the server says the saved sign-in no longer
+  // works (password changed elsewhere, signed out by an admin, …).
+  onSignedOut?: () => void;
 }
 
 export interface AppUser {

@@ -111,6 +111,13 @@ function kounselia_user_id_from_app_token( $raw_token ) {
         return 0;
     }
 
+    // A member an admin banned or deleted is signed out of the app
+    // straight away (the website blocks their chat the same way).
+    if ( get_user_meta( $row->user_id, 'kounselia_banned', true ) || get_user_meta( $row->user_id, 'kounselia_deleted_at', true ) ) {
+        kounselia_revoke_app_tokens( (int) $row->user_id );
+        return 0;
+    }
+
     $now = time();
     if ( strtotime( $row->expires_at . ' UTC' ) < $now ) {
         $wpdb->delete( $table, array( 'id' => $row->id ) );
@@ -200,11 +207,19 @@ function kounselia_ajax_app_login() {
         wp_send_json_error( array( 'message' => 'Access denied from this network.' ), 403 );
     }
 
-    if ( kounselia_rate_limited( 'login', 5, 600 ) ) {
+    // Limits are per email address, not per internet address: mobile
+    // carriers put many people behind one address, so a per-address limit
+    // would lock out strangers who happen to share it. A much looser
+    // per-address cap still slows down anyone trying many accounts.
+    if ( kounselia_rate_limited( 'app_login', 40, 600 ) ) {
         wp_send_json_error( array( 'message' => 'Too many attempts. Please try again later.' ), 429 );
     }
 
     $email    = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+    $fail_key = 'kounselia_app_login_fail_' . md5( strtolower( $email ) );
+    if ( (int) get_transient( $fail_key ) >= 5 ) {
+        wp_send_json_error( array( 'message' => 'Too many attempts. Please wait a few minutes and try again.' ), 429 );
+    }
     $password = isset( $_POST['password'] ) ? (string) wp_unslash( $_POST['password'] ) : '';
     $device   = isset( $_POST['device_name'] ) ? wp_unslash( $_POST['device_name'] ) : '';
 
@@ -216,8 +231,10 @@ function kounselia_ajax_app_login() {
     // unlike wp_signon which the website uses.
     $user = wp_authenticate( $email, $password );
     if ( is_wp_error( $user ) ) {
+        set_transient( $fail_key, (int) get_transient( $fail_key ) + 1, 10 * MINUTE_IN_SECONDS );
         wp_send_json_error( array( 'message' => 'That email and password do not match.' ), 401 );
     }
+    delete_transient( $fail_key );
 
     update_user_meta( $user->ID, 'kounselia_last_ip', $ip );
 
@@ -241,7 +258,9 @@ function kounselia_ajax_app_register() {
         wp_send_json_error( array( 'message' => 'Registration is currently unavailable from your network.' ), 403 );
     }
 
-    if ( kounselia_rate_limited( 'register', 3, 3600 ) ) {
+    // Looser than the website's 3 an hour per address, for the same
+    // shared-carrier-address reason as sign-in above.
+    if ( kounselia_rate_limited( 'app_register', 20, 3600 ) ) {
         wp_send_json_error( array( 'message' => 'Too many attempts. Please try again later.' ), 429 );
     }
 
