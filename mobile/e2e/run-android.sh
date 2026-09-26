@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Runs inside the Android emulator step of .github/workflows/android-check.yml:
+# installs the app, taps through every main screen in light and then dark
+# mode (e2e/flows), and keeps a screenshot of each plus any crash found in
+# the phone's log. Everything lands in e2e-output/.
+set -u
+cd "$(dirname "$0")/.."
+ROOT="$PWD"
+OUT="$ROOT/e2e-output"
+mkdir -p "$OUT/shots"
+APP=com.kounselia.app
+
+adb install -r android/app/build/outputs/apk/release/app-release.apk
+adb logcat -b all -c
+
+run_flows() {
+  local prefix="$1"
+  for flow in e2e/flows/*.yaml; do
+    name="$(basename "$flow" .yaml)"
+    # A previous flow ending in a crash mustn't stop the rest.
+    (cd "$OUT/shots" && "$HOME/.maestro/bin/maestro" test -e "P=$prefix-" "$ROOT/$flow") > "$OUT/$prefix-$name.log" 2>&1
+    status=$?
+    if [ "$status" -eq 0 ]; then result=passed; else result=FAILED; fi
+    running=$(adb shell pidof "$APP" > /dev/null && echo "app running" || echo "APP NOT RUNNING")
+    echo "$prefix $name: $result ($running)" | tee -a "$OUT/summary.txt"
+    # Keep any crash, then start the next flow with a clean log.
+    adb logcat -d -b crash > "$OUT/$prefix-$name-crash.txt" 2>/dev/null
+    adb logcat -d -s ReactNativeJS:V ReactNative:V AndroidRuntime:E > "$OUT/$prefix-$name-js.txt" 2>/dev/null
+    [ -s "$OUT/$prefix-$name-crash.txt" ] || rm -f "$OUT/$prefix-$name-crash.txt"
+    adb logcat -b all -c
+  done
+}
+
+adb shell cmd uimode night no
+run_flows light
+adb shell cmd uimode night yes
+run_flows dark
+
+adb logcat -d > "$OUT/logcat-end.txt" 2>/dev/null
+exit 0

@@ -1,0 +1,12 @@
+appId: com.kounselia.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Talk to someone now"
+    timeout: 60000
+- scrollUntilVisible:
+    element: "Past entries"
+    direction: DOWN
+- tapOn: "Past entries"
+- waitForAnimationToEnd
+- takeScreenshot: ${P}09-journal

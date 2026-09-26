@@ -1,0 +1,21 @@
+appId: com.kounselia.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Talk to someone now"
+    timeout: 60000
+- tapOn: "Settings"
+- waitForAnimationToEnd
+- takeScreenshot: ${P}15-settings-top
+- scroll
+- takeScreenshot: ${P}16-settings-2
+- scroll
+- takeScreenshot: ${P}17-settings-3
+- scroll
+- takeScreenshot: ${P}18-settings-4
+- scrollUntilVisible:
+    element: "Sign out"
+    direction: DOWN
+- tapOn: "Sign out"
+- waitForAnimationToEnd
+- takeScreenshot: ${P}19-sign-out-question
