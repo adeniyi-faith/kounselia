@@ -8,7 +8,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { Toast, useToast } from '@/components/chat/Toast';
@@ -18,6 +18,7 @@ import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 import { showDialog } from '@/components/Dialog';
+import { DetailSkeleton } from '@/components/Skeleton';
 
 const IMPORT_PROMPT =
   'Please summarize everything you know about me as a person. Include my life timeline (dates and events), my emotional patterns and feelings about specific things in my life, my relationships, my work situation and goals, and any mental health themes. Write it as a clear factual summary.';
@@ -167,16 +168,16 @@ export default function Memory() {
     return (
       <SafeAreaView style={styles.safe}>
         {header}
-        <View style={styles.center}>
-          {failed ? (
-            <>
-              <Text style={styles.notice}>We couldn’t load your memory profile. Please check your internet connection.</Text>
-              <Button title="Try again" variant="ghost" onPress={load} />
-            </>
-          ) : (
-            <ActivityIndicator color={colors.accentText} />
-          )}
-        </View>
+        {failed ? (
+          <View style={styles.center}>
+            <Text style={styles.notice}>We couldn’t load your memory profile. Please check your internet connection.</Text>
+            <Button title="Try again" variant="ghost" onPress={load} />
+          </View>
+        ) : (
+          <View style={styles.skeleton}>
+            <DetailSkeleton />
+          </View>
+        )}
       </SafeAreaView>
     );
   }
@@ -336,6 +337,7 @@ function Field({ label, value, onChange, multiline }: { label: string; value: st
 const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
+  skeleton: { padding: 16 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
   content: { padding: 16, paddingBottom: 48 },
   intro: { flexDirection: 'row', gap: 10, backgroundColor: colors.plumLight, borderRadius: radius.sm, padding: 14 },

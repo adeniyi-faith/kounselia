@@ -14,6 +14,7 @@ import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 import { showDialog } from '@/components/Dialog';
+import { ListSkeleton } from '@/components/Skeleton';
 
 // Sessions with licensed professionals — the website dashboard's
 // "Your upcoming sessions", "Past sessions" and "Find a professional".
@@ -105,7 +106,9 @@ export default function Book() {
               <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
-            <ActivityIndicator color={colors.accentText} style={{ marginTop: 40 }} />
+            <View style={{ marginTop: 16 }}>
+              <ListSkeleton rows={4} square />
+            </View>
           )
         ) : (
           <>
