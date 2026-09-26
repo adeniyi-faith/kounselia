@@ -3,8 +3,8 @@
 // same show/hide eye as the website.
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { forwardRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
-import { colors, fonts, radius } from '@/theme';
+import { Pressable, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { fonts, makeStyles, radius, useColors } from '@/theme';
 
 interface Props extends TextInputProps {
   label: string;
@@ -12,6 +12,8 @@ interface Props extends TextInputProps {
 }
 
 export const TextField = forwardRef<TextInput, Props>(function TextField({ label, password = false, style, ...input }, ref) {
+  const styles = useStyles();
+  const colors = useColors();
   const [focused, setFocused] = useState(false);
   const [visible, setVisible] = useState(false);
 
@@ -51,7 +53,7 @@ export const TextField = forwardRef<TextInput, Props>(function TextField({ label
   );
 });
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   field: { marginBottom: 18 },
   label: { fontFamily: fonts.medium, fontSize: 13, color: colors.text2, marginBottom: 6, letterSpacing: 0.2 },
   box: {
@@ -80,4 +82,4 @@ const styles = StyleSheet.create({
   },
   inputWithToggle: { paddingRight: 48 },
   toggle: { position: 'absolute', right: 16 },
-});
+}));

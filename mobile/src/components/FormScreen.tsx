@@ -2,9 +2,9 @@
 // notch and home bar, slides it up when the keyboard opens, and lets a
 // tap outside the fields close the keyboard.
 import type { ReactNode } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles } from '@/theme';
 
 interface Props {
   title: string;
@@ -13,6 +13,7 @@ interface Props {
 }
 
 export function FormScreen({ title, subtitle, children }: Props) {
+  const styles = useStyles();
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -32,11 +33,11 @@ export function FormScreen({ title, subtitle, children }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   content: { padding: 24, paddingTop: 16 },
   // .modal h2 / .modal .sub
   title: { fontFamily: fonts.serif, fontSize: 30, color: colors.text, marginBottom: 8 },
   subtitle: { fontFamily: fonts.light, fontSize: 15, lineHeight: 24, color: colors.text2, marginBottom: 28 },
-});
+}));

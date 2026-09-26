@@ -8,10 +8,12 @@ import {
 } from '@expo-google-fonts/outfit';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as SystemUI from 'expo-system-ui';
+import { useEffect } from 'react';
 import { BrowserProvider } from '@/browser/BrowserProvider';
 import { tablerFont } from '@/components/TablerIcon';
 import { SessionProvider, useSession } from '@/session';
-import { colors } from '@/theme';
+import { ThemeProvider, useColors, useTheme } from '@/theme';
 
 // Keep the Kounselia splash up until the fonts are in and we know whether
 // someone is signed in, so nobody sees a flash of the wrong screen.
@@ -29,17 +31,30 @@ export default function RootLayout() {
   });
 
   return (
-    <SessionProvider>
-      <BrowserProvider>
-        <StatusBar style="dark" />
-        {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
-        {fontsLoaded || fontError ? <RootNavigator /> : null}
-      </BrowserProvider>
-    </SessionProvider>
+    <ThemeProvider>
+      <SessionProvider>
+        <BrowserProvider>
+          <SystemColors />
+          {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
+          {fontsLoaded || fontError ? <RootNavigator /> : null}
+        </BrowserProvider>
+      </SessionProvider>
+    </ThemeProvider>
   );
 }
 
+// The clock and battery icons, and the colour behind the app (seen for a
+// moment when the keyboard opens or a screen slides), follow light or dark.
+function SystemColors() {
+  const { scheme, colors } = useTheme();
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(colors.bg).catch(() => undefined);
+  }, [colors.bg]);
+  return <StatusBar style={scheme === 'dark' ? 'light' : 'dark'} />;
+}
+
 function RootNavigator() {
+  const colors = useColors();
   const { status } = useSession();
   if (status === 'loading') return null;
   SplashScreen.hide();

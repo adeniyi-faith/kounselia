@@ -4,10 +4,10 @@
 import type { CounselorSummary } from '@kounselia/core';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
-import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Modal, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CallStatus } from '@/audio/useVoiceCall';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 
 interface Props {
@@ -24,6 +24,7 @@ interface Props {
 }
 
 function Ring({ active }: { active: boolean }) {
+  const styles = useStyles();
   const [pulse] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (!active) {
@@ -41,12 +42,14 @@ function Ring({ active }: { active: boolean }) {
 }
 
 export function CallOverlay(props: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const { visible, counselor, status, statusText, timerText, caption, muted, freeCallMinutes, onEnd, onToggleMute } = props;
   const insets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onEnd} statusBarTranslucent>
-      <LinearGradient colors={[colors.navy, colors.accent]} style={[styles.screen, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
+      <LinearGradient colors={[colors.navyFill, colors.accent]} style={[styles.screen, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
         <Pressable onPress={onEnd} accessibilityRole="button" accessibilityLabel="End call" style={[styles.close, { top: insets.top + 16 }]}>
           <TablerIcon name="x" size={20} color="#fff" />
         </Pressable>
@@ -74,7 +77,7 @@ export function CallOverlay(props: Props) {
             accessibilityState={{ selected: muted }}
             style={[styles.ctrl, muted && styles.ctrlMuted]}
           >
-            <TablerIcon name={muted ? 'microphone-off' : 'microphone'} size={22} color={muted ? colors.navy : '#fff'} />
+            <TablerIcon name={muted ? 'microphone-off' : 'microphone'} size={22} color={muted ? colors.navyFill : '#fff'} />
           </Pressable>
           <Pressable onPress={onEnd} accessibilityRole="button" accessibilityLabel="Hang up" style={[styles.ctrl, styles.end]}>
             <TablerIcon name="phone-x" size={26} color="#fff" />
@@ -88,7 +91,7 @@ export function CallOverlay(props: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
   close: {
     position: 'absolute',
@@ -110,6 +113,6 @@ const styles = StyleSheet.create({
   controls: { flexDirection: 'row', alignItems: 'center', gap: 18 },
   ctrl: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.14)', alignItems: 'center', justifyContent: 'center' },
   ctrlMuted: { backgroundColor: '#fff' },
-  end: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.rose },
+  end: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.roseFill },
   note: { fontFamily: fonts.regular, fontSize: 12, color: 'rgba(255,255,255,0.55)', maxWidth: 300, textAlign: 'center', marginTop: 22 },
-});
+}));

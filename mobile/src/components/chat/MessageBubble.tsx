@@ -6,9 +6,9 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import type { AppMessage } from '@/chat/useChat';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles, useColors } from '@/theme';
 import { CounselorAvatar } from '../CounselorAvatar';
 import { TablerIcon } from '../TablerIcon';
 import { formatTime } from './formatTime';
@@ -27,6 +27,7 @@ interface Props {
 // A reply's "**Heading**" paragraphs become headings and blank lines
 // separate paragraphs — the same formatting the web chat applies.
 function FormattedText({ text }: { text: string }) {
+  const styles = useStyles();
   return (
     <>
       {text.split(/\n\n/).map((para, i) => {
@@ -49,6 +50,8 @@ function FormattedText({ text }: { text: string }) {
 }
 
 export const MessageBubble = memo(function MessageBubble({ message, counselor, onRate, onRetry, onNotify, playPhase, onListen }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   async function copy() {
     try {
       await Clipboard.setStringAsync(message.text);
@@ -121,7 +124,7 @@ export const MessageBubble = memo(function MessageBubble({ message, counselor, o
                 style={styles.listen}
               >
                 {playPhase === 'loading' ? (
-                  <ActivityIndicator size="small" color={colors.accent} />
+                  <ActivityIndicator size="small" color={colors.accentText} />
                 ) : (
                   <TablerIcon name={playPhase === 'playing' ? 'player-stop-filled' : 'volume'} size={15} color={playPhase ? colors.accent : colors.text3} />
                 )}
@@ -154,6 +157,8 @@ export const MessageBubble = memo(function MessageBubble({ message, counselor, o
 });
 
 function ActionButton({ icon, label, color, onPress }: { icon: string; label: string; color?: string; onPress: () => void }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
@@ -167,7 +172,7 @@ function ActionButton({ icon, label, color, onPress }: { icon: string; label: st
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   userRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingLeft: 48 },
   userWrap: { maxWidth: '100%', alignItems: 'flex-end' },
   aiRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingRight: 32 },
@@ -177,10 +182,10 @@ const styles = StyleSheet.create({
   userBubble: { borderBottomRightRadius: 6 },
   failedBubble: { opacity: 0.6 },
   // #chat .msg.ai .msg-bubble
-  aiBubble: { backgroundColor: '#F0F4F8', borderWidth: 1, borderColor: '#DCE4EC', borderBottomLeftRadius: 4 },
+  aiBubble: { backgroundColor: colors.chatBubble, borderWidth: 1, borderColor: colors.chatBubbleBorder, borderBottomLeftRadius: 4 },
   userText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 24, color: '#fff' },
-  aiText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 24, color: '#1E293B' },
-  heading: { fontFamily: fonts.semibold, fontSize: 15, lineHeight: 22, color: colors.accent },
+  aiText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 24, color: colors.chatText },
+  heading: { fontFamily: fonts.semibold, fontSize: 15, lineHeight: 22, color: colors.accentText },
   gap: { marginTop: 12 },
   time: { fontFamily: fonts.regular, fontSize: 11, color: colors.text3, marginTop: 6, marginLeft: 4 },
   timeRight: { marginLeft: 0, marginRight: 4 },
@@ -193,4 +198,4 @@ const styles = StyleSheet.create({
   listen: { width: 26, height: 26, marginTop: 6, alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: 4, marginTop: 4 },
   action: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
-});
+}));

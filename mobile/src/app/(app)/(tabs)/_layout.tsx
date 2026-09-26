@@ -1,11 +1,12 @@
 import { Tabs } from 'expo-router/js-tabs';
 import { TabBar } from '@/components/TabBar';
-import { colors } from '@/theme';
+import { useColors } from '@/theme';
 
 // Same tabs as the website dashboard's phone layout, with "Book" (sessions
 // with professionals) where the website has a calendar button. "My plan"
 // joins with the payments work.
 export default function TabsLayout() {
+  const colors = useColors();
   return (
     <Tabs
       tabBar={(props) => <TabBar {...props} />}

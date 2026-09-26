@@ -3,14 +3,14 @@
 // "Keep reading". The body is HTML written in the website's editor and
 // cleaned by the server before it was saved.
 import type { BlogPost } from '@kounselia/core';
-import { colors } from '@/theme';
+import type { Palette } from '@/theme';
 import { articleDate } from './ArticleCard';
 
 function esc(text: string | null | undefined) {
   return String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
 
-export function articleHtml(post: BlogPost) {
+export function articleHtml(post: BlogPost, colors: Palette, dark: boolean) {
   const initial = esc(post.author.name.charAt(0).toUpperCase());
   const avatar = post.author.avatar ? `<img src="${esc(post.author.avatar)}" alt="">` : initial;
   const topic = post.tags[0]?.name;
@@ -28,6 +28,7 @@ export function articleHtml(post: BlogPost) {
 <html><head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="${dark ? 'dark' : 'light'}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
@@ -39,7 +40,7 @@ export function articleHtml(post: BlogPost) {
   .sub{font-size:17px;line-height:1.55;color:${colors.text2};margin:0 0 18px}
   .by{display:flex;align-items:center;gap:10px;font-size:13px;color:${colors.text3};margin-bottom:22px}
   .by b{display:block;color:${colors.text};font-weight:500;font-size:14px}
-  .av{width:38px;height:38px;border-radius:50%;background:${colors.accentLight};color:${colors.accent};display:flex;align-items:center;justify-content:center;font-weight:600;overflow:hidden;flex:none}
+  .av{width:38px;height:38px;border-radius:50%;background:${colors.accentLight};color:${colors.accentText};display:flex;align-items:center;justify-content:center;font-weight:600;overflow:hidden;flex:none}
   .av img{width:100%;height:100%;object-fit:cover}
   figure{margin:0 -20px 26px}
   figure img{width:100%;display:block}
@@ -49,7 +50,7 @@ export function articleHtml(post: BlogPost) {
   .body h2,.body h3{font-family:'Cormorant Garamond',Georgia,serif;font-weight:500;line-height:1.2;margin:1.6em 0 .5em}
   .body h2{font-size:28px}.body h3{font-size:23px}
   .body p{margin:0 0 1.1em}
-  .body a{color:${colors.accent};text-underline-offset:3px}
+  .body a{color:${colors.accentText};text-underline-offset:3px}
   .body blockquote{margin:1.4em 0;padding:4px 0 4px 18px;border-left:3px solid ${colors.gold};font-family:'Cormorant Garamond',Georgia,serif;font-size:22px;line-height:1.4;color:${colors.text2}}
   .body ul,.body ol{padding-left:1.3em}
   .body li{margin:.35em 0}

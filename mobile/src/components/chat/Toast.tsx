@@ -1,8 +1,8 @@
 // A short note that fades in over the screen ("Copied",
 // "Thanks for the feedback!") and fades out by itself.
 import { useEffect, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text } from 'react-native';
-import { colors, fonts } from '@/theme';
+import { Animated, Text } from 'react-native';
+import { fonts, makeStyles } from '@/theme';
 
 export function useToast() {
   // The text stays after the note hides, so it can fade out with it.
@@ -20,6 +20,7 @@ export function useToast() {
 }
 
 export function Toast({ note }: { note: { text: string; visible: boolean } | null }) {
+  const styles = useStyles();
   const [opacity] = useState(() => new Animated.Value(0));
   const visible = !!note?.visible;
 
@@ -35,15 +36,15 @@ export function Toast({ note }: { note: { text: string; visible: boolean } | nul
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   toast: {
     position: 'absolute',
     alignSelf: 'center',
     top: 110, // under the header, clear of the newest messages
-    backgroundColor: colors.text,
+    backgroundColor: colors.toast,
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 50,
   },
   text: { fontFamily: fonts.medium, fontSize: 14, color: '#fff' },
-});
+}));
