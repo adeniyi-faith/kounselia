@@ -238,7 +238,7 @@ export default function Settings() {
             icon="brain"
             tint="plum"
             label="Memory profile"
-            sub={memory ? 'Your story, goals and what matters to you' : 'Not set up yet — tell your counselors about you'}
+            sub={memory ? 'Your story, goals and what matters to you' : 'Not set up yet. Tell your counselors about you'}
             onPress={() => router.push('/memory')}
             last
           />

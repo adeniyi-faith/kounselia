@@ -292,7 +292,7 @@ export default function BookProfessional() {
             <ActivityIndicator color={colors.accentText} />
             <Text style={styles.waitText}>Waiting for your payment… This updates by itself once Paystack confirms it.</Text>
           </View>
-          <Button title="I've paid — check now" onPress={() => checkPayment(true)} busy={checking} />
+          <Button title="I've paid. Check now" onPress={() => checkPayment(true)} busy={checking} />
           <Button title="Open the payment page again" variant="ghost" onPress={() => openPayment(waiting.url)} />
         </View>
       ) : days.length > 0 ? (

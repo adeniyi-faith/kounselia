@@ -128,7 +128,7 @@ function kounselia_expire_stale_checkins( $user_id ) {
  * Turn a stored event into the actual opening line a counselor uses.
  */
 function kounselia_build_checkin_question( $event_row, $first_name ) {
-    $lead  = $first_name ? "Hi {$first_name} — before we start, " : 'Before we start, ';
+    $lead  = $first_name ? "Hi {$first_name}! Before we start, " : 'Before we start, ';
     $event = trim( (string) $event_row->event_text );
     return $lead . "you mentioned " . lcfirst( rtrim( $event, '.' ) ) . ". How did it go?";
 }
