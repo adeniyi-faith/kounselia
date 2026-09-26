@@ -24,8 +24,19 @@ function canVoiceCall(counselor: Counselor): boolean {
 }
 
 export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequestSignUp, onRequestSignIn }: Props) {
-  const { messages, typing, limitBanner, inputDisabled, appendGreeting, sendMessage, loadHistory, clearChat, playVoice, sessionId } =
-    useChat({ config, counselorSlug, counselor });
+  const {
+    messages,
+    typing,
+    limitBanner,
+    inputDisabled,
+    appendGreeting,
+    sendMessage,
+    loadHistory,
+    clearChat,
+    rateMessage,
+    playVoice,
+    sessionId,
+  } = useChat({ config, counselorSlug, counselor });
 
   const call = useVoiceCall({
     config,
@@ -60,10 +71,12 @@ export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequest
       onRequestSignUp();
       return;
     }
+    if (historyLoading) return;
     setHistoryLoading(true);
-    const ok = await loadHistory();
+    const result = await loadHistory();
     setHistoryLoading(false);
-    if (!ok) showToast('No previous history found.');
+    if (result === 'empty') showToast('No previous history found.');
+    if (result === 'error') showToast("Couldn't load your history. Please check your connection and try again.");
   };
 
   const handleExport = () => {
@@ -71,9 +84,18 @@ export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequest
     if (!exportChatAsFile(messages, counselor)) showToast('No messages to export.');
   };
 
-  const handleClear = () => {
+  const [clearing, setClearing] = useState(false);
+
+  const handleClear = async () => {
     setMenuOpen(false);
-    clearChat();
+    if (clearing) return;
+    if (!window.confirm('Clear this conversation? It will be removed from your chat history and cannot be brought back.')) {
+      return;
+    }
+    setClearing(true);
+    const ok = await clearChat();
+    setClearing(false);
+    showToast(ok ? 'Conversation cleared.' : "Couldn't clear the chat. Please check your connection and try again.");
   };
 
   const handleUpgrade = () => {
@@ -163,6 +185,8 @@ export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequest
         counselor={counselor}
         loggedIn={config.loggedIn}
         onPlayVoice={playVoice}
+        onRate={rateMessage}
+        onNotify={showToast}
       />
 
       <div className="chat-footer">

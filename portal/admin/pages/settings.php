@@ -165,6 +165,14 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
             ? 'Safety alert recipients cleared — critical alerts will go to every admin/staff account again.'
             : count( $emails ) . ' safety alert recipient' . ( 1 === count( $emails ) ? '' : 's' ) . ' saved.';
 
+    // 10B. AI risk check on/off
+    } elseif ( 'save_ai_safety_screening' === $kounselia_action
+        && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_ai_safety' ) ) {
+
+        update_option( 'kounselia_ai_safety_screening', ! empty( $_POST['ai_safety_screening'] ) ? 1 : 0 );
+        kounselia_admin_log( 'update_ai_safety_screening', 'settings' );
+        $kounselia_notice = ! empty( $_POST['ai_safety_screening'] ) ? 'AI risk check turned on.' : 'AI risk check turned off — only keyword matches will be flagged.';
+
     // 11B. Save Paystack Secret Key
     } elseif ( 'save_paystack_key' === $kounselia_action
         && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_paystack' ) ) {
@@ -173,6 +181,68 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
         update_option( 'kounselia_paystack_secret_key', sanitize_text_field( $secret_key ) );
         kounselia_admin_log( 'update_settings', 'settings' );
         $kounselia_notice = $secret_key ? 'Paystack secret key saved.' : 'Paystack secret key cleared — subscriptions are disabled until a key is set.';
+
+    // 11E. Currency & pricing
+    } elseif ( 'save_currency_settings' === $kounselia_action
+        && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_currency' ) ) {
+
+        $mode = isset( $_POST['currency_mode'] ) ? sanitize_text_field( wp_unslash( $_POST['currency_mode'] ) ) : 'auto';
+        update_option( 'kounselia_currency_mode', in_array( $mode, array( 'auto', 'NGN', 'USD' ), true ) ? $mode : 'auto' );
+
+        $countries = isset( $_POST['naira_countries'] ) ? strtoupper( (string) wp_unslash( $_POST['naira_countries'] ) ) : 'NG';
+        $countries = array_values( array_unique( array_filter( array_map( 'trim', explode( ',', $countries ) ), function ( $c ) {
+            return (bool) preg_match( '/^[A-Z]{2}$/', $c );
+        } ) ) );
+        update_option( 'kounselia_naira_countries', $countries ? implode( ',', $countries ) : 'NG' );
+
+        $unknown = isset( $_POST['unknown_currency'] ) ? sanitize_text_field( wp_unslash( $_POST['unknown_currency'] ) ) : 'USD';
+        update_option( 'kounselia_currency_unknown_default', in_array( $unknown, array( 'NGN', 'USD' ), true ) ? $unknown : 'USD' );
+
+        $rate = isset( $_POST['usd_ngn_rate'] ) ? (float) $_POST['usd_ngn_rate'] : 0;
+        if ( $rate > 0 ) {
+            update_option( 'kounselia_usd_ngn_rate', $rate );
+        }
+
+        update_option( 'kounselia_geo_lookup_enabled', ! empty( $_POST['geo_lookup_enabled'] ) ? 1 : 0 );
+        update_option( 'kounselia_trust_country_header', ! empty( $_POST['trust_country_header'] ) ? 1 : 0 );
+
+        kounselia_admin_log( 'update_currency_settings', 'settings' );
+        $kounselia_notice = $rate > 0 ? 'Currency settings saved.' : 'Currency settings saved (exchange rate unchanged — it must be greater than zero).';
+
+    // 11C. Finish / resend OTP for a payout Paystack is holding
+    } elseif ( in_array( $kounselia_action, array( 'finalize_payout_otp', 'resend_payout_otp' ), true )
+        && current_user_can( 'administrator' )
+        && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_payout_otp' ) ) {
+
+        $payout_id = isset( $_POST['payout_id'] ) ? absint( $_POST['payout_id'] ) : 0;
+
+        if ( 'finalize_payout_otp' === $kounselia_action ) {
+            $otp    = isset( $_POST['otp'] ) ? preg_replace( '/\D/', '', (string) wp_unslash( $_POST['otp'] ) ) : '';
+            $result = $otp ? kounselia_finalize_payout_otp( $payout_id, $otp ) : new WP_Error( 'missing', 'Please enter the code Paystack sent you.' );
+            if ( is_wp_error( $result ) ) {
+                $kounselia_error = $result->get_error_message();
+            } else {
+                kounselia_admin_log( 'finalize_payout', 'payout', $payout_id );
+                $kounselia_notice = 'success' === $result
+                    ? 'Payout #' . $payout_id . ' approved and sent.'
+                    : 'Code accepted — Paystack is still processing payout #' . $payout_id . '. It will update automatically.';
+            }
+        } else {
+            $result = kounselia_resend_payout_otp( $payout_id );
+            if ( is_wp_error( $result ) ) {
+                $kounselia_error = $result->get_error_message();
+            } else {
+                $kounselia_notice = 'A new code for payout #' . $payout_id . ' has been sent to the Paystack account owner.';
+            }
+        }
+
+    // 11D. Check pending payouts with Paystack right now
+    } elseif ( 'check_payouts_now' === $kounselia_action
+        && current_user_can( 'administrator' )
+        && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_payout_otp' ) ) {
+
+        kounselia_follow_up_pending_payouts();
+        $kounselia_notice = 'Pending payouts re-checked with Paystack.';
 
     // 11. Save Platform Settings
     } elseif ( 'save_platform_settings' === $kounselia_action
@@ -210,6 +280,7 @@ $active_rl_transients  = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->opt
 $current_db_version    = get_option( 'kounselia_db_version', 'Unknown' );
 
 $kounselia_paystack_key = get_option( 'kounselia_paystack_secret_key', '' );
+$kounselia_awaiting_payouts = function_exists( 'kounselia_get_awaiting_payouts' ) ? kounselia_get_awaiting_payouts() : array();
 $kounselia_paystack_mode = $kounselia_paystack_key
     ? ( 0 === strpos( $kounselia_paystack_key, 'sk_live_' ) ? 'Live mode' : 'Test mode' )
     : 'Not configured';
@@ -392,6 +463,16 @@ $opt_booking_commission_percent = (float) get_option( 'kounselia_booking_commiss
       </div>
       <button type="submit" class="login-submit" style="width:auto;padding:10px 20px;">Save Recipients</button>
     </form>
+
+    <form method="post" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
+      <?php wp_nonce_field( 'kounselia_settings_ai_safety' ); ?>
+      <input type="hidden" name="kounselia_action" value="save_ai_safety_screening">
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--text1);">
+        <input type="checkbox" name="ai_safety_screening" value="1" <?php checked( function_exists( 'kounselia_ai_safety_screening_enabled' ) && kounselia_ai_safety_screening_enabled() ); ?> style="margin-top:3px;">
+        <span><strong>AI risk check</strong> — every minute, member messages the keyword list didn't catch are read by the AI, which flags indirect or misspelled signs of risk. Critical ones alert the people above just like a keyword match. Runs in the background, so chats are not slowed down. Uses your Gemini API keys.</span>
+      </label>
+      <button type="submit" class="login-submit" style="width:auto;padding:10px 20px;margin-top:12px;">Save</button>
+    </form>
   </div>
 
   <!-- ===============================================================
@@ -421,6 +502,118 @@ $opt_booking_commission_percent = (float) get_option( 'kounselia_booking_commiss
           placeholder="sk_test_...">
       </div>
       <button type="submit" class="login-submit" style="width:auto;padding:11px 22px;">Save Key</button>
+    </form>
+
+    <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
+      <label style="display:block;font-size:13px;font-weight:600;margin-bottom:6px;">Webhook URL</label>
+      <p style="color:var(--text2);font-size:13px;margin-bottom:8px;line-height:1.55;max-width:64ch;">
+        Paste this into the <strong>Webhook URL</strong> box under Settings → API Keys &amp; Webhooks in Paystack. It lets Paystack tell Kounselia about a payment even if the member closes their browser before being sent back. (An hourly background check also catches missed payments, but the webhook is instant.)
+      </p>
+      <input type="text" readonly onclick="this.select()" value="<?php echo esc_attr( function_exists( 'kounselia_paystack_webhook_url' ) ? kounselia_paystack_webhook_url() : '' ); ?>" style="width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:6px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;background:var(--bg);color:var(--text1);">
+    </div>
+
+    <div id="payouts" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:8px;">
+        <label style="font-size:13px;font-weight:600;">Payouts waiting for approval</label>
+        <?php if ( current_user_can( 'administrator' ) ) : ?>
+          <form method="post">
+            <?php wp_nonce_field( 'kounselia_settings_payout_otp' ); ?>
+            <input type="hidden" name="kounselia_action" value="check_payouts_now">
+            <button type="submit" class="login-submit" style="width:auto;padding:7px 14px;font-size:12px;">Check with Paystack now</button>
+          </form>
+        <?php endif; ?>
+      </div>
+      <p style="color:var(--text2);font-size:13px;margin-bottom:10px;line-height:1.55;max-width:64ch;">
+        These are checked with Paystack automatically every 15 minutes. If your Paystack account requires a one-time code (OTP) for transfers, Paystack sends it to the account owner — enter it here to release the payout.
+      </p>
+      <?php if ( empty( $kounselia_awaiting_payouts ) ) : ?>
+        <div style="color:var(--text3);font-size:13px;">No payouts are waiting right now.</div>
+      <?php else : ?>
+        <?php foreach ( $kounselia_awaiting_payouts as $kounselia_payout ) : ?>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--border);">
+            <div style="font-size:13px;">
+              <strong>#<?php echo (int) $kounselia_payout->id; ?></strong>
+              — <?php echo esc_html( $kounselia_payout->professional_name ?: 'Professional #' . $kounselia_payout->professional_id ); ?>
+              — <?php echo esc_html( kounselia_format_money( $kounselia_payout->amount, $kounselia_payout->currency ) ); ?>
+              <span style="color:var(--text3);">· requested <?php echo esc_html( $kounselia_payout->created_at ); ?><?php echo $kounselia_payout->last_checked_at ? ' · last checked ' . esc_html( $kounselia_payout->last_checked_at ) : ''; ?></span>
+            </div>
+            <?php if ( current_user_can( 'administrator' ) && $kounselia_payout->paystack_transfer_code ) : ?>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <form method="post" style="display:flex;gap:6px;">
+                  <?php wp_nonce_field( 'kounselia_settings_payout_otp' ); ?>
+                  <input type="hidden" name="kounselia_action" value="finalize_payout_otp">
+                  <input type="hidden" name="payout_id" value="<?php echo (int) $kounselia_payout->id; ?>">
+                  <input type="text" name="otp" inputmode="numeric" autocomplete="one-time-code" placeholder="OTP code" style="width:110px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text1);">
+                  <button type="submit" class="login-submit" style="width:auto;padding:7px 14px;font-size:12px;">Approve</button>
+                </form>
+                <form method="post">
+                  <?php wp_nonce_field( 'kounselia_settings_payout_otp' ); ?>
+                  <input type="hidden" name="kounselia_action" value="resend_payout_otp">
+                  <input type="hidden" name="payout_id" value="<?php echo (int) $kounselia_payout->id; ?>">
+                  <button type="submit" style="padding:7px 12px;font-size:12px;border:1px solid var(--border);border-radius:6px;background:transparent;color:var(--text2);cursor:pointer;">Resend code</button>
+                </form>
+              </div>
+            <?php endif; ?>
+          </div>
+        <?php endforeach; ?>
+      <?php endif; ?>
+    </div>
+  </div>
+
+  <!-- ===============================================================
+       2D. CURRENCY & PRICING
+  ================================================---------------- -->
+  <div class="panel" id="currency">
+    <div class="panel-title">
+      Currency &amp; Pricing
+      <span style="font-weight:400;color:var(--text3);font-size:12px;">your currency right now: <?php echo esc_html( kounselia_viewer_currency() ); ?><?php $kounselia_my_country = kounselia_detect_country(); echo $kounselia_my_country ? ' (' . esc_html( $kounselia_my_country ) . ')' : ''; ?></span>
+    </div>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:16px;line-height:1.55;max-width:64ch;">
+      Visitors in the countries below see and pay in naira; everyone else sees and pays in US dollars. Professionals set their rates in naira and are always paid out in naira — an international client is shown the naira rate converted at the exchange rate below, and the professional still earns their naira rate minus commission. <strong>Dollar payments must be enabled on your Paystack account</strong> (Paystack → Settings → Preferences), or dollar checkouts will be refused.
+    </p>
+    <form method="post">
+      <?php wp_nonce_field( 'kounselia_settings_currency' ); ?>
+      <input type="hidden" name="kounselia_action" value="save_currency_settings">
+      <div class="op-grid">
+        <div class="op-card">
+          <label class="op-label" for="currency_mode">Which currency to show</label>
+          <select id="currency_mode" name="currency_mode" class="op-val-input">
+            <option value="auto" <?php selected( kounselia_currency_mode(), 'auto' ); ?>>Automatic, by visitor location</option>
+            <option value="NGN" <?php selected( kounselia_currency_mode(), 'NGN' ); ?>>Naira for everyone</option>
+            <option value="USD" <?php selected( kounselia_currency_mode(), 'USD' ); ?>>Dollars for everyone</option>
+          </select>
+          <div class="op-desc">Override the automatic choice if you ever need one currency sitewide.</div>
+        </div>
+        <div class="op-card">
+          <label class="op-label" for="naira_countries">Countries that see naira</label>
+          <input type="text" id="naira_countries" name="naira_countries" class="op-val-input" value="<?php echo esc_attr( implode( ', ', kounselia_naira_countries() ) ); ?>" placeholder="NG">
+          <div class="op-desc">Two-letter country codes, comma separated (NG = Nigeria).</div>
+        </div>
+        <div class="op-card">
+          <label class="op-label" for="usd_ngn_rate">Exchange rate (₦ per $1)</label>
+          <input type="number" id="usd_ngn_rate" name="usd_ngn_rate" class="op-val-input" min="1" step="0.01" value="<?php echo esc_attr( kounselia_usd_ngn_rate() ); ?>">
+          <div class="op-desc">Used to show naira session rates (and plans without a dollar price) in dollars.</div>
+        </div>
+        <div class="op-card">
+          <label class="op-label" for="unknown_currency">If location can't be found</label>
+          <select id="unknown_currency" name="unknown_currency" class="op-val-input">
+            <option value="USD" <?php selected( kounselia_unknown_location_currency(), 'USD' ); ?>>Show dollars</option>
+            <option value="NGN" <?php selected( kounselia_unknown_location_currency(), 'NGN' ); ?>>Show naira</option>
+          </select>
+          <div class="op-desc">Rare — e.g. the location service is down.</div>
+        </div>
+        <div class="op-card">
+          <label class="op-label"><input type="checkbox" name="geo_lookup_enabled" value="1" <?php checked( kounselia_geo_lookup_enabled() ); ?>> Look up visitor location</label>
+          <div class="op-desc">Looks up the visitor's country from their IP address (via ipapi.co, cached for a week per visitor).</div>
+        </div>
+        <div class="op-card">
+          <label class="op-label"><input type="checkbox" name="trust_country_header" value="1" <?php checked( kounselia_trust_country_header() ); ?>> Site is behind Cloudflare</label>
+          <div class="op-desc">Only tick this if Cloudflare (or a similar CDN) sits in front of the site — it then uses the country Cloudflare reports. Otherwise visitors could fake their country.</div>
+        </div>
+      </div>
+      <div style="margin-top: 20px;">
+        <button type="submit" class="login-submit" style="width:auto;padding:10px 20px;">Save Currency Settings</button>
+      </div>
     </form>
   </div>
 
