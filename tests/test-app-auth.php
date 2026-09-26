@@ -102,12 +102,12 @@ class Test_App_Auth extends WP_Ajax_UnitTestCase {
     function test_app_requests_ignore_cookies_but_website_requests_keep_them() {
         $user_id = $this->member();
 
-        // A website request: whatever the cookie check decided stands.
-        $this->assertSame( $user_id, apply_filters( 'determine_current_user', $user_id ) );
+        // A website request: whoever the cookie check found stays signed in.
+        $this->assertSame( $user_id, kounselia_determine_app_user( $user_id ) );
 
         // An app request without a token is signed out, cookie or not.
         $_SERVER['HTTP_X_KOUNSELIA_CLIENT'] = 'app';
-        $this->assertSame( 0, apply_filters( 'determine_current_user', $user_id ) );
+        $this->assertSame( 0, kounselia_determine_app_user( $user_id ) );
     }
 
     function test_website_requests_still_need_a_nonce() {

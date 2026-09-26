@@ -263,22 +263,24 @@ function kounselia_ajax_app_register() {
     ) );
 }
 add_action( 'wp_ajax_nopriv_kounselia_app_register', 'kounselia_ajax_app_register' );
+add_action( 'wp_ajax_kounselia_app_register', 'kounselia_ajax_app_register' );
 
 /* -------------------------------------------------------------------------
  * APP: WHO AM I / SIGN OUT
  * ---------------------------------------------------------------------- */
 
 // Lets the app check, when it opens, that its saved sign-in still works.
+// Checks is_user_logged_in() itself rather than trusting which of the two
+// hooks fired, so a missing or dead token always answers "signed out".
 function kounselia_ajax_app_me() {
     kounselia_verify_nonce();
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( array( 'message' => 'Please sign in again.', 'signed_out' => true ), 401 );
+    }
     wp_send_json_success( array( 'user' => kounselia_app_user_payload( wp_get_current_user() ) ) );
 }
 add_action( 'wp_ajax_kounselia_app_me', 'kounselia_ajax_app_me' );
-
-function kounselia_ajax_app_me_signed_out() {
-    wp_send_json_error( array( 'message' => 'Please sign in again.', 'signed_out' => true ), 401 );
-}
-add_action( 'wp_ajax_nopriv_kounselia_app_me', 'kounselia_ajax_app_me_signed_out' );
+add_action( 'wp_ajax_nopriv_kounselia_app_me', 'kounselia_ajax_app_me' );
 
 // Signs out this phone only.
 function kounselia_ajax_app_logout() {
