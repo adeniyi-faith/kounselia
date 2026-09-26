@@ -1,5 +1,6 @@
-// Sign in, sign up, password reset, sign out. Pure network calls, no
-// DOM — reusable in the React Native app as-is.
+// Sign in, sign up, password reset, sign out for the website, where the
+// browser keeps the sign-in cookie. The mobile app uses appAuth.ts instead.
+import { postAction } from './http';
 import type { KounseliaConfig } from './types';
 
 interface AuthResult {
@@ -14,13 +15,7 @@ async function postAuth(
   action: string,
   params: Record<string, string>,
 ): Promise<AuthResult> {
-  const body = new URLSearchParams({ action, nonce: config.nonce, ...params });
-  const res = await fetch(config.ajaxUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body,
-  });
-  const json = await res.json();
+  const json = await postAction(config, action, params);
   if (json.success) {
     return { success: true, name: json.data?.name, nonce: json.data?.nonce };
   }
@@ -42,9 +37,5 @@ export function forgotPassword(config: KounseliaConfig, email: string, website: 
 }
 
 export function logout(config: KounseliaConfig) {
-  return fetch(config.ajaxUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ action: 'kounselia_logout', nonce: config.nonce }),
-  }).catch(() => undefined);
+  return postAction(config, 'kounselia_logout').catch(() => undefined);
 }

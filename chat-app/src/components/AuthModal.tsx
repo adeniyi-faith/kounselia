@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { forgotPassword, login, register } from '../core/auth';
-import type { KounseliaConfig } from '../core/types';
+import { forgotPassword, login, register } from '@kounselia/core';
+import type { KounseliaConfig } from '@kounselia/core';
 
 export type AuthModalView = 'login' | 'register' | 'forgot' | null;
 

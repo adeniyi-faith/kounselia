@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useChat } from '../hooks/useChat';
 import { useVoiceCall } from '../hooks/useVoiceCall';
-import type { Counselor, KounseliaConfig } from '../core/types';
+import type { Counselor, KounseliaConfig } from '@kounselia/core';
 import { exportChatAsFile } from '../exportChat';
 import { CallOverlay } from './CallOverlay';
 import { ChatMenu } from './ChatMenu';

@@ -1,4 +1,4 @@
-import type { Counselor } from '../core/types';
+import type { Counselor } from '@kounselia/core';
 import type { CallStatus } from '../hooks/useVoiceCall';
 
 interface Props {
