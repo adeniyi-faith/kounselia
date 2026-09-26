@@ -264,3 +264,27 @@ function kounselia_memory_delete_profile( $user_id ) {
 
     delete_user_meta( $user_id, 'kounselia_core_memory' );
 }
+
+/**
+ * A rolling average of how long it actually takes to pull up a member's
+ * memory before the AI replies (see chat-endpoint.php, where every real
+ * reply times this and calls in here). Backs the "Memory lookup time"
+ * stat on the AI Brain admin page — a real measurement, not a guess.
+ *
+ * Stored as a simple exponential moving average so it stays current
+ * without needing to keep a growing log of every call.
+ */
+function kounselia_record_memory_lookup_time( $milliseconds ) {
+    $previous = get_option( 'kounselia_memory_lookup_avg_ms' );
+    $updated  = ( false === $previous ) ? $milliseconds : ( $previous * 0.9 ) + ( $milliseconds * 0.1 );
+    update_option( 'kounselia_memory_lookup_avg_ms', $updated, false );
+}
+
+/**
+ * The current rolling average from kounselia_record_memory_lookup_time(),
+ * or null if no real reply has been timed yet.
+ */
+function kounselia_get_memory_lookup_time() {
+    $value = get_option( 'kounselia_memory_lookup_avg_ms' );
+    return ( false === $value ) ? null : (float) $value;
+}
