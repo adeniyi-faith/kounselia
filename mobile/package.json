@@ -42,7 +42,10 @@
     "ios": "expo start --ios",
     "typecheck": "tsc --noEmit",
     "lint": "expo lint",
-    "doctor": "expo-doctor"
+    "doctor": "expo-doctor",
+    "build:test:android": "eas build --profile preview --platform android",
+    "build:test:ios": "eas build --profile preview --platform ios",
+    "build:store": "eas build --profile production --platform all"
   },
   "private": true,
   "description": "Kounselia iOS and Android app (Expo + React Native). Talks to the same WordPress server as the website; shared network code lives in ../packages/core."

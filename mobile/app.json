@@ -10,7 +10,10 @@
     "backgroundColor": "#F8F6F2",
     "ios": {
       "bundleIdentifier": "com.kounselia.app",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.kounselia.app",
