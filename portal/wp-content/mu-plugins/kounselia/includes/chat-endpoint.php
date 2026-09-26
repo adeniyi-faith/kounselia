@@ -100,7 +100,9 @@ function kounselia_ajax_chat() {
         $system_prompt .= kounselia_imported_memory_clause( $user_id );
     }
 
-    $history = kounselia_build_gemini_history( $session_id, 16 );
+    // How much of this conversation the counselor re-reads is a plan benefit.
+    $history_depth = ( $user_id && function_exists( 'kounselia_member_benefit' ) ) ? (int) kounselia_member_benefit( $user_id, 'memory_messages' ) : 16;
+    $history       = kounselia_build_gemini_history( $session_id, max( 4, $history_depth ) );
 
     // --------------------------------------------------------------------
     // FEATURE: AI TEAM COLLABORATION (Smarter Context Triage)

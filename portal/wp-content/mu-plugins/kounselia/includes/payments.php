@@ -112,6 +112,18 @@ function kounselia_subscription_period_end( $interval, $from_timestamp ) {
  * PAYSTACK API
  * ---------------------------------------------------------------------- */
 
+/**
+ * Paystack public key (pk_test_/pk_live_). Safe to show in the browser;
+ * enables the pop-up checkout. Optional.
+ */
+function kounselia_paystack_public_key() {
+    $key = get_option( 'kounselia_paystack_public_key', '' );
+    if ( ! $key && defined( 'KOUNSELIA_PAYSTACK_PUBLIC_KEY' ) ) {
+        $key = KOUNSELIA_PAYSTACK_PUBLIC_KEY;
+    }
+    return $key;
+}
+
 function kounselia_paystack_secret_key() {
     $key = get_option( 'kounselia_paystack_secret_key', '' );
     if ( $key ) {
@@ -188,6 +200,35 @@ function kounselia_ajax_init_subscription_payment() {
     $reference = 'KOUNSELIA-' . $user->ID . '-' . time() . '-' . wp_generate_password( 6, false );
 
     $callback_url = home_url( '/subscription-callback.php' );
+
+    // With a public key saved, checkout opens as a Paystack pop-up right on
+    // the dashboard. The amount is still verified server-side against this
+    // pending payment row afterwards, so the browser can't change the price.
+    $public_key = kounselia_paystack_public_key();
+    if ( $public_key && kounselia_paystack_secret_key() && empty( $_POST['redirect'] ) ) {
+        global $wpdb;
+        $now = current_time( 'mysql' );
+        $wpdb->insert( $wpdb->prefix . 'kounselia_payments', array(
+            'user_id'    => $user->ID,
+            'plan_id'    => $plan_id,
+            'reference'  => $reference,
+            'amount'     => $amount,
+            'currency'   => $plan['currency'],
+            'status'     => 'pending',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ) );
+        wp_send_json_success( array(
+            'mode'         => 'inline',
+            'key'          => $public_key,
+            'email'        => $user->user_email,
+            'amount'       => (int) round( $amount * 100 ),
+            'currency'     => $plan['currency'],
+            'reference'    => $reference,
+            'metadata'     => array( 'user_id' => $user->ID, 'plan_id' => $plan_id ),
+            'callback_url' => $callback_url,
+        ) );
+    }
 
     $result = kounselia_paystack_request( 'POST', '/transaction/initialize', array(
         'email'        => $user->user_email,
@@ -286,8 +327,15 @@ function kounselia_complete_subscription_payment( $reference ) {
         'current_period_start'   => $now,
         'current_period_end'     => $period_end,
         'cancelled_at'           => null,
+        'pending_plan_id'        => null,
+        'renewal_attempts'       => 0,
+        'last_renewal_error'     => null,
         'updated_at'             => $now,
     );
+    // A reusable card lets the subscription renew by itself (see subscriptions.php).
+    if ( function_exists( 'kounselia_subscription_card_fields' ) ) {
+        $sub_data = array_merge( $sub_data, kounselia_subscription_card_fields( $result['data']['authorization'] ?? array() ) );
+    }
 
     $existing = kounselia_get_user_subscription( $payment->user_id );
     if ( $existing ) {

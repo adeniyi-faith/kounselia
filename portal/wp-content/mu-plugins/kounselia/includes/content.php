@@ -663,13 +663,23 @@ function kounselia_block_counselors() {
 function kounselia_block_plans() {
     $plans = function_exists( 'kounselia_get_plans' ) ? kounselia_get_plans( true ) : array();
     $out   = '<div class="k-block-plans">';
-    $out  .= '<div class="k-plan"><div class="k-plan-name">Free</div><div class="k-plan-price">0<span> / forever</span></div><ul><li>Talk to every counselor</li><li>Private, encrypted conversations</li><li>Mood check-ins and journal</li></ul><a class="k-btn outline" href="/?auth=register">Start free</a></div>';
+    // The benefit lists come from the real plan limits (membership.php), so this page can't drift from what members actually get.
+    $lines = function ( $tier ) {
+        if ( ! function_exists( 'kounselia_plan_benefit_lines' ) ) {
+            return '';
+        }
+        return implode( '', array_map( function ( $l ) {
+            return '<li>' . esc_html( $l ) . '</li>';
+        }, kounselia_plan_benefit_lines( $tier ) ) );
+    };
+    $out  .= '<div class="k-plan"><div class="k-plan-name">Free</div><div class="k-plan-price">0<span> / forever</span></div><ul>' . ( $lines( 'free' ) ?: '<li>Talk to every counselor</li><li>Private, encrypted conversations</li><li>Mood check-ins and journal</li>' ) . '</ul><a class="k-btn outline" href="/?auth=register">Start free</a></div>';
     foreach ( $plans as $plan ) {
         $symbol = 'NGN' === $plan['currency'] ? '₦' : ( 'USD' === $plan['currency'] ? '$' : ( 'GBP' === $plan['currency'] ? '£' : $plan['currency'] . ' ' ) );
         $out   .= '<div class="k-plan' . ( ! empty( $plan['is_popular'] ) ? ' popular' : '' ) . '">'
             . ( ! empty( $plan['is_popular'] ) ? '<div class="k-plan-badge">Most popular</div>' : '' )
             . '<div class="k-plan-name">' . esc_html( $plan['name'] ) . '</div>'
             . '<div class="k-plan-price">' . esc_html( $symbol . number_format_i18n( (float) $plan['price_amount'] ) ) . '<span> / ' . ( 'yearly' === $plan['interval'] ? 'year' : 'month' ) . '</span></div><ul>';
+        $out .= $lines( 'pro' );
         foreach ( (array) $plan['features'] as $f ) {
             $out .= '<li>' . esc_html( $f ) . '</li>';
         }

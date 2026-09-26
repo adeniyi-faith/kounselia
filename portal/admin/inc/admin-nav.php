@@ -68,7 +68,7 @@ function kounselia_nav_link( $slug, $href, $label ) {
   if(!btn || !nav) return;
   // The link row scrolls sideways on narrower desktops; keep the current section in view.
   var current = nav.querySelector('a.active');
-  if(current && window.innerWidth > 860){ nav.scrollLeft = current.offsetLeft - nav.clientWidth / 2 + current.clientWidth / 2; }
+  if(current && window.innerWidth > 860){ nav.scrollLeft = ( current.offsetLeft - nav.offsetLeft ) - nav.clientWidth / 2 + current.clientWidth / 2; }
   btn.addEventListener('click', function(){
     var open = nav.classList.toggle('open');
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');

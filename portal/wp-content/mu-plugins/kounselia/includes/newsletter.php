@@ -226,7 +226,7 @@ function kounselia_newsletter_manage_url( $sub, $action = 'preferences' ) {
 
 function kounselia_newsletter_send_confirmation( $sub ) {
     $content = '<p style="margin-bottom:18px;">Hi ' . esc_html( kounselia_newsletter_first_name( $sub ) ) . ', please confirm you would like to receive emails from Kounselia. If you did not sign up, you can safely ignore this message.</p>';
-    return kounselia_send_html_email( $sub->email, 'Please confirm your subscription', 'One quick step', $content, 'Yes, subscribe me', kounselia_newsletter_manage_url( $sub, 'confirm' ) );
+    return kounselia_send_html_email( $sub->email, 'Please confirm your subscription', 'One quick step', $content, 'Yes, subscribe me', kounselia_newsletter_manage_url( $sub, 'confirm' ), array( 'headers' => array( 'X-Kounselia-Channel: newsletter' ) ) );
 }
 
 function kounselia_newsletter_send_welcome( $sub ) {
@@ -260,6 +260,7 @@ function kounselia_newsletter_email_opts( $sub, $extra = array() ) {
     return array_merge( array(
         'footer_html' => $footer,
         'headers'     => array(
+            'X-Kounselia-Channel: newsletter', // Routing hint for mail-delivery.php; stripped before sending.
             'List-Unsubscribe: <' . $unsub . '>',
             'List-Unsubscribe-Post: List-Unsubscribe=One-Click',
         ),
@@ -770,6 +771,11 @@ function kounselia_newsletter_process_queue( $limit = null ) {
     global $wpdb;
     $settings = kounselia_newsletter_settings();
     $limit    = $limit ? (int) $limit : max( 5, (int) $settings['batch_size'] );
+    // Respect the email provider's daily allowance (e.g. Brevo free: 300/day):
+    // when it's used up, campaigns simply pause and continue tomorrow.
+    if ( function_exists( 'kounselia_mail_newsletter_capacity' ) ) {
+        $limit = (int) min( $limit, kounselia_mail_newsletter_capacity() );
+    }
     $ctable   = $wpdb->prefix . 'kounselia_campaigns';
     $rtable   = $wpdb->prefix . 'kounselia_campaign_recipients';
     $now      = current_time( 'mysql' );
@@ -797,6 +803,9 @@ function kounselia_newsletter_process_queue( $limit = null ) {
 
     // 3. Send.
     $attempted = 0;
+    if ( $limit <= 0 ) {
+        return 0;
+    }
     $sending   = $wpdb->get_results( "SELECT * FROM {$ctable} WHERE status = 'sending' ORDER BY id ASC" );
     foreach ( $sending as $campaign ) {
         if ( $attempted >= $limit ) {
