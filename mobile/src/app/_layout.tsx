@@ -1,11 +1,16 @@
-import { CormorantGaramond_400Regular, CormorantGaramond_500Medium } from '@expo-google-fonts/cormorant-garamond';
-import {
-  Outfit_300Light,
-  Outfit_400Regular,
-  Outfit_500Medium,
-  Outfit_600SemiBold,
-  useFonts,
-} from '@expo-google-fonts/outfit';
+// Each weight is imported from its own subpath (as the @expo-google-fonts
+// packages' own docs recommend), not the package root: importing from the
+// root pulls in every weight's font file as a side effect, even ones never
+// used, because the root module requires() all of them at the top. Cormorant
+// Garamond alone has 10 weights (~5MB); importing the 2 this app uses this
+// way, instead of the root, keeps the other 8 out of the app entirely.
+import { CormorantGaramond_400Regular } from '@expo-google-fonts/cormorant-garamond/400Regular';
+import { CormorantGaramond_500Medium } from '@expo-google-fonts/cormorant-garamond/500Medium';
+import { Outfit_300Light } from '@expo-google-fonts/outfit/300Light';
+import { Outfit_400Regular } from '@expo-google-fonts/outfit/400Regular';
+import { Outfit_500Medium } from '@expo-google-fonts/outfit/500Medium';
+import { Outfit_600SemiBold } from '@expo-google-fonts/outfit/600SemiBold';
+import { useFonts } from 'expo-font';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';

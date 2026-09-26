@@ -61,6 +61,15 @@
           "cameraPermission": false,
           "microphonePermission": "Kounselia uses your microphone so you can talk to your counselor and speak your messages instead of typing them."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableMinifyInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          }
+        }
       ]
     ],
     "experiments": {
