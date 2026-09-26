@@ -13,17 +13,17 @@ import { makeStyles, radius, shadows } from '@/theme';
 const SLIDES: { key: string; image: ImageSourcePropType; label: string }[] = [
   {
     key: 'no-waiting',
-    image: require('../../../assets/onboarding/1-no-waiting.jpg'),
+    image: require('../../../assets/onboarding/1-no-waiting.webp'),
     label: 'No appointments. No waiting. Just support.',
   },
   {
     key: 'privacy',
-    image: require('../../../assets/onboarding/2-privacy.jpg'),
+    image: require('../../../assets/onboarding/2-privacy.webp'),
     label: "We blurred this on purpose. Your privacy isn't a feature. It's a promise.",
   },
   {
     key: 'not-alone',
-    image: require('../../../assets/onboarding/3-not-alone.jpg'),
+    image: require('../../../assets/onboarding/3-not-alone.webp'),
     label: "You don't have to carry every thought alone.",
   },
 ];

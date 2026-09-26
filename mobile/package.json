@@ -8,6 +8,7 @@
     "@expo/vector-icons": "^15.0.2",
     "@kounselia/core": "file:../packages/core",
     "expo": "~57.0.25",
+    "expo-build-properties": "~57.0.22",
     "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.19",
     "expo-device": "~57.0.2",
@@ -40,6 +41,8 @@
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
+    "expo-atlas": "^0.4.0",
+    "subset-font": "2.9.0",
     "typescript": "~6.0.3"
   },
   "scripts": {
