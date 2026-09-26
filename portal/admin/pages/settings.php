@@ -165,6 +165,14 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
             ? 'Safety alert recipients cleared — critical alerts will go to every admin/staff account again.'
             : count( $emails ) . ' safety alert recipient' . ( 1 === count( $emails ) ? '' : 's' ) . ' saved.';
 
+    // 10B. AI risk check on/off
+    } elseif ( 'save_ai_safety_screening' === $kounselia_action
+        && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_ai_safety' ) ) {
+
+        update_option( 'kounselia_ai_safety_screening', ! empty( $_POST['ai_safety_screening'] ) ? 1 : 0 );
+        kounselia_admin_log( 'update_ai_safety_screening', 'settings' );
+        $kounselia_notice = ! empty( $_POST['ai_safety_screening'] ) ? 'AI risk check turned on.' : 'AI risk check turned off — only keyword matches will be flagged.';
+
     // 11B. Save Paystack Secret Key
     } elseif ( 'save_paystack_key' === $kounselia_action
         && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_paystack' ) ) {
@@ -454,6 +462,16 @@ $opt_booking_commission_percent = (float) get_option( 'kounselia_booking_commiss
         <textarea id="safety_alert_emails" name="safety_alert_emails" class="bulk-input" placeholder="oncall@kounselia.com, clinical-lead@kounselia.com"><?php echo esc_textarea( implode( ",\n", array_filter( explode( ',', $kounselia_safety_alert_emails ) ) ) ); ?></textarea>
       </div>
       <button type="submit" class="login-submit" style="width:auto;padding:10px 20px;">Save Recipients</button>
+    </form>
+
+    <form method="post" style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border);">
+      <?php wp_nonce_field( 'kounselia_settings_ai_safety' ); ?>
+      <input type="hidden" name="kounselia_action" value="save_ai_safety_screening">
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;color:var(--text1);">
+        <input type="checkbox" name="ai_safety_screening" value="1" <?php checked( function_exists( 'kounselia_ai_safety_screening_enabled' ) && kounselia_ai_safety_screening_enabled() ); ?> style="margin-top:3px;">
+        <span><strong>AI risk check</strong> — every minute, member messages the keyword list didn't catch are read by the AI, which flags indirect or misspelled signs of risk. Critical ones alert the people above just like a keyword match. Runs in the background, so chats are not slowed down. Uses your Gemini API keys.</span>
+      </label>
+      <button type="submit" class="login-submit" style="width:auto;padding:10px 20px;margin-top:12px;">Save</button>
     </form>
   </div>
 

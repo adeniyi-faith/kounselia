@@ -80,29 +80,24 @@ function kounselia_trust_country_header() {
  * IP for a week so it costs at most one outbound request per visitor.
  */
 function kounselia_detect_country() {
-    static $country = null;
-    if ( null !== $country ) {
-        return $country;
-    }
-
     foreach ( array( 'HTTP_CF_IPCOUNTRY', 'HTTP_X_COUNTRY_CODE', 'GEOIP_COUNTRY_CODE', 'HTTP_X_GEO_COUNTRY' ) as $header ) {
         if ( kounselia_trust_country_header() && ! empty( $_SERVER[ $header ] ) ) {
             $code = strtoupper( substr( sanitize_text_field( wp_unslash( $_SERVER[ $header ] ) ), 0, 2 ) );
             if ( preg_match( '/^[A-Z]{2}$/', $code ) && 'XX' !== $code ) {
-                return $country = $code;
+                return $code;
             }
         }
     }
 
     $ip = isset( $_SERVER['REMOTE_ADDR'] ) ? (string) $_SERVER['REMOTE_ADDR'] : '';
     if ( ! kounselia_geo_lookup_enabled() || ! filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) ) {
-        return $country = '';
+        return '';
     }
 
     $cache_key = 'kounselia_geo_' . md5( $ip );
     $cached    = get_transient( $cache_key );
     if ( false !== $cached ) {
-        return $country = (string) $cached;
+        return (string) $cached;
     }
 
     $response = wp_remote_get( 'https://ipapi.co/' . rawurlencode( $ip ) . '/country/', array( 'timeout' => 3 ) );
@@ -116,7 +111,7 @@ function kounselia_detect_country() {
 
     // A failed lookup is cached briefly too, so a lookup outage can't slow every page load.
     set_transient( $cache_key, $code, $code ? WEEK_IN_SECONDS : HOUR_IN_SECONDS );
-    return $country = $code;
+    return $code;
 }
 
 /** The currency the current visitor sees prices in and is charged in. */
