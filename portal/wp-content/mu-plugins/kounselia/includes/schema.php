@@ -530,6 +530,7 @@ function kounselia_install_tables() {
         status VARCHAR(16) NOT NULL DEFAULT 'active',
         paystack_authorization_code VARCHAR(100) NULL,
         paystack_email VARCHAR(191) NULL,
+        currency VARCHAR(8) NOT NULL DEFAULT 'NGN',
         cancel_reason VARCHAR(500) NULL,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,

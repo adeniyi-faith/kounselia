@@ -51,6 +51,7 @@ $nonce    = wp_create_nonce( 'kounselia_auth' );
 $available_plans     = function_exists( 'kounselia_get_plans' ) ? kounselia_get_plans( true ) : array();
 $user_subscription   = function_exists( 'kounselia_get_user_subscription' ) ? kounselia_get_user_subscription( $user->ID ) : null;
 $subscription_active = $user_subscription && strtotime( $user_subscription->current_period_end ) > current_time( 'timestamp' );
+$viewer_currency     = function_exists( 'kounselia_viewer_currency' ) ? kounselia_viewer_currency() : 'NGN';
 
 $imported_memory     = get_user_meta( $user->ID, 'kounselia_imported_memory', true );
 $memory_imported_at  = get_user_meta( $user->ID, 'kounselia_memory_imported_at', true );
@@ -878,7 +879,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
             <?php else : ?>
               <div class="tile-spec" style="margin-top:4px;color:var(--text3)">No reviews yet</div>
             <?php endif; ?>
-            <div class="tile-spec" style="margin-top:4px;font-weight:600;color:var(--accent)"><?php echo $pro->rate_amount ? '₦' . esc_html( number_format( (float) $pro->rate_amount ) ) . ' / session' : ''; ?></div>
+            <div class="tile-spec" style="margin-top:4px;font-weight:600;color:var(--accent)"><?php echo $pro->rate_amount ? esc_html( kounselia_format_money( kounselia_convert_ngn( $pro->rate_amount, $viewer_currency ), $viewer_currency ) ) . ' / session' : ''; ?></div>
           </a>
           <?php endforeach; ?>
         </div>
@@ -1059,7 +1060,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="plan-card pro">
           <?php if ( ! empty( $plan['is_popular'] ) ) : ?><span class="plan-badge">Popular</span><?php endif; ?>
           <h3><?php echo esc_html( $plan['name'] ); ?></h3>
-          <p class="plan-price">₦<?php echo esc_html( number_format( (float) $plan['price_amount'] ) ); ?> / <?php echo 'yearly' === $plan['interval'] ? 'year' : 'month'; ?></p>
+          <p class="plan-price"><?php echo esc_html( kounselia_format_money( kounselia_plan_price( $plan, $viewer_currency ), $viewer_currency ) ); ?> / <?php echo 'yearly' === $plan['interval'] ? 'year' : 'month'; ?></p>
           <ul class="plan-list">
             <?php foreach ( (array) $plan['features'] as $feature ) : ?>
               <li><i class="ti ti-check"></i> <?php echo esc_html( $feature ); ?></li>
