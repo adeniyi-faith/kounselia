@@ -58,7 +58,15 @@ in the Expo Go app. It needs a real build, made in the cloud by Expo's
 EAS service (nothing needs Xcode or Android Studio). Build settings are
 in `eas.json`.
 
-One-time setup:
+**The easy way, from GitHub** (no computer setup): the repository has an
+"App build" job. On GitHub open **Actions → App build → Run workflow**,
+choose the phone type (start with `android`) and `preview`, and press
+**Run workflow**. It takes about 15–20 minutes. When it's done, open the
+run: its summary shows a link with a QR code; open that on the Android
+phone to install. It uses the repository secret `EXPO_TOKEN` (an Expo
+access token from expo.dev → Account settings → Access tokens).
+
+**From a computer instead** — one-time setup:
 
 1. Create a free account at https://expo.dev.
 2. In this folder: `npx eas-cli@latest login`, then `npx eas-cli@latest init`

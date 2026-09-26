@@ -1,0 +1,107 @@
+# Builds the mobile app (mobile/) on Expo's EAS build service.
+#
+# Start it by hand: GitHub → Actions → "App build" → Run workflow, then
+# pick the phone type and the kind of build. When it finishes, the run's
+# summary page has the install link.
+#
+# Needs the repository secret EXPO_TOKEN (an Expo access token, made at
+# expo.dev → Account settings → Access tokens).
+#
+#   preview    → a test app to install directly (an .apk on Android)
+#   production → the build for Google Play / the App Store
+#
+# iPhone builds also need Apple's signing set up once from a computer
+# (see mobile/README.md), so start with Android.
+name: App build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Which phones
+        type: choice
+        options: [android, ios, all]
+        default: android
+      profile:
+        description: Kind of build
+        type: choice
+        options: [preview, production]
+        default: preview
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-build-${{ inputs.platform }}-${{ inputs.profile }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: EAS build (${{ inputs.platform }}, ${{ inputs.profile }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Check the Expo key is there
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::The repository secret EXPO_TOKEN is missing. Add it under Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+        working-directory: .
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install
+        run: npm ci
+
+      # The first build links the app to a project in the Expo account the
+      # key belongs to (it's created if it doesn't exist yet). Later builds
+      # find the same project by its name, "kounselia".
+      - name: Link to the Expo project
+        run: |
+          eas whoami
+          eas init --non-interactive --force
+          node -e "const c=require('./app.json');console.log('Expo project id:',c.expo.extra?.eas?.projectId)"
+
+      - name: Build
+        run: |
+          eas build --platform "${{ inputs.platform }}" --profile "${{ inputs.profile }}" \
+            --non-interactive --wait --json > ../eas-build.json
+
+      - name: Links
+        if: always()
+        working-directory: .
+        run: |
+          node - <<'JS' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require('fs');
+          let builds = [];
+          try { builds = JSON.parse(fs.readFileSync('eas-build.json', 'utf8')); } catch {}
+          if (!builds.length) { console.log('No build information. See the Build step above for what went wrong.'); process.exit(0); }
+          console.log('## Kounselia app build\n');
+          for (const b of builds) {
+            const owner = b.project?.ownerAccount?.name;
+            const page = owner ? `https://expo.dev/accounts/${owner}/projects/${b.project.slug}/builds/${b.id}` : `https://expo.dev (Builds, id ${b.id})`;
+            console.log(`### ${b.platform} (${b.buildProfile}): ${b.status}\n`);
+            console.log(`- Build page, with a QR code to install from your phone: ${page}`);
+            if (b.artifacts?.buildUrl) console.log(`- Direct download: ${b.artifacts.buildUrl}`);
+            console.log('');
+          }
+          JS
