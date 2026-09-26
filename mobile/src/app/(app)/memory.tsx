@@ -8,7 +8,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { Toast, useToast } from '@/components/chat/Toast';
@@ -17,6 +17,7 @@ import { HeaderButton, ScreenHeader } from '@/components/ScreenHeader';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
+import { showDialog } from '@/components/Dialog';
 
 const IMPORT_PROMPT =
   'Please summarize everything you know about me as a person. Include my life timeline (dates and events), my emotional patterns and feelings about specific things in my life, my relationships, my work situation and goals, and any mental health themes. Write it as a clear factual summary.';
@@ -105,23 +106,28 @@ export default function Memory() {
   }
 
   function confirmDelete() {
-    Alert.alert('Delete your memory profile?', 'Your counselors will no longer remember these details. Your conversations stay as they are.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete',
-        style: 'destructive',
-        onPress: async () => {
-          const res = await deleteMemory(config);
-          if (!res.ok) {
-            toast.show(res.message);
-            return;
-          }
-          setMemory(null);
-          setEditing(null);
-          toast.show('Memory profile deleted');
+    showDialog({
+      title: 'Delete your memory profile?',
+      message: 'Your counselors will no longer remember these details. Your conversations stay as they are.',
+      icon: 'trash',
+      buttons: [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            const res = await deleteMemory(config);
+            if (!res.ok) {
+              toast.show(res.message);
+              return;
+            }
+            setMemory(null);
+            setEditing(null);
+            toast.show('Memory profile deleted');
+          },
         },
-      },
-    ]);
+      ],
+    });
   }
 
   async function copyPrompt() {

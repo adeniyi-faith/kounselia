@@ -2,7 +2,7 @@ import { fetchCheckinQuestion, type CounselorSummary } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Keyboard, KeyboardAvoidingView, Platform, Share, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Keyboard, KeyboardAvoidingView, Platform, Share, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReplyPlayer } from '@/audio/useReplyPlayer';
 import { useVoiceCall } from '@/audio/useVoiceCall';
@@ -18,6 +18,7 @@ import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { useCounselors } from '@/counselors';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors } from '@/theme';
+import { showDialog } from '@/components/Dialog';
 
 function goBack() {
   if (router.canGoBack()) router.back();
@@ -151,10 +152,11 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
   }
 
   function confirmClear() {
-    Alert.alert(
-      'Clear this conversation?',
-      'It will be removed from your chat history and cannot be brought back.',
-      [
+    showDialog({
+      title: 'Clear this conversation?',
+      message: 'It will be removed from your chat history and cannot be brought back.',
+      icon: 'trash',
+      buttons: [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Clear',
@@ -165,7 +167,7 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
           },
         },
       ],
-    );
+    });
   }
 
   return (

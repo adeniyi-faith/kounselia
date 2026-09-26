@@ -15,7 +15,7 @@ import {
 } from '@kounselia/core';
 import * as Device from 'expo-device';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Alert } from 'react-native';
+import { showDialog } from './components/Dialog';
 import { AJAX_URL } from './config';
 import { deleteSecure, readSecure, writeSecure } from './secureStorage';
 
@@ -128,7 +128,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
     forget();
-    Alert.alert('Please sign in again', 'You were signed out of Kounselia on this phone. This happens if your password was changed.');
+    showDialog({ title: 'Please sign in again', message: 'You were signed out of Kounselia on this phone. This happens if your password was changed.', icon: 'lock' });
   }, []);
 
   const config = useMemo(() => makeConfig(token, onSignedOut), [token, onSignedOut]);
