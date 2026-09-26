@@ -1,5 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
-import { fetchHistory, fetchVoiceAudio, sendChatMessage, synthesizeMemory } from '../core/api';
+import {
+  clearChatOnServer,
+  fetchHistory,
+  fetchVoiceAudio,
+  rateMessage as rateMessageOnServer,
+  sendChatMessage,
+  synthesizeMemory,
+} from '../core/api';
 import { getGuestToken } from '../core/guestToken';
 import type { ChatMessage, Counselor, KounseliaConfig } from '../core/types';
 
@@ -45,17 +52,22 @@ export function useChat({ config, counselorSlug, counselor }: UseChatOptions) {
       }
 
       setMessages((prev) => [...prev, { id: nextId(), sender: 'user', text: trimmed, createdAt: Date.now() }]);
-      guestMessageCount.current += 1;
       setTyping(true);
 
-      const result = await sendChatMessage(config, {
-        counselor: counselorSlug,
-        message: trimmed,
-        sessionId: sessionId.current,
-        guestToken: loggedIn ? undefined : getGuestToken(),
-      });
+      let result;
+      try {
+        result = await sendChatMessage(config, {
+          counselor: counselorSlug,
+          message: trimmed,
+          sessionId: sessionId.current,
+          guestToken: loggedIn ? undefined : getGuestToken(),
+        });
+      } finally {
+        setTyping(false);
+      }
 
-      setTyping(false);
+      // A message that never reached the server shouldn't use up a guest's free messages.
+      if (!result.networkError) guestMessageCount.current += 1;
       if (result.sessionId) sessionId.current = result.sessionId;
 
       if (result.reply) {
@@ -109,24 +121,29 @@ export function useChat({ config, counselorSlug, counselor }: UseChatOptions) {
     [config, counselorSlug, loggedIn, typing],
   );
 
-  const loadHistory = useCallback(async () => {
+  const loadHistory = useCallback(async (): Promise<'ok' | 'empty' | 'error'> => {
     const history = await fetchHistory(config, counselorSlug);
-    if (!history) return false;
+    if (history.status !== 'ok') return history.status;
     sessionId.current = history.sessionId;
     guestMessageCount.current = 0;
     setMessages(
       history.messages.map((m) => ({
         id: nextId(),
-        sender: m.sender,
+        sender: m.sender === 'user' ? 'user' : 'ai',
         text: m.content,
         messageId: m.id,
+        rating: m.rating ?? null,
         createdAt: Date.now(),
       })),
     );
-    return true;
+    return 'ok';
   }, [config, counselorSlug]);
 
-  const clearChat = useCallback(() => {
+  // Resolves false (and leaves the conversation on screen) if the server
+  // couldn't be reached, so a "cleared" chat never quietly comes back later.
+  const clearChat = useCallback(async (): Promise<boolean> => {
+    const ok = await clearChatOnServer(config, counselorSlug, loggedIn ? undefined : getGuestToken());
+    if (!ok) return false;
     sessionId.current = 0;
     guestMessageCount.current = 0;
     messagesSinceMemorySync.current = 0;
@@ -134,7 +151,14 @@ export function useChat({ config, counselorSlug, counselor }: UseChatOptions) {
     setInputDisabled(false);
     setMessages([]);
     setTimeout(appendGreeting, 300);
-  }, [appendGreeting]);
+    return true;
+  }, [appendGreeting, config, counselorSlug, loggedIn]);
+
+  const rateMessage = useCallback(
+    (messageId: number, rating: 'up' | 'down') =>
+      rateMessageOnServer(config, messageId, rating, loggedIn ? undefined : getGuestToken()),
+    [config, loggedIn],
+  );
 
   const playVoice = useCallback(
     (messageId: number) => fetchVoiceAudio(config, messageId, loggedIn ? undefined : getGuestToken()),
@@ -150,6 +174,7 @@ export function useChat({ config, counselorSlug, counselor }: UseChatOptions) {
     sendMessage,
     loadHistory,
     clearChat,
+    rateMessage,
     playVoice,
     sessionId,
   };

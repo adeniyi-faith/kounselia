@@ -12,6 +12,7 @@ class Test_Membership extends WP_Ajax_UnitTestCase {
         parent::set_up();
         reset_phpmailer_instance();
         update_option( 'kounselia_paystack_secret_key', 'sk_test_fake' );
+        update_option( 'kounselia_currency_mode', 'NGN' ); // No visitor location in tests.
         delete_option( 'kounselia_paystack_public_key' );
         delete_option( 'kounselia_plan_benefits' );
         update_option( 'kounselia_plans', array(
@@ -145,6 +146,40 @@ class Test_Membership extends WP_Ajax_UnitTestCase {
         $this->assertSame( date( 'Y-m-d', strtotime( '+1 year', strtotime( $sub->current_period_end ) ) ), substr( $after->current_period_end, 0, 10 ), 'New period starts where the old one ended.' );
 
         $this->assertSame( 0, kounselia_process_renewals(), 'Not charged twice.' );
+    }
+
+    function test_renewal_reported_by_webhook_is_applied_only_once() {
+        $user = self::factory()->user->create();
+        $sub  = $this->subscription( $user );
+        $this->paystack_reply = function ( $url, $body ) {
+            // The charge response and the later verify call both say "success".
+            return array( 'status' => true, 'data' => array( 'status' => 'success', 'amount' => 500000, 'currency' => 'NGN', 'authorization' => array() ) );
+        };
+        kounselia_process_renewals();
+        $after_charge = kounselia_get_user_subscription( $user )->current_period_end;
+
+        global $wpdb;
+        $reference = $wpdb->get_var( "SELECT reference FROM {$wpdb->prefix}kounselia_payments WHERE reference LIKE 'KOUNSELIA-RENEW-%' ORDER BY id DESC LIMIT 1" );
+        $result    = kounselia_reconcile_charge_reference( $reference ); // What the Paystack webhook does.
+
+        $this->assertTrue( $result['success'] );
+        $this->assertSame( $after_charge, kounselia_get_user_subscription( $user )->current_period_end, 'The webhook must not extend the plan a second time.' );
+        $this->assertSame( date( 'Y-m-d', strtotime( '+1 month', strtotime( $sub->current_period_end ) ) ), substr( $after_charge, 0, 10 ) );
+    }
+
+    function test_renewal_charges_in_the_currency_the_member_pays_in() {
+        $user = self::factory()->user->create();
+        $this->subscription( $user, array( 'currency' => 'USD', 'amount' => 4.99 ) );
+        $plans = get_option( 'kounselia_plans' );
+        $plans['pro-monthly']['price_usd'] = 4.99;
+        update_option( 'kounselia_plans', $plans );
+        $this->paystack_reply = function ( $url, $body ) {
+            return array( 'status' => true, 'data' => array( 'status' => 'success', 'amount' => $body['amount'], 'authorization' => array() ) );
+        };
+        kounselia_process_renewals();
+        $call = end( $this->paystack_calls );
+        $this->assertSame( 'USD', $call['body']['currency'] );
+        $this->assertSame( 499, $call['body']['amount'] );
     }
 
     function test_failed_renewal_is_recorded_and_member_is_emailed() {

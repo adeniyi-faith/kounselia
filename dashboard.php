@@ -51,6 +51,7 @@ $nonce    = wp_create_nonce( 'kounselia_auth' );
 $available_plans     = function_exists( 'kounselia_get_plans' ) ? kounselia_get_plans( true ) : array();
 $user_subscription   = function_exists( 'kounselia_get_user_subscription' ) ? kounselia_get_user_subscription( $user->ID ) : null;
 $subscription_active = $user_subscription && strtotime( $user_subscription->current_period_end ) > current_time( 'timestamp' );
+$viewer_currency     = function_exists( 'kounselia_viewer_currency' ) ? kounselia_viewer_currency() : 'NGN';
 
 // Pro members' discount on professional sessions (capped at the commission; see membership.php).
 $kounselia_session_discount = function_exists( 'kounselia_member_session_price' )
@@ -983,10 +984,12 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
             <?php endif; ?>
             <div class="tile-spec" style="margin-top:4px;font-weight:600;color:var(--accent)"><?php
               if ( $pro->rate_amount ) {
-                  $kounselia_price = function_exists( 'kounselia_member_session_price' ) ? kounselia_member_session_price( $user->ID, $pro->rate_amount, kounselia_booking_commission_percent() ) : array( 'charged' => (float) $pro->rate_amount, 'discount' => 0 );
-                  echo '₦' . esc_html( number_format( $kounselia_price['charged'] ) ) . ' / session';
-                  if ( $kounselia_price['discount'] > 0 ) {
-                      echo ' <s style="color:var(--text3);font-weight:400">₦' . esc_html( number_format( (float) $pro->rate_amount ) ) . '</s> <span style="color:var(--gold);font-weight:500">Pro price</span>';
+                  // Shown in the viewer's currency, with the Pro discount (if any) applied.
+                  $kounselia_full  = kounselia_convert_ngn( $pro->rate_amount, $viewer_currency );
+                  $kounselia_price = round( $kounselia_full * ( 1 - (float) $kounselia_session_discount / 100 ), 2 );
+                  echo esc_html( kounselia_format_money( $kounselia_price, $viewer_currency ) ) . ' / session';
+                  if ( $kounselia_price < $kounselia_full ) {
+                      echo ' <s style="color:var(--text3);font-weight:400">' . esc_html( kounselia_format_money( $kounselia_full, $viewer_currency ) ) . '</s> <span style="color:var(--gold);font-weight:500">Pro price</span>';
                   }
               }
             ?></div>

@@ -674,11 +674,13 @@ function kounselia_block_plans() {
     };
     $out  .= '<div class="k-plan"><div class="k-plan-name">Free</div><div class="k-plan-price">0<span> / forever</span></div><ul>' . ( $lines( 'free' ) ?: '<li>Talk to every counselor</li><li>Private, encrypted conversations</li><li>Mood check-ins and journal</li>' ) . '</ul><a class="k-btn outline" href="/?auth=register">Start free</a></div>';
     foreach ( $plans as $plan ) {
-        $symbol = 'NGN' === $plan['currency'] ? '₦' : ( 'USD' === $plan['currency'] ? '$' : ( 'GBP' === $plan['currency'] ? '£' : $plan['currency'] . ' ' ) );
-        $out   .= '<div class="k-plan' . ( ! empty( $plan['is_popular'] ) ? ' popular' : '' ) . '">'
+        // Shown in the visitor's currency (naira or dollars), like the dashboard.
+        $currency = function_exists( 'kounselia_viewer_currency' ) ? kounselia_viewer_currency() : 'NGN';
+        $price    = function_exists( 'kounselia_plan_price' ) ? kounselia_format_money( kounselia_plan_price( $plan, $currency ), $currency ) : '₦' . number_format_i18n( (float) $plan['price_amount'] );
+        $out     .= '<div class="k-plan' . ( ! empty( $plan['is_popular'] ) ? ' popular' : '' ) . '">'
             . ( ! empty( $plan['is_popular'] ) ? '<div class="k-plan-badge">Most popular</div>' : '' )
             . '<div class="k-plan-name">' . esc_html( $plan['name'] ) . '</div>'
-            . '<div class="k-plan-price">' . esc_html( $symbol . number_format_i18n( (float) $plan['price_amount'] ) ) . '<span> / ' . ( 'yearly' === $plan['interval'] ? 'year' : 'month' ) . '</span></div><ul>';
+            . '<div class="k-plan-price">' . esc_html( $price ) . '<span> / ' . ( 'yearly' === $plan['interval'] ? 'year' : 'month' ) . '</span></div><ul>';
         $out .= $lines( 'pro' );
         foreach ( (array) $plan['features'] as $f ) {
             $out .= '<li>' . esc_html( $f ) . '</li>';

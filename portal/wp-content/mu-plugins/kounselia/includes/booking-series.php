@@ -148,6 +148,8 @@ function kounselia_maybe_save_series_authorization( $booking_id, $paystack_data 
     $wpdb->update( $wpdb->prefix . 'kounselia_booking_series', array(
         'paystack_authorization_code' => $auth['authorization_code'],
         'paystack_email'              => $client ? $client->user_email : ( isset( $paystack_data['customer']['email'] ) ? $paystack_data['customer']['email'] : '' ),
+        // A saved card can only be charged again in the currency it was first charged in.
+        'currency'                    => ! empty( $paystack_data['currency'] ) ? strtoupper( $paystack_data['currency'] ) : 'NGN',
         'updated_at'                  => current_time( 'mysql' ),
     ), array( 'id' => $series->id ) );
 }
@@ -297,16 +299,20 @@ function kounselia_process_one_series_renewal( $series ) {
 function kounselia_charge_series_renewal( $series, $booking_id, $professional ) {
     global $wpdb;
 
-    $amount = (float) $professional->rate_amount;
-    if ( $amount <= 0 ) {
+    $rate_ngn = (float) $professional->rate_amount;
+    if ( $rate_ngn <= 0 ) {
         return new WP_Error( 'invalid_amount', 'This professional has not set a rate.' );
     }
+
+    $currency = ! empty( $series->currency ) ? $series->currency : 'NGN';
+    $amount   = kounselia_convert_ngn( $rate_ngn, $currency );
 
     $reference = 'KOUNSELIA-SERIES-' . $series->id . '-' . $booking_id . '-' . time();
     $result    = kounselia_paystack_request( 'POST', '/transaction/charge_authorization', array(
         'authorization_code' => $series->paystack_authorization_code,
         'email'              => $series->paystack_email,
         'amount'             => (int) round( $amount * 100 ),
+        'currency'           => $currency,
         'reference'          => $reference,
     ) );
 
@@ -314,19 +320,19 @@ function kounselia_charge_series_renewal( $series, $booking_id, $professional ) 
         return new WP_Error( 'charge_failed', $result['message'] ?: 'The saved card was declined for this week\'s session.' );
     }
 
-    $commission_percent  = kounselia_booking_commission_percent();
-    $platform_fee_amount = round( $amount * $commission_percent / 100, 2 );
-    $professional_amount = round( $amount - $platform_fee_amount, 2 );
-    $now                 = current_time( 'mysql' );
+    $split = kounselia_booking_payout_split( $rate_ngn );
+    $now   = current_time( 'mysql' );
 
     $wpdb->insert( $wpdb->prefix . 'kounselia_booking_payments', array(
         'booking_id'          => $booking_id,
         'client_user_id'      => $series->client_user_id,
         'professional_id'     => $series->professional_id,
         'amount'              => $amount,
-        'currency'            => 'NGN',
-        'platform_fee_amount' => $platform_fee_amount,
-        'professional_amount' => $professional_amount,
+        'currency'            => $currency,
+        'platform_fee_amount' => $split['platform_fee_amount'],
+        'professional_amount' => $split['professional_amount'],
+        'payout_currency'     => 'NGN',
+        'exchange_rate'       => 'NGN' === $currency ? null : kounselia_usd_ngn_rate(),
         'reference'           => $reference,
         'status'              => 'success',
         'gateway_response'    => wp_json_encode( $result['data'] ),

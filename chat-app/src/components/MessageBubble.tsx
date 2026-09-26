@@ -6,6 +6,8 @@ interface Props {
   counselor: Counselor;
   loggedIn: boolean;
   onPlayVoice: (messageId: number) => Promise<string | null>;
+  onRate: (messageId: number, rating: 'up' | 'down') => Promise<boolean>;
+  onNotify: (message: string) => void;
 }
 
 function formatTime(ts: number): string {
@@ -35,10 +37,11 @@ function renderFormattedText(text: string) {
   });
 }
 
-export function MessageBubble({ message, counselor, loggedIn, onPlayVoice }: Props) {
+export function MessageBubble({ message, counselor, loggedIn, onPlayVoice, onRate, onNotify }: Props) {
   const [playState, setPlayState] = useState<'idle' | 'loading' | 'playing'>('idle');
   const [copied, setCopied] = useState(false);
-  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null);
+  const [feedback, setFeedback] = useState<'up' | 'down' | null>(message.rating ?? null);
+  const [feedbackSaving, setFeedbackSaving] = useState(false);
 
   if (message.sender === 'user') {
     return (
@@ -65,19 +68,42 @@ export function MessageBubble({ message, counselor, loggedIn, onPlayVoice }: Pro
     const audioUrl = await onPlayVoice(message.messageId);
     if (!audioUrl) {
       setPlayState('idle');
+      onNotify("Couldn't play this message. Please check your connection and try again.");
       return;
     }
     const audio = new Audio(audioUrl);
-    setPlayState('playing');
-    audio.play();
     audio.onended = () => setPlayState('idle');
+    audio.onerror = () => setPlayState('idle');
+    setPlayState('playing');
+    audio.play().catch(() => {
+      setPlayState('idle');
+      onNotify("Couldn't play this message.");
+    });
   };
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(message.text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard
+      .writeText(message.text)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      })
+      .catch(() => onNotify('Failed to copy text.'));
+  };
+
+  const handleRate = async (rating: 'up' | 'down') => {
+    if (!message.messageId || feedbackSaving || feedback === rating) return;
+    const previous = feedback;
+    setFeedback(rating);
+    setFeedbackSaving(true);
+    const ok = await onRate(message.messageId, rating);
+    setFeedbackSaving(false);
+    if (ok) {
+      onNotify(rating === 'up' ? 'Thanks for the feedback!' : 'Feedback recorded.');
+    } else {
+      setFeedback(previous);
+      onNotify("Couldn't save your feedback. Please try again.");
+    }
   };
 
   return (
@@ -124,7 +150,8 @@ export function MessageBubble({ message, counselor, loggedIn, onPlayVoice }: Pro
           </button>
           <button
             className="msg-fb-btn"
-            onClick={() => setFeedback('up')}
+            onClick={() => handleRate('up')}
+            disabled={!message.messageId}
             title="Helpful"
             style={feedback === 'up' ? { color: '#2E5C3E' } : undefined}
           >
@@ -132,7 +159,8 @@ export function MessageBubble({ message, counselor, loggedIn, onPlayVoice }: Pro
           </button>
           <button
             className="msg-fb-btn"
-            onClick={() => setFeedback('down')}
+            onClick={() => handleRate('down')}
+            disabled={!message.messageId}
             title="Not Helpful"
             style={feedback === 'down' ? { color: '#8B3A52' } : undefined}
           >

@@ -104,10 +104,26 @@ function closeChatMenu() {
   if(menu && menu.classList.contains('show')) menu.classList.remove('show');
 }
 
-function clearCurrentChat(e) {
+async function clearCurrentChat(e) {
   if(e) e.stopPropagation();
   closeChatMenu();
+  if(!confirm('Clear this conversation? It will be removed from your chat history and cannot be brought back.')) return;
   stopVoiceActivity(true); // Force abort any active recording
+
+  // Only wipe the screen once the server has actually cleared it, otherwise
+  // the "cleared" conversation would quietly come back on the next reload.
+  const params = new URLSearchParams({action:'kounselia_clear_chat', nonce:KOUNSELIA.nonce, counselor:curSlug});
+  if(!loggedIn) params.set('guest_token', getGuestToken());
+  try {
+    const r = await fetch(KOUNSELIA.ajaxUrl, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:params});
+    const json = await r.json();
+    if(!json.success) throw new Error('clear failed');
+  } catch(err) {
+    showChatToast("Couldn't clear the chat. Please check your connection and try again.");
+    return;
+  }
+
+  showChatToast('Conversation cleared.');
   document.getElementById('messages').innerHTML = '';
   msgCount = 0;
   curSessionId = 0;
@@ -191,7 +207,7 @@ async function fetchAndDisplayHistory(e) {
 
       json.data.messages.forEach(m => {
         if(m.sender === 'user') { renderUserBubble(m.content); msgCount++; }
-        else { renderAiBubble(m.content, m.id); }
+        else { renderAiBubble(m.content, m.id, null, m.rating); }
       });
       scrollBot();
     } else {
@@ -199,7 +215,7 @@ async function fetchAndDisplayHistory(e) {
     }
   } catch(err) {
     icon.className = 'ti ti-history';
-    showChatToast('Failed to load history.');
+    showChatToast("Couldn't load your history. Please check your connection and try again.");
   }
 }
 
@@ -215,24 +231,37 @@ function copyAiMsg(btn) {
   }).catch(() => showChatToast('Failed to copy text'));
 }
 
-function rateAiMsg(btn, msgId, type) {
-  const icon = btn.querySelector('i');
-  icon.classList.add('action-pulse');
-  const parent = btn.parentElement;
-  const buttons = parent.querySelectorAll('.msg-fb-btn');
-  
-  if(type === 'up') {
-    icon.className = 'ti ti-thumb-up-filled';
-    btn.style.color = '#2E5C3E'; 
-    buttons[2].querySelector('i').className = 'ti ti-thumb-down';
-    buttons[2].style.color = '';
-    showChatToast('Thanks for the feedback!');
-  } else {
-    icon.className = 'ti ti-thumb-down-filled';
-    btn.style.color = '#8B3A52';
-    buttons[1].querySelector('i').className = 'ti ti-thumb-up';
-    buttons[1].style.color = '';
-    showChatToast('Feedback recorded.');
+function applyRatingUI(bar, type) {
+  const buttons = bar.querySelectorAll('.msg-fb-btn');
+  const up = buttons[1], down = buttons[2];
+  up.querySelector('i').className = type === 'up' ? 'ti ti-thumb-up-filled' : 'ti ti-thumb-up';
+  up.style.color = type === 'up' ? '#2E5C3E' : '';
+  down.querySelector('i').className = type === 'down' ? 'ti ti-thumb-down-filled' : 'ti ti-thumb-down';
+  down.style.color = type === 'down' ? '#8B3A52' : '';
+  bar.dataset.rating = type || '';
+}
+
+async function rateAiMsg(btn, msgId, type) {
+  const bar = btn.parentElement;
+  if(!msgId) { showChatToast("This message can't be rated."); return; }
+  if(bar.dataset.saving === '1' || bar.dataset.rating === type) return;
+
+  const previous = bar.dataset.rating || null;
+  applyRatingUI(bar, type);
+  bar.dataset.saving = '1';
+
+  const params = new URLSearchParams({action:'kounselia_rate_message', nonce:KOUNSELIA.nonce, message_id:msgId, rating:type});
+  if(!loggedIn) params.set('guest_token', getGuestToken());
+  try {
+    const r = await fetch(KOUNSELIA.ajaxUrl, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:params});
+    const json = await r.json();
+    if(!json.success) throw new Error('rate failed');
+    showChatToast(type === 'up' ? 'Thanks for the feedback!' : 'Feedback recorded.');
+  } catch(err) {
+    applyRatingUI(bar, previous);
+    showChatToast("Couldn't save your feedback. Please try again.");
+  } finally {
+    bar.dataset.saving = '0';
   }
 }
 
@@ -323,7 +352,7 @@ function renderUserBubble(text){
   wrap.appendChild(m);
 }
 
-function renderAiBubble(text, messageId, consulted){
+function renderAiBubble(text, messageId, consulted, rating){
   const wrap=document.getElementById('messages');
   const m=document.createElement('div');
   m.className='msg ai';
@@ -356,6 +385,7 @@ function renderAiBubble(text, messageId, consulted){
       </div>
     </div>`;
   wrap.appendChild(m);
+  if(rating === 'up' || rating === 'down') applyRatingUI(m.querySelector('.msg-feedback-bar'), rating);
   scrollBot();
 }
 
@@ -701,20 +731,24 @@ function playVoice(messageId,btnEl){
       btnEl.classList.add('playing');
       btnEl.dataset.wasPlaying='1';
       btnEl.innerHTML='<i class="ti ti-player-stop-filled"></i>';
-      audio.play();
-      audio.onended=()=>{
+      const resetBtn=()=>{
         btnEl.classList.remove('playing');
         btnEl.dataset.wasPlaying='0';
         btnEl.innerHTML='<i class="ti ti-volume"></i>';
         if(currentAudio===audio) currentAudio=null;
       };
+      audio.onended=resetBtn;
+      audio.onerror=resetBtn;
+      audio.play().catch(()=>{ resetBtn(); showChatToast("Couldn't play this message."); });
     } else {
       btnEl.innerHTML='<i class="ti ti-volume"></i>';
+      showChatToast((json.data && json.data.message) || "Couldn't play this message. Please try again.");
     }
   })
   .catch(()=>{
     btnEl.classList.remove('loading');
     btnEl.innerHTML='<i class="ti ti-volume"></i>';
+    showChatToast("Couldn't play this message. Please check your connection and try again.");
   });
 }
 
@@ -1251,4 +1285,4 @@ function endVoiceCall(){
 
   document.getElementById('call-overlay').classList.remove('active');
   document.getElementById('call-ring').classList.remove('speaking');
-}
+}

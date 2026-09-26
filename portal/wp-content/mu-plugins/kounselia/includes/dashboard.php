@@ -66,7 +66,7 @@ function kounselia_get_recent_sessions( $user_id, $limit = 5 ) {
                 MAX(m.created_at) AS last_message_at
          FROM {$sessions_table} s
          LEFT JOIN {$messages_table} m ON m.session_id = s.id
-         WHERE s.user_id = %d
+         WHERE s.user_id = %d AND s.status != 'cleared'
          GROUP BY s.id
          ORDER BY last_message_at DESC, s.started_at DESC
          LIMIT %d",
