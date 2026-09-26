@@ -1,0 +1,14 @@
+appId: com.kounselia.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Talk to someone now"
+    timeout: 60000
+- tapOn: "Sessions"
+- waitForAnimationToEnd
+- takeScreenshot: ${P}12-sessions
+- tapOn: "Book a professional"
+- waitForAnimationToEnd
+- takeScreenshot: ${P}13-book
+- scroll
+- takeScreenshot: ${P}14-book-2

@@ -1,0 +1,22 @@
+# The article reader shows the article in a web view (reported crashing).
+appId: com.kounselia.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Talk to someone now"
+    timeout: 60000
+- scrollUntilVisible:
+    element: "See all"
+    direction: DOWN
+- tapOn: "See all"
+- extendedWaitUntil:
+    visible: "How to sleep when your mind races"
+    timeout: 15000
+- takeScreenshot: ${P}07-articles
+- tapOn: "How to sleep when your mind races"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "Start with light"
+    timeout: 15000
+    optional: true
+- takeScreenshot: ${P}08-article
