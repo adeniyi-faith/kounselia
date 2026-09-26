@@ -165,3 +165,108 @@ function kounselia_professional_card_html( $pro ) {
         . '<span class="k-pro-foot">' . $rating . ( $price ? '<span class="k-pro-price">' . esc_html( $price ) . '<small> / session</small></span>' : '' ) . '</span>'
         . '</span></a>';
 }
+
+/* -------------------------------------------------------------------------
+ * ONE-TIME BACKFILL for sites that already had their footer/pages seeded
+ * (by kounselia_content_seed_defaults()) before this file existed. Runs
+ * once, adds the two professionals links to whatever footer the admin
+ * already has (never touching their other customisations), and appends
+ * a short note to the "Our counselors" page pointing to /professionals/
+ * — but only if that page doesn't already mention it.
+ * ---------------------------------------------------------------------- */
+
+function kounselia_professionals_backfill_links() {
+    if ( get_option( 'kounselia_professionals_links_backfilled' ) ) {
+        return;
+    }
+    update_option( 'kounselia_professionals_links_backfilled', 1 );
+
+    if ( function_exists( 'kounselia_footer_settings' ) ) {
+        kounselia_footer_backfill_professionals_links();
+    }
+    if ( function_exists( 'kounselia_get_page_by_slug' ) ) {
+        kounselia_counselors_page_backfill_professionals_note();
+    }
+}
+
+function kounselia_footer_backfill_professionals_links() {
+    $footer  = kounselia_footer_settings();
+    $columns = (array) $footer['columns'];
+
+    $has_link = function ( $target ) use ( $columns ) {
+        foreach ( $columns as $col ) {
+            foreach ( (array) $col['links'] as $link ) {
+                if ( ! empty( $link['url'] ) && untrailingslashit( $link['url'] ) === untrailingslashit( $target ) ) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    $changed = false;
+
+    if ( ! $has_link( '/professionals/' ) ) {
+        $inserted = false;
+        foreach ( $columns as $ci => $col ) {
+            foreach ( (array) $col['links'] as $li => $link ) {
+                if ( 'our-counselors' === ( $link['page'] ?? '' ) ) {
+                    // Sits right after "Our counselors", the same place the default footer puts it.
+                    array_splice( $columns[ $ci ]['links'], $li + 1, 0, array( array( 'label' => 'Find a professional', 'page' => '', 'url' => '/professionals/' ) ) );
+                    $inserted = true;
+                    break 2;
+                }
+            }
+        }
+        if ( ! $inserted && isset( $columns[0] ) ) {
+            $columns[0]['links'][] = array( 'label' => 'Find a professional', 'page' => '', 'url' => '/professionals/' );
+            $inserted = true;
+        }
+        $changed = $changed || $inserted;
+    }
+
+    if ( ! $has_link( '/professionals/join' ) ) {
+        // Prefer an "Organisation" column if there is one, else the last column.
+        $target_ci = null;
+        foreach ( $columns as $ci => $col ) {
+            if ( false !== stripos( (string) $col['title'], 'organisation' ) || false !== stripos( (string) $col['title'], 'organization' ) ) {
+                $target_ci = $ci;
+                break;
+            }
+        }
+        if ( null === $target_ci && $columns ) {
+            $target_ci = count( $columns ) - 1;
+        }
+        if ( null !== $target_ci ) {
+            $columns[ $target_ci ]['links'][] = array( 'label' => 'For professionals', 'page' => '', 'url' => '/professionals/join' );
+            $changed = true;
+        }
+    }
+
+    if ( $changed ) {
+        $footer['columns'] = $columns;
+        update_option( 'kounselia_footer', $footer );
+    }
+}
+
+function kounselia_counselors_page_backfill_professionals_note() {
+    $page = kounselia_get_page_by_slug( 'our-counselors', false );
+    if ( ! $page || false !== stripos( (string) $page->content, 'professionals' ) ) {
+        return; // No such page, or it already mentions professionals — leave it alone.
+    }
+
+    $note = '<h2>Want to talk to a licensed human?</h2>'
+        . '<p>Our counselors are AI — and they will always say so. When you would rather speak with a licensed psychologist, counsellor or therapist, you can book a private video session with one of our <a href="/professionals/">verified professionals</a>.</p>';
+
+    kounselia_save_page( array(
+        'title'            => $page->title,
+        'slug'             => $page->slug,
+        'eyebrow'          => $page->eyebrow,
+        'subtitle'         => $page->subtitle,
+        'hero_image'       => $page->hero_image,
+        'meta_description' => $page->meta_description,
+        'status'           => $page->status,
+        'content'          => $page->content . $note,
+    ), $page->id );
+}
+add_action( 'init', 'kounselia_professionals_backfill_links', 20 );
