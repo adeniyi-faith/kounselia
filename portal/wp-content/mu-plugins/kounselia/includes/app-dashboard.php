@@ -56,12 +56,25 @@ function kounselia_recommended_counselor( $today_mood, $active_slugs, $tried_slu
 }
 
 /**
+ * A member's confirmed sessions that haven't finished yet, soonest first.
+ * kounselia_get_client_bookings() drops a session the moment it starts,
+ * which would hide its Join button from anyone a minute late; this keeps
+ * it until its joining window closes (15 minutes after the end).
+ */
+function kounselia_app_open_bookings( $user_id ) {
+    $now = current_time( 'timestamp' );
+    return array_values( array_filter( kounselia_get_client_bookings( $user_id, false ), function ( $b ) use ( $now ) {
+        return strtotime( $b->scheduled_end ) + 15 * MINUTE_IN_SECONDS >= $now;
+    } ) );
+}
+
+/**
  * "Your care team" on Home (inc/dashboard-care-team.php): the member's
  * next booked session with a professional, or, with none booked, up to
  * three professionals to invite them to book, plus their Pro discount.
  */
 function kounselia_app_care_team( $user_id ) {
-    $bookings = kounselia_get_client_bookings( $user_id );
+    $bookings = kounselia_app_open_bookings( $user_id );
     $next     = null;
     if ( ! empty( $bookings ) ) {
         $b    = $bookings[0];
@@ -134,7 +147,9 @@ function kounselia_ajax_app_home() {
         $checkin = array(
             'id'             => (int) $event->id,
             'event_text'     => $event->event_text,
-            'counselor_slug' => ! empty( $tried_slugs ) ? $tried_slugs[0] : $slug,
+            // Someone switched off since can't ask; fall back to the
+            // suggested counselor, as the website does.
+            'counselor_slug' => ( ! empty( $tried_slugs ) && in_array( $tried_slugs[0], $active_slugs, true ) ) ? $tried_slugs[0] : $slug,
         );
     }
 
@@ -188,7 +203,7 @@ function kounselia_ajax_app_bookings() {
     $user_id = kounselia_app_require_member();
 
     $upcoming = array();
-    foreach ( kounselia_get_client_bookings( $user_id ) as $b ) {
+    foreach ( kounselia_app_open_bookings( $user_id ) as $b ) {
         $upcoming[] = array(
             'id'              => (int) $b->id,
             'professional_id' => (int) $b->professional_id,
@@ -286,3 +301,25 @@ function kounselia_ajax_get_booking_room() {
 }
 add_action( 'wp_ajax_kounselia_get_booking_room', 'kounselia_ajax_get_booking_room' );
 add_action( 'wp_ajax_nopriv_kounselia_get_booking_room', 'kounselia_ajax_get_booking_room' );
+
+/* -------------------------------------------------------------------------
+ * PAYMENT CHECK: has Paystack confirmed a booking yet?
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Asked by the app every few seconds while the member pays, so it can say
+ * "You're booked" as soon as Paystack confirms, without reloading the
+ * whole Book screen each time.
+ */
+function kounselia_ajax_get_booking_status() {
+    $user_id    = kounselia_app_require_member();
+    $booking_id = isset( $_POST['booking_id'] ) ? absint( $_POST['booking_id'] ) : 0;
+    $booking    = $booking_id ? kounselia_get_booking_with_parties( $booking_id ) : null;
+
+    if ( ! $booking || (int) $booking->client_user_id !== (int) $user_id ) {
+        wp_send_json_error( array( 'message' => 'Booking not found.' ), 404 );
+    }
+    wp_send_json_success( array( 'status' => $booking->status ) );
+}
+add_action( 'wp_ajax_kounselia_get_booking_status', 'kounselia_ajax_get_booking_status' );
+add_action( 'wp_ajax_nopriv_kounselia_get_booking_status', 'kounselia_ajax_get_booking_status' );

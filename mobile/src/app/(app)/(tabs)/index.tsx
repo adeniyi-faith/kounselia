@@ -95,7 +95,7 @@ export default function Home() {
         {!home ? (
           failed ? (
             <View style={styles.center}>
-              <Text style={styles.notice}>We couldn't load your dashboard. Please check your internet connection.</Text>
+              <Text style={styles.notice}>We couldn’t load your dashboard. Please check your internet connection.</Text>
               <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
@@ -136,7 +136,7 @@ export default function Home() {
           </>
         )}
       </ScrollView>
-      <Toast message={toast.message} />
+      <Toast note={toast.note} />
     </SafeAreaView>
   );
 }

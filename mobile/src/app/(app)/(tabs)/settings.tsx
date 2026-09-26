@@ -1,7 +1,9 @@
 import Constants from 'expo-constants';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
+import { openSafetyResources } from '@/components/openSafety';
+import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
 import { colors, fonts, radius, shadows } from '@/theme';
 
@@ -37,6 +39,21 @@ export default function Settings() {
             ) : null}
           </View>
         </View>
+        <Pressable
+          onPress={openSafetyResources}
+          accessibilityRole="link"
+          accessibilityHint="Opens emergency numbers and crisis lines"
+          style={({ pressed }) => [styles.help, pressed && { opacity: 0.85 }]}
+        >
+          <View style={styles.helpIcon}>
+            <TablerIcon name="lifebuoy" size={20} color={colors.rose} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.helpTitle}>Get help now</Text>
+            <Text style={styles.helpText}>If you’re in danger or thinking about ending your life, reach people who can help right away.</Text>
+          </View>
+          <TablerIcon name="chevron-right" size={18} color={colors.text3} />
+        </Pressable>
         <Button title="Sign out" variant="ghost" onPress={confirmSignOut} style={styles.signOut} />
         <Text style={styles.version}>Kounselia {Constants.expoConfig?.version ?? ''}</Text>
       </ScrollView>
@@ -72,6 +89,20 @@ const styles = StyleSheet.create({
   who: { flex: 1 },
   name: { fontFamily: fonts.medium, fontSize: 16, color: colors.text },
   email: { fontFamily: fonts.regular, fontSize: 14, color: colors.text2, marginTop: 2 },
+  help: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: radius.r,
+    backgroundColor: colors.roseLight,
+    borderWidth: 1,
+    borderColor: 'rgba(139,58,82,0.18)',
+  },
+  helpIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  helpTitle: { fontFamily: fonts.semibold, fontSize: 15, color: colors.rose },
+  helpText: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, color: colors.text2, marginTop: 2 },
   signOut: { marginTop: 28 },
   version: { fontFamily: fonts.regular, fontSize: 12, color: colors.text3, textAlign: 'center', marginTop: 20 },
 });

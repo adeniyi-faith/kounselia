@@ -1,9 +1,9 @@
-import { createBooking, fetchBookings, fetchSlots, rescheduleBooking, type Professional, type Slots } from '@kounselia/core';
+import { createBooking, fetchBookings, fetchBookingStatus, fetchSlots, rescheduleBooking, type Professional, type Slots } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, AppState, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { ProfessionalAvatar } from '@/components/dashboard/ProfessionalAvatar';
@@ -24,12 +24,19 @@ function dayKey(d: Date) {
 // Pick a time with a professional, then pay — or, with ?reschedule=<id>,
 // move an existing booking to a new time (no payment).
 export default function BookProfessional() {
-  const { proId, reschedule } = useLocalSearchParams<{ proId: string; reschedule?: string }>();
+  const { proId, reschedule, pro: proParam } = useLocalSearchParams<{ proId: string; reschedule?: string; pro?: string }>();
   const professionalId = Number(proId);
   const rescheduleId = reschedule ? Number(reschedule) : undefined;
   const { config } = useSession();
 
-  const [pro, setPro] = useState<Professional | null>(null);
+  // The Book tab passes the professional along; only fetch it if not.
+  const [pro, setPro] = useState<Professional | null>(() => {
+    try {
+      return proParam ? (JSON.parse(proParam) as Professional) : null;
+    } catch {
+      return null;
+    }
+  });
   const [slots, setSlots] = useState<Slots | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [day, setDay] = useState<string | null>(null);
@@ -38,18 +45,25 @@ export default function BookProfessional() {
   const [weekly, setWeekly] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // After checkout opens: the booking we're waiting on and its payment page.
+  const [waiting, setWaiting] = useState<{ bookingId: number; url: string } | null>(null);
+  const [checking, setChecking] = useState(false);
+  const done = useRef(false);
 
   useEffect(() => {
     (async () => {
-      const [bookings, times] = await Promise.all([fetchBookings(config), fetchSlots(config, professionalId, rescheduleId)]);
-      if (!bookings.ok || !times.ok) {
-        setFailed(!times.ok ? times.message : bookings.ok ? '' : bookings.message);
+      const times = await fetchSlots(config, professionalId, rescheduleId);
+      if (!times.ok) {
+        setFailed(times.message);
         return;
       }
-      setPro(bookings.data.professionals.find((p) => p.id === professionalId) ?? null);
       setSlots(times.data);
+      if (!proParam) {
+        const bookings = await fetchBookings(config);
+        if (bookings.ok) setPro(bookings.data.professionals.find((p) => p.id === professionalId) ?? null);
+      }
     })();
-  }, [config, professionalId, rescheduleId]);
+  }, [config, professionalId, rescheduleId, proParam]);
 
   // Group the free slots by day, in the member's time zone.
   const days = useMemo(() => {
@@ -88,31 +102,65 @@ export default function BookProfessional() {
     }
 
     const res = await createBooking(config, professionalId, picked.value, note.trim(), weekly);
+    setBusy(false);
     if (!res.ok) {
-      setBusy(false);
       setError(res.message);
       return;
     }
-    // Pay on Paystack's page. The booking is confirmed by Paystack telling
-    // the server directly, so after the page closes we ask the server.
-    await WebBrowser.openBrowserAsync(res.data.authorization_url, {
-      toolbarColor: colors.surface,
-      controlsColor: colors.accent,
-      dismissButtonStyle: 'done',
-    });
-    const after = await fetchBookings(config);
-    setBusy(false);
-    const confirmed = after.ok && after.data.upcoming.some((b) => b.id === res.data.booking_id);
-    if (confirmed) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-      Alert.alert("You're booked", `Your session with ${pro?.name ?? 'your professional'} is confirmed. You'll find it under Book, with a Join button 10 minutes before it starts.`);
-      router.back();
-    } else {
-      setError(
-        "We haven't received the payment yet. If you did pay, it can take a minute to show — pull down on the Book screen to refresh. The time is held for you for a short while.",
-      );
-    }
+    // Pay on Paystack's page. Paystack tells the server directly when the
+    // payment goes through; we keep asking the server until it has.
+    setWaiting({ bookingId: res.data.booking_id, url: res.data.authorization_url });
+    openPayment(res.data.authorization_url);
   }
+
+  function openPayment(url: string) {
+    WebBrowser.openBrowserAsync(url, { toolbarColor: colors.surface, controlsColor: colors.accent, dismissButtonStyle: 'done' }).catch(() => undefined);
+  }
+
+  const checkPayment = useCallback(
+    async (fromButton = false) => {
+      if (!waiting || done.current) return;
+      if (fromButton) setChecking(true);
+      const res = await fetchBookingStatus(config, waiting.bookingId);
+      if (fromButton) setChecking(false);
+      if (done.current) return;
+      if (res.ok && res.data.status === 'confirmed') {
+        done.current = true;
+        // Close the payment page for them (iPhone only; on Android they see
+        // Paystack's "Payment received" page and tap back).
+        if (Platform.OS === 'ios') WebBrowser.dismissBrowser().catch(() => undefined);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+        Alert.alert("You're booked", `Your session with ${pro?.name ?? 'your professional'} is confirmed. You'll find it under Book, with a Join button 10 minutes before it starts.`);
+        router.back();
+      } else if (!res.ok && !res.offline) {
+        // The hold ran out before payment arrived; the time was released.
+        done.current = true;
+        setWaiting(null);
+        setError('This booking expired before the payment came through, so no money was taken. Please choose a time again.');
+      } else if (fromButton) {
+        setError("We haven't received the payment yet. If you've just paid, give it a moment and check again.");
+      }
+    },
+    [config, pro, waiting],
+  );
+
+  // While waiting: check every 4 seconds, and whenever the app comes back
+  // to the front (e.g. after closing the payment page). Stops after 20 minutes.
+  useEffect(() => {
+    if (!waiting) return;
+    const started = Date.now();
+    const timer = setInterval(() => {
+      if (Date.now() - started > 20 * 60 * 1000) clearInterval(timer);
+      else checkPayment();
+    }, 4000);
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') checkPayment();
+    });
+    return () => {
+      clearInterval(timer);
+      sub.remove();
+    };
+  }, [waiting, checkPayment]);
 
   if (failed !== null) {
     return (
@@ -231,7 +279,16 @@ export default function BookProfessional() {
         )}
         {error ? <View style={{ marginTop: 16 }}><FormMessage tone="error" text={error} /></View> : null}
       </ScrollView>
-      {days.length > 0 && (
+      {waiting ? (
+        <View style={[styles.footer, { gap: 10 }]}>
+          <View style={styles.waitRow} accessibilityLiveRegion="polite">
+            <ActivityIndicator color={colors.accent} />
+            <Text style={styles.waitText}>Waiting for your payment… This updates by itself once Paystack confirms it.</Text>
+          </View>
+          <Button title="I've paid — check now" onPress={() => checkPayment(true)} busy={checking} />
+          <Button title="Open the payment page again" variant="ghost" onPress={() => openPayment(waiting.url)} />
+        </View>
+      ) : days.length > 0 ? (
         <View style={styles.footer}>
           <Button
             title={rescheduleId ? 'Move my session' : 'Continue to payment'}
@@ -240,7 +297,7 @@ export default function BookProfessional() {
             disabled={!picked}
           />
         </View>
-      )}
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -297,5 +354,7 @@ const styles = StyleSheet.create({
   weeklyRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20 },
   weeklyTitle: { fontFamily: fonts.medium, fontSize: 15, color: colors.text },
   weeklySub: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, color: colors.text3, marginTop: 2 },
+  waitRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
+  waitText: { flex: 1, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.text2 },
   footer: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg },
 });
