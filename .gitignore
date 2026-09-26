@@ -45,3 +45,4 @@ vendor/
 # Friendly-URL rules for the CMS pages and blog (see page/ and blog/)
 !page/.htaccess
 !blog/.htaccess
+!professionals/.htaccess

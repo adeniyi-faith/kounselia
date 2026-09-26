@@ -15,7 +15,8 @@ $kounselia_nav_current = isset( $kounselia_nav_current ) ? $kounselia_nav_curren
     </a>
     <div class="k-nav-links">
       <a href="/?browse=1#counselors-anchor">Talk to someone</a>
-      <a href="/blog/" class="<?php echo 'blog' === $kounselia_nav_current ? 'active' : ''; ?>">Journal</a>
+      <a href="/professionals/" class="<?php echo 'professionals' === $kounselia_nav_current ? 'active' : ''; ?>">Professionals</a>
+      <a href="/blog/" class="k-hide-xs<?php echo 'blog' === $kounselia_nav_current ? ' active' : ''; ?>">Journal</a>
       <a href="<?php echo esc_url( kounselia_page_url( 'our-mission' ) ); ?>" class="k-hide-sm<?php echo 'our-mission' === $kounselia_nav_current ? ' active' : ''; ?>">Our mission</a>
     </div>
     <div class="nav-right">
