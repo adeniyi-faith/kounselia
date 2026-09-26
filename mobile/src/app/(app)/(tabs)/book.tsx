@@ -1,7 +1,7 @@
 import { cancelBooking, cancelSeries, fetchBookings, type BookingsData, type Professional, type UpcomingBooking } from '@kounselia/core';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { Toast, useToast } from '@/components/chat/Toast';
@@ -13,6 +13,7 @@ import { sessionWhen } from '@/components/dashboard/when';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
+import { showDialog } from '@/components/Dialog';
 
 // Sessions with licensed professionals — the website dashboard's
 // "Your upcoming sessions", "Past sessions" and "Find a professional".
@@ -57,12 +58,13 @@ export default function Book() {
   }
 
   function confirmCancel(b: UpcomingBooking, wholeSeries: boolean) {
-    Alert.alert(
-      wholeSeries ? 'Cancel your weekly sessions?' : 'Cancel this session?',
-      wholeSeries
+    showDialog({
+      title: wholeSeries ? 'Cancel your weekly sessions?' : 'Cancel this session?',
+      message: wholeSeries
         ? `This cancels every upcoming weekly session with ${b.pro_name}.`
         : `Your session with ${b.pro_name} on ${sessionWhen(b.start_utc)} will be cancelled.`,
-      [
+      icon: 'calendar-x',
+      buttons: [
         { text: 'Keep it', style: 'cancel' },
         {
           text: wholeSeries ? 'Cancel weekly' : 'Cancel session',
@@ -74,7 +76,7 @@ export default function Book() {
           },
         },
       ],
-    );
+    });
   }
 
   function moreFor(b: UpcomingBooking) {
@@ -84,7 +86,7 @@ export default function Book() {
     ];
     if (b.series_id) buttons.push({ text: 'Cancel weekly sessions', style: 'destructive', onPress: () => confirmCancel(b, true) });
     buttons.push({ text: 'Close', style: 'cancel' });
-    Alert.alert(`${b.pro_name}`, sessionWhen(b.start_utc), buttons);
+    showDialog({ title: b.pro_name, message: sessionWhen(b.start_utc), icon: 'calendar-event', buttons });
   }
 
   return (

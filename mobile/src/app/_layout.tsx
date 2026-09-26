@@ -16,6 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import { BrowserProvider } from '@/browser/BrowserProvider';
+import { DialogHost } from '@/components/Dialog';
 import { tablerFont } from '@/components/TablerIcon';
 import { SessionProvider, useSession } from '@/session';
 import { ThemeProvider, useColors, useTheme } from '@/theme';
@@ -42,6 +43,7 @@ export default function RootLayout() {
           <SystemColors />
           {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
           {fontsLoaded || fontError ? <RootNavigator /> : null}
+          <DialogHost />
         </BrowserProvider>
       </SessionProvider>
     </ThemeProvider>
