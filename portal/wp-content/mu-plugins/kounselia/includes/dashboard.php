@@ -23,6 +23,20 @@ function kounselia_get_avatar_url( $user_id, $size = 'thumbnail' ) {
     return $url ? $url : false;
 }
 
+/**
+ * The first word of a display name, for a "Welcome back, X" greeting —
+ * skipping a leading title (Dr., Mr., Mrs., Ms., Prof.) so "Dr. Amara
+ * Nwosu" greets "Amara", not "Dr.".
+ */
+function kounselia_greeting_first_name( $display_name ) {
+    $words = preg_split( '/\s+/', trim( $display_name ) );
+    $titles = array( 'dr', 'dr.', 'mr', 'mr.', 'mrs', 'mrs.', 'ms', 'ms.', 'prof', 'prof.' );
+    if ( count( $words ) > 1 && in_array( strtolower( $words[0] ), $titles, true ) ) {
+        return $words[1];
+    }
+    return $words[0];
+}
+
 function kounselia_get_dashboard_stats( $user_id ) {
     global $wpdb;
     $sessions_table = $wpdb->prefix . 'kounselia_sessions';
