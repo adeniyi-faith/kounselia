@@ -48,10 +48,12 @@ export function WebFrame({ source, ref, shouldLoad, onNav, onProgress, onLoaded,
         // Only a broken top page counts; a missing image doesn't.
         if (e.nativeEvent.statusCode >= 500) onFail?.();
       }}
+      // No decelerationRate here: the words "normal"/"fast" are only turned
+      // into a number on iPhone, and Android crashes when handed the word
+      // (it was the cause of the article and safety-page crashes).
       allowsBackForwardNavigationGestures
       pullToRefreshEnabled
       setSupportMultipleWindows={false}
-      decelerationRate="normal"
       startInLoadingState={false}
     />
   );

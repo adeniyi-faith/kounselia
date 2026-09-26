@@ -17,6 +17,7 @@ run_flows() {
   local prefix="$1"
   for flow in e2e/flows/*.yaml; do
     name="$(basename "$flow" .yaml)"
+    touch "$OUT/.flow-start"
     # A previous flow ending in a crash mustn't stop the rest.
     (cd "$OUT/shots" && "$HOME/.maestro/bin/maestro" test -e "P=$prefix-" "$ROOT/$flow") > "$OUT/$prefix-$name.log" 2>&1
     status=$?
@@ -27,6 +28,14 @@ run_flows() {
     adb logcat -d -b crash > "$OUT/$prefix-$name-crash.txt" 2>/dev/null
     adb logcat -d -s ReactNativeJS:V ReactNative:V AndroidRuntime:E > "$OUT/$prefix-$name-js.txt" 2>/dev/null
     [ -s "$OUT/$prefix-$name-crash.txt" ] || rm -f "$OUT/$prefix-$name-crash.txt"
+    # Maestro saves screenshots next to the flow files or in its own
+    # folder, depending on version: gather this flow's into e2e-output/shots.
+    find "$ROOT/e2e/flows" "$HOME/.maestro" "$OUT/shots" -maxdepth 4 -name '*.png' -newer "$OUT/.flow-start" -print0 2>/dev/null |
+      while IFS= read -r -d '' shot; do
+        base="$(basename "$shot")"
+        case "$base" in "$prefix"-*) dest="$base" ;; *) dest="$prefix-${base#\$\{P\}}" ;; esac
+        [ "$shot" = "$OUT/shots/$dest" ] || mv "$shot" "$OUT/shots/$dest"
+      done
     adb logcat -b all -c
   done
 }
@@ -36,5 +45,11 @@ run_flows light
 adb shell cmd uimode night yes
 run_flows dark
 
-adb logcat -d > "$OUT/logcat-end.txt" 2>/dev/null
+echo "$(ls "$OUT/shots" | wc -l) screenshots" | tee -a "$OUT/summary.txt"
+
+# A crash anywhere fails the check.
+if ls "$OUT"/*-crash.txt > /dev/null 2>&1; then
+  echo "The app crashed (see the *-crash.txt files)." | tee -a "$OUT/summary.txt"
+  exit 1
+fi
 exit 0
