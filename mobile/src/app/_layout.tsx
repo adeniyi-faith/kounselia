@@ -69,7 +69,9 @@ function RootNavigator() {
   // members only the (app) ones; switching between them happens by itself
   // when `status` changes.
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+    // Signing in or out swaps the whole app over, so it fades rather than
+    // sliding as if it were one more screen.
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg }, animation: 'fade' }}>
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="(app)" />
       </Stack.Protected>
