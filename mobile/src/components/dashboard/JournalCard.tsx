@@ -47,7 +47,9 @@ export function JournalCard({ config, initial }: { config: KounseliaConfig; init
 
   // Save anything unsaved when leaving the screen.
   const latest = useRef(text);
-  latest.current = text;
+  useEffect(() => {
+    latest.current = text;
+  });
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);

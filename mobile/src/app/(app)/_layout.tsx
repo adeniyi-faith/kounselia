@@ -12,6 +12,10 @@ export default function AppLayout() {
         <Stack.Screen name="chat/[slug]" />
         <Stack.Screen name="book/[proId]" />
         <Stack.Screen name="booking/[id]" />
+        <Stack.Screen name="journal" />
+        <Stack.Screen name="articles/index" />
+        <Stack.Screen name="articles/[slug]" />
+        <Stack.Screen name="memory" />
       </Stack>
     </CounselorsProvider>
   );

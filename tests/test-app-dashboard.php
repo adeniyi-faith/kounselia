@@ -161,6 +161,50 @@ class Test_App_Dashboard extends WP_Ajax_UnitTestCase {
         $this->assertNull( $res['data']['checkin'] );
     }
 
+    function test_a_session_that_has_started_is_still_joinable_from_the_app() {
+        $client = self::factory()->user->create();
+        wp_set_current_user( $client );
+        $booking_id = $this->booking( $client, -5 * MINUTE_IN_SECONDS ); // started 5 minutes ago
+
+        $res = $this->ajax( 'kounselia_app_bookings' );
+        $this->assertSame( $booking_id, $res['data']['upcoming'][0]['id'] );
+        $this->assertTrue( $res['data']['upcoming'][0]['joinable'] );
+
+        $home = $this->ajax( 'kounselia_app_home' );
+        $this->assertTrue( $home['data']['care']['next']['joinable'] );
+    }
+
+    function test_check_in_falls_back_when_that_counselor_is_switched_off() {
+        global $wpdb;
+        $user = self::factory()->user->create();
+        wp_set_current_user( $user );
+        $wpdb->insert( $wpdb->prefix . 'kounselia_memory_upcoming_events', array(
+            'user_id' => $user, 'event_text' => 'The exam', 'event_date' => current_time( 'Y-m-d' ),
+            'status' => 'pending', 'created_at' => current_time( 'mysql' ),
+        ) );
+        $session_id = kounselia_resolve_session( 'marcus', $user, '', 0 );
+        kounselia_log_message( $session_id, 'user', 'Exam tomorrow' );
+        $wpdb->update( $wpdb->prefix . 'kounselia_counselor_prompts', array( 'is_active' => 0 ), array( 'counselor_slug' => 'marcus' ) );
+
+        $res = $this->ajax( 'kounselia_app_home' );
+        $this->assertNotSame( 'marcus', $res['data']['checkin']['counselor_slug'] );
+        $this->assertSame( $res['data']['recommended']['slug'], $res['data']['checkin']['counselor_slug'] );
+    }
+
+    function test_booking_status_is_only_for_the_member_who_booked() {
+        $client   = self::factory()->user->create();
+        $stranger = self::factory()->user->create();
+        $booking_id = $this->booking( $client, DAY_IN_SECONDS );
+
+        wp_set_current_user( $client );
+        $res = $this->ajax( 'kounselia_get_booking_status', array( 'booking_id' => $booking_id ) );
+        $this->assertSame( 'confirmed', $res['data']['status'] );
+
+        wp_set_current_user( $stranger );
+        $res = $this->ajax( 'kounselia_get_booking_status', array( 'booking_id' => $booking_id ) );
+        $this->assertFalse( $res['success'] );
+    }
+
     function test_slots_come_with_utc_times() {
         $this->assertSame( get_gmt_from_date( '2030-01-02 09:00:00', 'Y-m-d\TH:i:s\Z' ), kounselia_app_utc( '2030-01-02 09:00:00' ) );
         $this->assertNull( kounselia_app_utc( null ) );

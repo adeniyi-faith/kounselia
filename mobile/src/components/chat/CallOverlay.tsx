@@ -3,7 +3,7 @@
 // a countdown, live captions, mute and hang-up buttons.
 import type { CounselorSummary } from '@kounselia/core';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CallStatus } from '@/audio/useVoiceCall';
@@ -24,7 +24,7 @@ interface Props {
 }
 
 function Ring({ active }: { active: boolean }) {
-  const pulse = useRef(new Animated.Value(0)).current;
+  const [pulse] = useState(() => new Animated.Value(0));
   useEffect(() => {
     if (!active) {
       pulse.stopAnimation();

@@ -14,7 +14,8 @@ import {
   type KounseliaConfig,
 } from '@kounselia/core';
 import * as Device from 'expo-device';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Alert } from 'react-native';
 import { AJAX_URL } from './config';
 import { deleteSecure, readSecure, writeSecure } from './secureStorage';
 
@@ -31,6 +32,8 @@ interface Session {
   signIn(email: string, password: string): Promise<AppAuthResult>;
   signUp(name: string, email: string, password: string): Promise<AppAuthResult>;
   signOut(): Promise<void>;
+  // After the member changes their details in Settings.
+  updateUser(changes: Partial<AppUser>): void;
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -43,8 +46,8 @@ function parseUser(json: string | null): AppUser | null {
   }
 }
 
-function makeConfig(token: string | null): KounseliaConfig {
-  return { ajaxUrl: AJAX_URL, client: 'app', authToken: token, loggedIn: !!token };
+function makeConfig(token: string | null, onSignedOut?: () => void): KounseliaConfig {
+  return { ajaxUrl: AJAX_URL, client: 'app', authToken: token, loggedIn: !!token, onSignedOut };
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
@@ -96,6 +99,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         writeSecure(TOKEN_KEY, result.token),
         writeSecure(USER_KEY, JSON.stringify(result.user)),
       ]);
+      expired.current = false;
       setToken(result.token);
       setUser(result.user);
       setStatus('signed-in');
@@ -103,7 +107,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return result;
   }, []);
 
-  const config = useMemo(() => makeConfig(token), [token]);
+  // The server can end a sign-in at any time (password changed on the
+  // website, signed out by an admin). Any request that finds out sends the
+  // member back to the welcome screen, with one explanation.
+  const expired = useRef(false);
+  const onSignedOut = useCallback(() => {
+    if (expired.current) return;
+    expired.current = true;
+    forget();
+    Alert.alert('Please sign in again', 'You were signed out of Kounselia on this phone. This happens if your password was changed.');
+  }, []);
+
+  const config = useMemo(() => makeConfig(token, onSignedOut), [token, onSignedOut]);
 
   const value = useMemo<Session>(
     () => ({
@@ -119,6 +134,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         const old = config;
         await forget();
         await appLogout(old);
+      },
+      updateUser: (changes) => {
+        if (!user) return;
+        const next = { ...user, ...changes };
+        setUser(next);
+        writeSecure(USER_KEY, JSON.stringify(next));
       },
     }),
     [status, user, config, remember],

@@ -9,7 +9,7 @@
 import { fetchVoiceToken, logVoiceTurn, type KounseliaConfig } from '@kounselia/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioContext, AudioRecorder, type AudioBufferSourceNode } from 'react-native-audio-api';
-import { base64ToBytes, floatToPcm16Base64, utf8Decode } from './bytes';
+import { floatToPcm16Base64, utf8Decode } from './bytes';
 import { micAllowed, releaseSound, setSoundMode } from './session';
 
 export type CallStatus = 'idle' | 'connecting' | 'listening' | 'speaking' | 'ended';
@@ -52,7 +52,9 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
   const active = useRef(false);
   const connecting = useRef(false);
   const latest = useRef({ config, counselorSlug, getSessionId, onSessionId });
-  latest.current = { config, counselorSlug, getSessionId, onSessionId };
+  useEffect(() => {
+    latest.current = { config, counselorSlug, getSessionId, onSessionId };
+  });
 
   const stopPlayback = useCallback(() => {
     playing.current.forEach((node) => {
@@ -233,6 +235,9 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
         socket.onerror = () => reject(new Error('connection'));
         socket.onclose = () => {
           if (active.current) endCall();
+          // Closed before the call started (e.g. the pass was refused):
+          // give up rather than stay on "Connecting…" forever.
+          else reject(new Error('closed'));
         };
       }),
     [endCall, flushBot, flushUser, play, startMicrophone, startTimer, stopPlayback],

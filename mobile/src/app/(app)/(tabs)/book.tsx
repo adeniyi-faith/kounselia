@@ -97,7 +97,7 @@ export default function Book() {
         {!data ? (
           failed ? (
             <View style={styles.center}>
-              <Text style={styles.notice}>We couldn't load your sessions. Please check your internet connection.</Text>
+              <Text style={styles.notice}>We couldn’t load your sessions. Please check your internet connection.</Text>
               <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
@@ -208,7 +208,7 @@ export default function Book() {
           }
         }}
       />
-      <Toast message={toast.message} />
+      <Toast note={toast.note} />
     </SafeAreaView>
   );
 }
@@ -216,7 +216,7 @@ export default function Book() {
 function ProfessionalTile({ pro }: { pro: Professional }) {
   return (
     <Pressable
-      onPress={() => router.push({ pathname: '/book/[proId]', params: { proId: String(pro.id) } })}
+      onPress={() => router.push({ pathname: '/book/[proId]', params: { proId: String(pro.id), pro: JSON.stringify(pro) } })}
       accessibilityRole="button"
       accessibilityLabel={`${pro.name}, ${pro.title}. ${pro.price ? `${pro.price} per session.` : ''} Book a session`}
       style={({ pressed }) => [styles.tile, pressed && { transform: [{ scale: 0.97 }] }]}

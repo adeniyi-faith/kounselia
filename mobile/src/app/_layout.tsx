@@ -8,6 +8,7 @@ import {
 } from '@expo-google-fonts/outfit';
 import { SplashScreen, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { BrowserProvider } from '@/browser/BrowserProvider';
 import { tablerFont } from '@/components/TablerIcon';
 import { SessionProvider, useSession } from '@/session';
 import { colors } from '@/theme';
@@ -29,9 +30,11 @@ export default function RootLayout() {
 
   return (
     <SessionProvider>
-      <StatusBar style="dark" />
-      {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
-      {fontsLoaded || fontError ? <RootNavigator /> : null}
+      <BrowserProvider>
+        <StatusBar style="dark" />
+        {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
+        {fontsLoaded || fontError ? <RootNavigator /> : null}
+      </BrowserProvider>
     </SessionProvider>
   );
 }

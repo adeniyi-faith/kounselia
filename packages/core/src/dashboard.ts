@@ -12,7 +12,7 @@ export type Result<T> = { ok: true; data: T } | { ok: false; offline?: boolean; 
 
 const OFFLINE = "Couldn't reach Kounselia. Please check your internet connection.";
 
-async function call<T>(config: KounseliaConfig, action: string, params: Record<string, string | number | undefined> = {}): Promise<Result<T>> {
+export async function callAction<T>(config: KounseliaConfig, action: string, params: Record<string, string | number | undefined> = {}): Promise<Result<T>> {
   try {
     const json = await postAction(config, action, params);
     if (json?.success) return { ok: true, data: (json.data ?? {}) as T };
@@ -25,6 +25,8 @@ async function call<T>(config: KounseliaConfig, action: string, params: Record<s
     return { ok: false, offline: true, message: OFFLINE };
   }
 }
+
+const call = callAction;
 
 // ---- Home -----------------------------------------------------------------
 
@@ -151,6 +153,11 @@ export const createBooking = (config: KounseliaConfig, professionalId: number, s
     note,
     make_recurring: weekly ? 1 : undefined,
   });
+
+// "confirmed" once Paystack has told the server the payment went through;
+// "pending_payment" until then.
+export const fetchBookingStatus = (config: KounseliaConfig, bookingId: number) =>
+  call<{ status: string }>(config, 'kounselia_get_booking_status', { booking_id: bookingId });
 
 export const rescheduleBooking = (config: KounseliaConfig, bookingId: number, slot: string) =>
   call<{ message: string }>(config, 'kounselia_reschedule_booking', { booking_id: bookingId, scheduled_start: slot });
