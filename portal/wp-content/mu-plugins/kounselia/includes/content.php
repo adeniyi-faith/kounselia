@@ -602,7 +602,7 @@ function kounselia_footer_resolve_link( $link ) {
 function kounselia_blog_settings() {
     $defaults = array(
         'title'             => 'The Kounselia Journal',
-        'tagline'           => 'Honest writing on feelings, relationships, work and healing — for anyone, anywhere.',
+        'tagline'           => 'Honest writing on feelings, relationships, work and healing, for anyone, anywhere.',
         'per_page'          => 10,
         'auto_notify'       => 1,
         'notify_segment_id' => 0,
