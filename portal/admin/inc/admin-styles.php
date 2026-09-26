@@ -61,57 +61,77 @@ a:hover{color:#6E2E41}
 /* ---------------------------------------------------------------------
    STREAMING_CHUNK:Styling top navigation...
 --------------------------------------------------------------------- */
-.admin-topbar{
-  position:sticky;top:0;z-index:40;
-  display:flex;align-items:center;justify-content:space-between;gap:16px;
-  background:rgba(255,255,255,.92);backdrop-filter:blur(10px);
-  border-bottom:1px solid var(--border);
-  padding:14px 24px;
+/* Sidebar navigation (see inc/admin-nav.php). Desktop: fixed on the left.
+   Under 960px: slim top bar + slide-in drawer. */
+:root{--admin-sidebar-w:252px;--admin-top:0px}
+body:has(.admin-sidebar){padding-left:var(--admin-sidebar-w)}
+.admin-sidebar{
+  position:fixed;top:0;left:0;bottom:0;width:var(--admin-sidebar-w);z-index:60;
+  display:flex;flex-direction:column;background:var(--surface);border-right:1px solid var(--border);
 }
-.admin-logo{display:flex;align-items:center;gap:8px;white-space:nowrap;}
-.admin-site-logo{height:24px;width:auto;object-fit:contain;}
+.admin-sidebar-head{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 14px}
+.admin-logo{display:flex;align-items:center;gap:8px;white-space:nowrap;text-decoration:none}
+.admin-site-logo{height:26px;width:auto;object-fit:contain;}
 .admin-logo small{font-family:'Outfit',sans-serif;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--text3);font-weight:600;padding-left:8px;border-left:1px solid var(--border);margin-top:2px;}
+.admin-sidebar-close{display:none;background:none;border:none;font-size:20px;color:var(--text2);cursor:pointer;padding:6px;border-radius:8px}
+.admin-sidebar-close:hover{background:var(--surface2)}
 
-.admin-nav{display:flex;gap:2px;align-items:center;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 94%,transparent);mask-image:linear-gradient(90deg,#000 94%,transparent)}
-.admin-nav::-webkit-scrollbar{display:none}
-.admin-nav a,.admin-nav .disabled{
-  font-size:13.5px;padding:8px 14px;border-radius:var(--r-full);
-  color:var(--text2);white-space:nowrap;transition:background .15s var(--ease),color .15s var(--ease);
+.admin-nav{flex:1;overflow-y:auto;padding:4px 12px 16px;scrollbar-width:thin}
+.admin-nav-group{margin-bottom:14px}
+.admin-nav-label{font-size:10.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--text3);padding:10px 12px 6px}
+.admin-nav a.nav-link{
+  display:flex;align-items:center;gap:11px;padding:9px 12px;border-radius:10px;
+  font-size:13.5px;color:var(--text2);text-decoration:none;position:relative;
+  transition:background .15s var(--ease),color .15s var(--ease);
 }
-.admin-nav a:hover{background:var(--surface2);color:var(--text);text-decoration:none}
-.admin-nav a.active{background:var(--accent);color:#fff;font-weight:500}
-.admin-nav a.active:hover{color:#fff}
-.admin-nav .disabled{color:#D8D4C9;cursor:default}
+.admin-nav a.nav-link i{font-size:18px;color:var(--text3);transition:color .15s var(--ease);flex-shrink:0}
+.admin-nav a.nav-link span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.admin-nav a.nav-link:hover{background:var(--surface2);color:var(--text)}
+.admin-nav a.nav-link:hover i{color:var(--accent)}
+.admin-nav a.nav-link.active{background:var(--accent-light);color:var(--accent);font-weight:500}
+.admin-nav a.nav-link.active i{color:var(--accent)}
+.admin-nav a.nav-link.active::before{content:'';position:absolute;left:-12px;top:8px;bottom:8px;width:3px;border-radius:0 3px 3px 0;background:var(--accent)}
+.nav-badge{font-size:10.5px;font-weight:600;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--gold-light);color:var(--gold);display:inline-flex;align-items:center;justify-content:center;font-variant-numeric:tabular-nums}
+.nav-badge.urgent{background:var(--rose);color:#fff}
 
-.admin-who{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--text2);white-space:nowrap}
-.admin-who .who-name{font-weight:500;color:var(--text)}
-.admin-who a{font-size:13px}
+.admin-who{display:flex;align-items:center;gap:10px;margin:0 12px 14px;padding:10px;border-radius:12px;background:var(--surface2)}
+.who-av{width:34px;height:34px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;flex-shrink:0}
+.who-meta{flex:1;min-width:0;display:flex;flex-direction:column}
+.who-name{font-size:13px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.who-role{font-size:11px;color:var(--text3)}
+.who-out{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:18px}
+.who-out:hover{background:var(--surface);color:var(--rose)}
 
-.nav-toggle{display:none;background:none;border:none;padding:6px;cursor:pointer;color:var(--accent)}
+.admin-mobilebar{display:none}
+.admin-nav-backdrop{display:none}
+.nav-toggle{background:none;border:none;padding:8px;margin-left:-8px;cursor:pointer;color:var(--accent);border-radius:10px}
+.nav-toggle:hover{background:var(--surface2)}
 .nav-toggle svg{width:22px;height:22px;display:block}
 
-/* Mobile nav: collapse the link row into a dropdown panel */
-@media (max-width:860px){
-  .admin-topbar{padding:12px 16px}
-  .admin-logo small{display:none} /* Hides the "Admin" badge on mobile to save space */
-  .nav-toggle{display:block}
-  .admin-nav{
-    -webkit-mask-image:none;mask-image:none;overflow:visible;
-    display:none;position:absolute;top:100%;left:0;right:0;
-    background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--sh-md);
-    flex-direction:column;align-items:stretch;padding:8px;gap:2px;
+@media (max-width:960px){
+  :root{--admin-top:58px}
+  body:has(.admin-sidebar){padding-left:0}
+  .admin-mobilebar{
+    display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:40;height:58px;padding:0 14px;
+    background:rgba(255,255,255,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border-bottom:1px solid var(--border);
   }
-  .admin-nav.open{display:flex}
-  .admin-nav a,.admin-nav .disabled{padding:12px 14px;border-radius:var(--r-sm)}
-  .admin-nav a.active{border-radius:var(--r-sm)}
-  .admin-who{font-size:12.5px;gap:10px}
-  .admin-who .who-name{display:none}
+  .admin-mobilebar .admin-logo{flex:1}
+  .admin-mobilebar-av{width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px}
+  .admin-sidebar{width:min(300px,86vw);transform:translateX(-102%);transition:transform .28s var(--ease);box-shadow:var(--sh-lg);padding-bottom:env(safe-area-inset-bottom)}
+  .admin-nav-open .admin-sidebar{transform:none}
+  .admin-sidebar-close{display:block}
+  .admin-nav-backdrop{display:block;position:fixed;inset:0;z-index:55;background:rgba(24,22,15,.4);opacity:0;pointer-events:none;transition:opacity .25s var(--ease)}
+  .admin-nav-open .admin-nav-backdrop{opacity:1;pointer-events:auto}
+  html.admin-nav-open,html.admin-nav-open body{overflow:hidden}
+  .admin-nav a.nav-link{padding:12px 12px;font-size:14.5px}
 }
+@media (prefers-reduced-motion:reduce){ .admin-sidebar,.admin-nav-backdrop{transition:none} }
 
 /* ---------------------------------------------------------------------
    STREAMING_CHUNK:Styling page shell & cards...
 --------------------------------------------------------------------- */
-.admin-body{padding:28px 24px 60px;max-width:1180px;margin:0 auto}
+.admin-body{padding:32px 32px 64px;max-width:1180px;margin:0 auto}
+@media (max-width:960px){ .admin-body{padding:24px 20px 56px} }
 @media (max-width:640px){ .admin-body{padding:18px 14px 48px} }
 
 h1.admin-title{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:27px;color:var(--accent);line-height:1.2;letter-spacing:.01em}

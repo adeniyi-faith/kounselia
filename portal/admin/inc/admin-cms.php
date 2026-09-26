@@ -68,7 +68,7 @@ $kounselia_cms_nonce = wp_create_nonce( 'kounselia_admin_nonce' );
 @media (max-width:1000px){ .editor-layout{grid-template-columns:1fr} }
 .editor-main{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:22px 26px 26px;box-shadow:var(--sh-sm);min-width:0}
 @media (max-width:640px){ .editor-main{padding:16px} }
-.editor-side{display:flex;flex-direction:column;gap:16px;position:sticky;top:76px}
+.editor-side{display:flex;flex-direction:column;gap:16px;position:sticky;top:calc(var(--admin-top,0px) + 20px)}
 @media (max-width:1000px){ .editor-side{position:static} }
 .side-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;box-shadow:var(--sh-sm)}
 .side-box h3{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--text3);font-weight:600;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center}
@@ -230,7 +230,7 @@ window.KAdmin = (function(){
       min_height: 460,
       max_height: opts.maxHeight || 1400,
       toolbar_sticky: true,
-      toolbar_sticky_offset: 64,
+      toolbar_sticky_offset: window.innerWidth <= 960 ? 58 : 0,
       toolbar: 'blocks styles | bold italic underline | link image media' + (blocks.length ? ' kblocks' : '') + ' | bullist numlist blockquote | alignleft aligncenter | table hr | removeformat code fullscreen',
       toolbar_mode: 'wrap',
       quickbars_selection_toolbar: 'bold italic | h2 h3 blockquote | quicklink',
