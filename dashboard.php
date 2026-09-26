@@ -316,6 +316,11 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .btn-save:hover{background:var(--accent2)}
 .btn-save:disabled{opacity:.6;cursor:default}
 .inline-msg{font-size:12.5px;margin-top:10px;display:none}
+.email-pref{display:flex;gap:12px;align-items:flex-start;padding:10px 0;cursor:pointer;font-size:14px}
+.email-pref input{width:18px;height:18px;accent-color:var(--accent);margin-top:2px;flex-shrink:0}
+.email-pref b{display:block;font-weight:500;color:var(--text)}
+.email-pref small{display:block;color:var(--text3);font-size:12.5px;margin-top:2px;line-height:1.45}
+.email-pref-note{font-size:12px;color:var(--text3);margin:6px 0 14px}
 .inline-msg.ok{color:var(--sage)}
 .inline-msg.err{color:var(--rose)}
 
@@ -956,6 +961,15 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
             <button class="btn-save" id="pw-save">Update password</button>
             <div class="inline-msg" id="pw-msg"></div>
           </div>
+
+          <div class="settings-card">
+            <h4>Email preferences</h4>
+            <label class="email-pref"><input type="checkbox" id="pref-newsletter"> <span><b>Newsletter</b><small>Occasional ideas for looking after your mind, and news from Kounselia.</small></span></label>
+            <label class="email-pref"><input type="checkbox" id="pref-blog"> <span><b>New blog posts</b><small>A short email when a new story is published on the journal.</small></span></label>
+            <p class="email-pref-note">Emails about your account, like booking confirmations and reminders, are always sent.</p>
+            <button class="btn-save" id="pref-save">Save preferences</button>
+            <div class="inline-msg" id="pref-msg"></div>
+          </div>
         </div>
       </div>
     </section>
@@ -1397,6 +1411,20 @@ function setupPasswordSave(curId, newId, cfmId, btnId, msgId){
 }
 setupPasswordSave('pw-current','pw-new','pw-confirm','pw-save','pw-msg');
 
+// Email preferences (newsletter / new blog post emails).
+(function(){
+  const nl=document.getElementById('pref-newsletter'), blog=document.getElementById('pref-blog'), btn=document.getElementById('pref-save');
+  if(!btn) return;
+  const post=(data)=>fetch(KOUNSELIA.ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(Object.assign({nonce:KOUNSELIA.nonce},data))}).then(r=>r.json());
+  post({action:'kounselia_get_email_prefs'}).then(res=>{ if(res.success){ nl.checked=!!res.data.newsletter; blog.checked=!!res.data.blog; } }).catch(()=>{});
+  btn.addEventListener('click',function(){
+    btn.disabled=true;
+    post({action:'kounselia_save_email_prefs',newsletter:nl.checked?'1':'0',blog:blog.checked?'1':'0'})
+      .then(res=>{ btn.disabled=false; showInline('pref-msg',res.data&&res.data.message?res.data.message:(res.success?'Saved.':'Could not save.'),!!res.success); })
+      .catch(()=>{ btn.disabled=false; showInline('pref-msg','Something went wrong, please try again.',false); });
+  });
+})();
+
 function dismissCheckin(checkinId){
   const card=document.getElementById('checkin-card');
   if(card){ card.style.opacity='0'; setTimeout(()=>card.remove(),200); }
@@ -1508,6 +1536,9 @@ if(subCancelBtn){
 
 (function(){
   const params = new URLSearchParams(window.location.search);
+  // Links from the public pages (e.g. the Pro plans page) can open a tab directly: ?tab=upgrade
+  const tabParam = params.get('tab');
+  if(tabParam && /^[a-z]+$/.test(tabParam) && document.getElementById('view-' + tabParam)){ switchTab(tabParam); }
   const subResult = params.get('sub');
   if(subResult === 'success'){
     toast("Payment confirmed — you're all set.");

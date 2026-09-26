@@ -40,7 +40,9 @@ function kounselia_nav_link( $slug, $href, $label ) {
     <?php kounselia_nav_link( 'dashboard', '/portal/admin/pages/dashboard.php', 'Dashboard' ); ?>
     <?php kounselia_nav_link( 'ai-brain', '/portal/admin/pages/ai-brain.php', 'AI Brain' ); ?>
     <?php kounselia_nav_link( 'ai-collaboration', '/portal/admin/pages/ai-collaboration.php', 'AI Collaboration' ); ?>
-    <?php kounselia_nav_link( 'broadcasts', '/portal/admin/pages/broadcasts.php', 'Broadcasts' ); ?>
+    <?php kounselia_nav_link( 'broadcasts', '/portal/admin/pages/newsletter.php', 'Newsletter' ); ?>
+    <?php kounselia_nav_link( 'blog', '/portal/admin/pages/blog.php', 'Blog' ); ?>
+    <?php kounselia_nav_link( 'pages', '/portal/admin/pages/pages.php', 'Pages' ); ?>
     <?php kounselia_nav_link( 'conversations', '/portal/admin/pages/conversations.php', 'Conversations' ); ?>
     <?php kounselia_nav_link( 'audit-log', '/portal/admin/pages/audit-log.php', 'Audit Log' ); ?>
     <?php kounselia_nav_link( 'safety', '/portal/admin/pages/safety-flags.php', 'Safety' ); ?>
@@ -64,6 +66,9 @@ function kounselia_nav_link( $slug, $href, $label ) {
   var btn = document.getElementById('kounseliaNavToggle');
   var nav = document.getElementById('kounseliaNav');
   if(!btn || !nav) return;
+  // The link row scrolls sideways on narrower desktops; keep the current section in view.
+  var current = nav.querySelector('a.active');
+  if(current && window.innerWidth > 860){ nav.scrollLeft = current.offsetLeft - nav.clientWidth / 2 + current.clientWidth / 2; }
   btn.addEventListener('click', function(){
     var open = nav.classList.toggle('open');
     btn.setAttribute('aria-expanded', open ? 'true' : 'false');
