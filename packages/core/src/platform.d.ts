@@ -20,6 +20,7 @@ interface FetchResponse {
   readonly ok: boolean;
   readonly status: number;
   json(): Promise<any>;
+  text(): Promise<string>;
 }
 
 declare function fetch(
