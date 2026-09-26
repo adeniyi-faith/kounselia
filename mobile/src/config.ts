@@ -7,3 +7,6 @@ export const AJAX_URL =
 // Web pages the app sends people to (password reset links in emails
 // already open these).
 export const SITE_URL = 'https://kounselia.com';
+
+// Crisis lines and emergency numbers (a page managed in the website admin).
+export const SAFETY_URL = `${SITE_URL}/page/safety-resources`;

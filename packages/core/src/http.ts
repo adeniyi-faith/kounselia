@@ -53,7 +53,14 @@ export async function postAction(
       body: formEncode(fields),
       signal: controller.signal,
     });
-    return await res.json();
+    const json = await res.json();
+    // A signed-in app request the server treats as signed out: either our
+    // own "signed_out" answer, or WordPress's bare 0 for an action that
+    // only exists for signed-in members.
+    if (config.client === 'app' && config.authToken && (json === 0 || json === '0' || json?.data?.signed_out)) {
+      config.onSignedOut?.();
+    }
+    return json;
   } finally {
     clearTimeout(timer);
   }

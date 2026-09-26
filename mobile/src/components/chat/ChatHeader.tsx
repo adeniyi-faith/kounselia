@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '@/theme';
+import { openSafetyResources } from '../openSafety';
 import { CounselorAvatar } from '../CounselorAvatar';
 import { TablerIcon } from '../TablerIcon';
 
@@ -65,7 +66,8 @@ export function ChatHeader({ counselor, onBack, onShare, onClear, onCall }: Prop
         <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuOpen(false)} accessibilityLabel="Close menu">
           <View style={[styles.menu, { top: insets.top + 62 }]}>
             <MenuItem icon="share" label="Share conversation" onPress={choose(onShare)} />
-            <MenuItem icon="trash" label="Clear chat" color={colors.rose} onPress={choose(onClear)} last />
+            <MenuItem icon="trash" label="Clear chat" color={colors.rose} onPress={choose(onClear)} />
+            <MenuItem icon="lifebuoy" label="Get urgent help" onPress={choose(openSafetyResources)} last />
           </View>
         </Pressable>
       </Modal>
