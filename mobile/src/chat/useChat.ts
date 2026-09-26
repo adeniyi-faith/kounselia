@@ -153,11 +153,22 @@ export function useChat(config: KounseliaConfig, counselor: CounselorSummary) {
     return true;
   }, [config, counselor]);
 
+  // A counselor line shown at the bottom without going to the server,
+  // like the greeting (used for a check-in question). In a brand-new
+  // conversation it replaces the generic greeting, as on the website.
+  const addCounselorLine = useCallback((text: string) => {
+    const line: AppMessage = { id: nextId(), sender: 'ai', text, createdAt: Date.now() };
+    setMessages((prev) => {
+      const onlyGreeting = prev.length === 1 && prev[0].sender === 'ai' && !prev[0].messageId;
+      return onlyGreeting ? [line] : [...prev, line];
+    });
+  }, []);
+
   // For the voice call, which continues the same conversation.
   const getSessionId = useCallback(() => sessionId.current, []);
   const setSessionId = useCallback((id: number) => {
     sessionId.current = id;
   }, []);
 
-  return { messages, phase, typing, load, send, retry, rate, clear, getSessionId, setSessionId };
+  return { messages, phase, typing, load, send, retry, rate, clear, getSessionId, setSessionId, addCounselorLine };
 }

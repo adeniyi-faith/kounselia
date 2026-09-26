@@ -1,4 +1,4 @@
-import type { CounselorSummary } from '@kounselia/core';
+import { fetchCheckinQuestion, type CounselorSummary } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -26,11 +26,11 @@ function goBack() {
 
 // Waits for the counselor list, then opens the conversation.
 export default function ChatRoute() {
-  const { slug } = useLocalSearchParams<{ slug: string }>();
+  const { slug, checkin } = useLocalSearchParams<{ slug: string; checkin?: string }>();
   const { status, bySlug } = useCounselors();
   const counselor = bySlug(slug);
 
-  if (counselor) return <Conversation key={counselor.slug} counselor={counselor} />;
+  if (counselor) return <Conversation key={counselor.slug} counselor={counselor} checkinId={checkin ? Number(checkin) : undefined} />;
 
   return (
     <View style={styles.centerScreen}>
@@ -65,7 +65,7 @@ function useKeyboardOpen() {
   return open;
 }
 
-function Conversation({ counselor }: { counselor: CounselorSummary }) {
+function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; checkinId?: number }) {
   const { config } = useSession();
   const chat = useChat(config, counselor);
   const toast = useToast();
@@ -108,8 +108,13 @@ function Conversation({ counselor }: { counselor: CounselorSummary }) {
   );
 
   useEffect(() => {
-    chat.load().then((ok) => {
+    chat.load().then(async (ok) => {
       if (!ok) toast.show("Couldn't load your earlier messages.");
+      // Opened from a Home check-in: the counselor opens with the question.
+      if (checkinId) {
+        const res = await fetchCheckinQuestion(config, checkinId);
+        if (res.ok) chat.addCounselorLine(res.data.question);
+      }
     });
     // Load once per conversation.
     // eslint-disable-next-line react-hooks/exhaustive-deps

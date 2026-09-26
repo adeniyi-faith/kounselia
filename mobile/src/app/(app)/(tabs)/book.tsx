@@ -1,12 +1,12 @@
-import { cancelBooking, cancelSeries, fetchBookingRoom, fetchBookings, type BookingsData, type Professional, type UpcomingBooking } from '@kounselia/core';
+import { cancelBooking, cancelSeries, fetchBookings, type BookingsData, type Professional, type UpcomingBooking } from '@kounselia/core';
 import { router, useFocusEffect } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { Toast, useToast } from '@/components/chat/Toast';
 import { EmptyState, SectionHead } from '@/components/dashboard/Card';
+import { joinSession } from '@/components/dashboard/joinSession';
 import { ProfessionalAvatar } from '@/components/dashboard/ProfessionalAvatar';
 import { RateSheet } from '@/components/dashboard/RateSheet';
 import { sessionWhen } from '@/components/dashboard/when';
@@ -49,18 +49,9 @@ export default function Book() {
 
   async function join(b: UpcomingBooking) {
     setJoining(b.id);
-    const res = await fetchBookingRoom(config, b.id);
+    const problem = await joinSession(config, b.id);
     setJoining(null);
-    if (!res.ok) {
-      toast.show(res.message);
-      return;
-    }
-    await WebBrowser.openBrowserAsync(res.data.url, {
-      toolbarColor: colors.navy,
-      controlsColor: '#fff',
-      dismissButtonStyle: 'done',
-      presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN,
-    });
+    if (problem) toast.show(problem);
   }
 
   function confirmCancel(b: UpcomingBooking, wholeSeries: boolean) {

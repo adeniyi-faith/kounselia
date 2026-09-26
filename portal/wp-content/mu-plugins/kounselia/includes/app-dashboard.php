@@ -55,6 +55,45 @@ function kounselia_recommended_counselor( $today_mood, $active_slugs, $tried_slu
     return array( ! empty( $active_slugs ) ? $active_slugs[0] : 'serena', 'A good place to start.' );
 }
 
+/**
+ * "Your care team" on Home (inc/dashboard-care-team.php): the member's
+ * next booked session with a professional, or, with none booked, up to
+ * three professionals to invite them to book, plus their Pro discount.
+ */
+function kounselia_app_care_team( $user_id ) {
+    $bookings = kounselia_get_client_bookings( $user_id );
+    $next     = null;
+    if ( ! empty( $bookings ) ) {
+        $b    = $bookings[0];
+        $next = array(
+            'id'          => (int) $b->id,
+            'pro_name'    => $b->pro_name,
+            'pro_title'   => (string) $b->pro_title,
+            'start_utc'   => kounselia_app_utc( $b->scheduled_start ),
+            'joinable'    => kounselia_booking_is_joinable( $b ),
+            'more_booked' => count( $bookings ) - 1,
+        );
+    }
+
+    $faces = array();
+    if ( ! $next ) {
+        foreach ( array_slice( (array) kounselia_get_verified_professionals(), 0, 3 ) as $pro ) {
+            $avatar  = kounselia_get_avatar_url( $pro->user_id, 'thumbnail' );
+            $faces[] = array( 'name' => $pro->display_name, 'avatar_url' => $avatar ? $avatar : null );
+        }
+    }
+
+    $discount = function_exists( 'kounselia_member_session_price' ) && function_exists( 'kounselia_booking_commission_percent' )
+        ? (float) kounselia_member_session_price( $user_id, 100, kounselia_booking_commission_percent() )['discount_percent']
+        : 0;
+
+    return array(
+        'next'             => $next,
+        'professionals'    => $faces,
+        'discount_percent' => $discount,
+    );
+}
+
 function kounselia_app_require_member() {
     kounselia_verify_nonce();
     if ( ! is_user_logged_in() ) {
@@ -86,7 +125,22 @@ function kounselia_ajax_app_home() {
     list( $slug, $reason ) = kounselia_recommended_counselor( $today_mood, $active_slugs, $tried_slugs );
     $stats = kounselia_get_dashboard_stats( $user_id );
 
+    // "<Counselor> wants to check in": something the member mentioned
+    // was coming up, dated today or yesterday. Asked by the counselor
+    // they last talked to, as on the website.
+    $checkin = null;
+    $event   = function_exists( 'kounselia_get_next_checkin' ) ? kounselia_get_next_checkin( $user_id ) : null;
+    if ( $event ) {
+        $checkin = array(
+            'id'             => (int) $event->id,
+            'event_text'     => $event->event_text,
+            'counselor_slug' => ! empty( $tried_slugs ) ? $tried_slugs[0] : $slug,
+        );
+    }
+
     wp_send_json_success( array(
+        'checkin'     => $checkin,
+        'care'        => kounselia_app_care_team( $user_id ),
         'mood'        => array(
             'options' => $options,
             'today'   => $today_mood ? $today_mood : null,

@@ -35,7 +35,30 @@ export interface MoodOption {
   color: string; // counselor colour name, no "ic-"
 }
 
+export interface CheckIn {
+  id: number;
+  event_text: string; // what they mentioned, e.g. "Your job interview"
+  counselor_slug: string; // who asks
+}
+
+export interface CareTeam {
+  // Their next session with a professional, if one is booked.
+  next: {
+    id: number;
+    pro_name: string;
+    pro_title: string;
+    start_utc: string | null;
+    joinable: boolean;
+    more_booked: number;
+  } | null;
+  // With nothing booked: up to three professionals to show.
+  professionals: { name: string; avatar_url: string | null }[];
+  discount_percent: number; // Pro members' discount on sessions
+}
+
 export interface HomeData {
+  checkin: CheckIn | null;
+  care: CareTeam;
   mood: { options: MoodOption[]; today: string | null; week: { date: string; mood: string | null }[] };
   stats: { conversations: number; messages_this_week: number; counselors_met: number };
   recommended: { slug: string; reason: string };
@@ -45,6 +68,14 @@ export interface HomeData {
 export const fetchHome = (config: KounseliaConfig) => call<HomeData>(config, 'kounselia_app_home');
 export const saveMood = (config: KounseliaConfig, mood: string) => call<{ mood: string }>(config, 'kounselia_save_mood', { mood });
 export const saveJournal = (config: KounseliaConfig, content: string) => call<unknown>(config, 'kounselia_save_journal', { content });
+
+// Opening a check-in: the counselor's first line ("Hi Ada — before we
+// start, you mentioned your job interview. How did it go?"). Marks it done.
+export const fetchCheckinQuestion = (config: KounseliaConfig, checkinId: number) =>
+  call<{ question: string }>(config, 'kounselia_get_checkin', { checkin_id: checkinId });
+
+export const dismissCheckin = (config: KounseliaConfig, checkinId: number) =>
+  call<unknown>(config, 'kounselia_dismiss_checkin', { checkin_id: checkinId });
 
 // ---- Conversations ----------------------------------------------------------
 
