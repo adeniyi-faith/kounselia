@@ -95,6 +95,10 @@ function kounselia_ajax_chat() {
     3. QUESTIONS: Do NOT end every single message with a question. That feels like an interrogation. Sometimes just share an observation, sit in the silence with them, or relate to what they said.
     4. LENGTH: Vary your length. Sometimes 1 or 2 sentences is far more powerful and human than a long explanation.";
 
+    // Timed for the admin "Memory lookup time" stat — this is the actual
+    // work of pulling up what the AI knows about this person before it replies.
+    $kounselia_memory_lookup_started = microtime( true );
+
     if ( $user_id ) {
         $system_prompt .= kounselia_user_context_clause( $user_id );
         $system_prompt .= kounselia_imported_memory_clause( $user_id );
@@ -103,6 +107,10 @@ function kounselia_ajax_chat() {
     // How much of this conversation the counselor re-reads is a plan benefit.
     $history_depth = ( $user_id && function_exists( 'kounselia_member_benefit' ) ) ? (int) kounselia_member_benefit( $user_id, 'memory_messages' ) : 16;
     $history       = kounselia_build_gemini_history( $session_id, max( 4, $history_depth ) );
+
+    if ( function_exists( 'kounselia_record_memory_lookup_time' ) ) {
+        kounselia_record_memory_lookup_time( ( microtime( true ) - $kounselia_memory_lookup_started ) * 1000 );
+    }
 
     // --------------------------------------------------------------------
     // FEATURE: AI TEAM COLLABORATION (Smarter Context Triage)

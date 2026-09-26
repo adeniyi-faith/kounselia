@@ -98,3 +98,36 @@ class Test_Memory_Store extends WP_UnitTestCase {
         $this->assertSame( '', get_user_meta( $user_id, 'kounselia_core_memory', true ) );
     }
 }
+
+/**
+ * The AI Brain admin page shows a "Memory lookup time" — this must be a
+ * real measurement of how long fetching a member's memory actually
+ * takes (timed in chat-endpoint.php on every reply), never a made-up
+ * number, and it must read back as "no data yet" until a first real
+ * measurement exists.
+ */
+class Test_Memory_Lookup_Time extends WP_UnitTestCase {
+
+    public function set_up() {
+        parent::set_up();
+        delete_option( 'kounselia_memory_lookup_avg_ms' );
+    }
+
+    function test_no_data_yet_before_any_call_is_timed() {
+        $this->assertNull( kounselia_get_memory_lookup_time() );
+    }
+
+    function test_first_recorded_time_becomes_the_average() {
+        kounselia_record_memory_lookup_time( 42.0 );
+        $this->assertSame( 42.0, kounselia_get_memory_lookup_time() );
+    }
+
+    function test_later_calls_move_the_average_without_ever_being_a_flat_replacement() {
+        kounselia_record_memory_lookup_time( 100.0 );
+        kounselia_record_memory_lookup_time( 200.0 );
+
+        $average = kounselia_get_memory_lookup_time();
+        $this->assertGreaterThan( 100.0, $average );
+        $this->assertLessThan( 200.0, $average );
+    }
+}
