@@ -238,7 +238,7 @@ if ( $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST[
  * STREAMING_CHUNK:Styling the Swarm Interface...
  */
 .board-layout { display: flex; gap: 24px; height: calc(100vh - 120px); min-height: 700px; }
-@media (max-width: 1024px) { .board-layout { flex-direction: column; height: auto; } }
+@media (max-width: 1024px) { .board-layout { flex-direction: column; height: auto; } .board-sidebar { width: 100%; } }
 
 /* Sidebar: Participants */
 .board-sidebar { width: 320px; display: flex; flex-direction: column; flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--sh-sm); overflow: hidden; }

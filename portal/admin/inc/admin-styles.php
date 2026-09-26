@@ -201,6 +201,17 @@ table.admin-table .cell-who{display:flex;align-items:center;gap:8px;flex-wrap:wr
 .badge.active{background:var(--sage-light);color:var(--sage)}
 .badge.ended{background:var(--surface2);color:var(--text3)}
 
+/* Small pill action buttons — CRM row actions, member profile data controls, etc.
+   Shared here (not per-page) so every admin screen that uses them looks and
+   behaves the same, including on mobile. */
+.btn-action{padding:9px 16px;border-radius:var(--r-full);font-size:12.5px;font-weight:500;border:none;cursor:pointer;transition:all .2s var(--ease);min-height:38px}
+.btn-action.pro{background:var(--gold);color:#fff}
+.btn-action.downgrade{background:var(--surface2);color:var(--text2)}
+.btn-action.ban{background:var(--rose);color:#fff}
+.btn-action.unban{background:var(--sage);color:#fff}
+.btn-action:hover{filter:brightness(1.06)}
+.btn-action:disabled{opacity:.6;cursor:not-allowed}
+
 .empty-state{color:var(--text3);font-size:13.5px;padding:32px 0;text-align:center}
 
 /* ---------------------------------------------------------------------

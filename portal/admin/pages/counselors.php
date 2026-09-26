@@ -331,6 +331,19 @@ $recent_commits = $wpdb->get_results("
 #toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 2000; }
 .toast { background: var(--text); color: #fff; padding: 14px 20px; border-radius: var(--r-sm); font-size: 14px; box-shadow: var(--sh-lg); margin-top: 10px; animation: slideUp 0.3s ease; }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+@media (max-width: 1024px) {
+    .os-sidebar { width: 100%; }
+}
+@media (max-width: 640px) {
+    .os-header { flex-wrap: wrap; gap: 12px; }
+    .grid-2 { grid-template-columns: 1fr; }
+    .a-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 420px) {
+    .a-grid { grid-template-columns: 1fr; }
+    .sandbox-drawer { width: 100vw; right: -100vw; }
+}
 </style>
 </head>
 <body>

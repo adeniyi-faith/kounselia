@@ -76,7 +76,7 @@ foreach ($intercepts_raw as $row) {
  * STREAMING_CHUNK:Styling the Orchestration Visualizer... 
  */
 .collab-layout { display: flex; gap: 24px; height: calc(100vh - 120px); min-height: 700px; }
-@media (max-width: 1024px) { .collab-layout { flex-direction: column; height: auto; } }
+@media (max-width: 1024px) { .collab-layout { flex-direction: column; height: auto; } .collab-sidebar { width: 100%; } }
 
 /* Sidebar */
 .collab-sidebar { width: 340px; display: flex; flex-direction: column; flex-shrink: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); box-shadow: var(--sh-sm); overflow: hidden; }

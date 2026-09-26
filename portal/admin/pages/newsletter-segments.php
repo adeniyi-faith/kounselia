@@ -38,6 +38,8 @@ $editing  = $segment || isset( $_GET['new'] );
 .seg-card .n{font-size:24px;font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
 .seg-card .n small{font-size:12px;font-weight:400;color:var(--text3)}
 .ideas{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.editor-layout.wide{grid-template-columns:minmax(0,1fr) 360px}
+@media (max-width:1000px){ .editor-layout.wide{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -47,7 +49,7 @@ $editing  = $segment || isset( $_GET['new'] );
 
 <?php if ( $editing ) : ?>
   <a class="back-link" href="/portal/admin/pages/newsletter-segments.php"><i class="ti ti-arrow-left"></i> All segments</a>
-  <div class="editor-layout" style="grid-template-columns:minmax(0,1fr) 360px">
+  <div class="editor-layout wide">
     <div class="editor-main">
       <div class="field"><label for="s-name">Segment name</label><input type="text" id="s-name" value="<?php echo esc_attr( $segment ? $segment->name : '' ); ?>" placeholder="e.g. Quiet members (30+ days)"></div>
       <div class="field"><label for="s-desc">Notes for the team (optional)</label><input type="text" id="s-desc" value="<?php echo esc_attr( $segment ? $segment->description : '' ); ?>" placeholder="What is this audience for?"></div>
