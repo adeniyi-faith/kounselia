@@ -45,7 +45,7 @@ if ( ! $application ) {
 
 $is_verified  = ( 'verified' === $application->status );
 $display_name = $user->display_name ? $user->display_name : $user->user_login;
-$first_name   = explode( ' ', trim( $display_name ) )[0];
+$first_name   = kounselia_greeting_first_name( $display_name );
 $avatar_url   = function_exists( 'kounselia_get_avatar_url' ) ? kounselia_get_avatar_url( $user->ID, 'thumbnail' ) : false;
 $initial      = mb_strtoupper( mb_substr( $display_name, 0, 1 ) );
 
