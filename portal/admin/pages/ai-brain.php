@@ -90,7 +90,8 @@ $fmt_requests = number_format( $requests_today );
 $fmt_tokens = $daily_tokens_est > 1000000 ? number_format( $daily_tokens_est / 1000000, 2 ) . 'M' : number_format( $daily_tokens_est );
 $fmt_latency = number_format( $avg_latency, 2 ) . 's';
 
-// Hardcoded platform health metrics for the dashboard feel (Can be wired to external monitoring later)
+// Placeholder platform health metrics — not yet wired to real monitoring,
+// shown as estimates until they are (see the "(estimated)" labels below).
 $success_rate = "99.97%";
 $failure_rate = "0.03%";
 $memory_time = "112ms";
@@ -106,7 +107,20 @@ $memory_time = "112ms";
 <?php require __DIR__ . '/../inc/admin-styles.php'; ?>
 <style>
 .brain-header {
-    display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px;
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap; margin-bottom: 20px;
+}
+.brain-intro {
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+    padding: 16px 20px; margin-bottom: 24px; font-size: 13.5px; color: var(--text2); line-height: 1.6;
+}
+.brain-intro strong { color: var(--text); }
+.card-help {
+    font-size: 11.5px; color: var(--text3); margin-top: 6px; line-height: 1.4;
+}
+.est-tag {
+    font-size: 10px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase;
+    color: var(--gold); background: var(--gold-light); border-radius: var(--r-full);
+    padding: 1px 7px; margin-left: 6px; vertical-align: middle;
 }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); margin-bottom: 32px; }
@@ -199,56 +213,68 @@ tr.open + .log-drawer { display: table-row; }
     <div class="brain-header">
         <div>
             <h1 class="admin-title">AI Gateway & Brain</h1>
-            <div class="admin-subtitle">Real-time telemetry and orchestration for the Intelligence Layer.</div>
+            <div class="admin-subtitle">How Kounselia's AI counselors are performing right now.</div>
         </div>
-        <div class="live-indicator">
-            <div class="pulse-dot"></div> Systems Operational
+        <div class="live-indicator" role="status">
+            <div class="pulse-dot" aria-hidden="true"></div> Systems Operational
         </div>
+    </div>
+
+    <div class="brain-intro">
+        <strong>What am I looking at?</strong> This page shows how the AI that powers Kounselia's counselors is doing today — how many conversations it's had, how quickly it replies, and which underlying AI model is doing the work. Numbers tagged <span class="est-tag">Est.</span> are estimates while full monitoring is still being built, not exact measurements.
     </div>
 
     <div class="grid grid-4">
         <div class="card">
-            <div class="label">Requests Today</div>
+            <div class="label">Conversations handled today</div>
             <div class="num"><?php echo $fmt_requests; ?></div>
-            <div class="split"><span><i class="ti ti-arrow-up" style="color:var(--sage)"></i> 12% vs yesterday</span></div>
+            <div class="split"><span><i class="ti ti-arrow-up" aria-hidden="true" style="color:var(--sage)"></i> 12% vs yesterday</span></div>
+            <div class="card-help">Every reply the AI has sent to a member today.</div>
         </div>
         <div class="card">
-            <div class="label">Average Latency</div>
+            <div class="label">Average reply speed</div>
             <div class="num"><?php echo $fmt_latency; ?></div>
             <div class="split">Time to first byte</div>
+            <div class="card-help">How long a member typically waits for the AI to start responding.</div>
         </div>
         <div class="card">
-            <div class="label">Success Rate</div>
+            <div class="label">Success rate <span class="est-tag">Est.</span></div>
             <div class="num" style="color: var(--sage);"><?php echo $success_rate; ?></div>
-            <div class="split">Failure rate: <?php echo $failure_rate; ?></div>
+            <div class="split">Failed: <?php echo $failure_rate; ?></div>
+            <div class="card-help">Share of AI replies that completed without an error. Not yet connected to live monitoring.</div>
         </div>
         <div class="card">
-            <div class="label">Est. Token Usage</div>
+            <div class="label">Token usage <span class="est-tag">Est.</span></div>
             <div class="num"><?php echo $fmt_tokens; ?></div>
             <div class="split">Across all models today</div>
+            <div class="card-help">"Tokens" are the chunks of text AI models bill by — roughly 4 characters each. This drives AI running costs.</div>
         </div>
     </div>
 
     <div class="grid grid-3">
         <div class="card" style="padding: 16px 20px;">
-            <div class="label" style="margin-bottom: 4px;">Memory Retrieval Time</div>
+            <div class="label" style="margin-bottom: 4px;">Memory lookup time <span class="est-tag">Est.</span></div>
             <div class="num" style="font-size: 22px;"><?php echo $memory_time; ?></div>
+            <div class="card-help">How long it takes to pull up what the AI remembers about a member before it replies.</div>
         </div>
         <div class="card" style="padding: 16px 20px;">
-            <div class="label" style="margin-bottom: 4px;">Avg Prompt Length</div>
+            <div class="label" style="margin-bottom: 4px;">Avg. prompt length <span class="est-tag">Est.</span></div>
             <div class="num" style="font-size: 22px;">~850 Tokens</div>
+            <div class="card-help">The typical size of everything sent to the AI model per reply (the member's message plus their remembered context).</div>
         </div>
         <div class="card" style="padding: 16px 20px;">
-            <div class="label" style="margin-bottom: 4px;">Peer Consultations</div>
+            <div class="label" style="margin-bottom: 4px;">Peer consultations <span class="est-tag">Est.</span></div>
             <div class="num" style="font-size: 22px;"><?php echo number_format(floor($requests_today * 0.15)); ?></div>
+            <div class="card-help">Estimated times one AI counselor "checked in" with another behind the scenes on a longer message.</div>
         </div>
     </div>
 
-    <h3 style="font-size: 14px; font-weight: 600; text-transform: uppercase; color: var(--text2); letter-spacing: 0.5px; margin-bottom: 16px;">Orchestration Flow</h3>
+    <h2 style="font-size: 14px; font-weight: 600; text-transform: uppercase; color: var(--text2); letter-spacing: 0.5px; margin-bottom: 8px;">Orchestration Flow</h2>
+    <p style="font-size: 13px; color: var(--text3); margin: 0 0 16px; max-width: 640px;">The path a message takes: it comes in from the app, gets checked and prepared, is answered by our main AI model, and falls back to another provider automatically if that model is unavailable.</p>
     <div class="routing-container">
         <div class="route-node">
             <div class="route-box">
-                <i class="ti ti-user route-icon" style="color: var(--text3);"></i>
+                <i class="ti ti-user route-icon" aria-hidden="true" style="color: var(--text3);"></i>
                 <div class="route-title">User Request</div>
                 <div class="route-sub">Client App</div>
             </div>
@@ -258,7 +284,7 @@ tr.open + .log-drawer { display: table-row; }
 
         <div class="route-node">
             <div class="route-box active">
-                <i class="ti ti-cpu route-icon"></i>
+                <i class="ti ti-cpu route-icon" aria-hidden="true"></i>
                 <div class="route-title">Intelligence Engine</div>
                 <div class="route-sub">Pre-Processing & Auth</div>
             </div>
@@ -268,7 +294,7 @@ tr.open + .log-drawer { display: table-row; }
 
         <div class="route-node">
             <div class="route-box active" style="border-width: 2px;">
-                <i class="ti ti-brain route-icon"></i>
+                <i class="ti ti-brain route-icon" aria-hidden="true"></i>
                 <div class="route-title">Gemini 3.6 Flash</div>
                 <div class="route-sub">Primary LLM</div>
             </div>
@@ -278,7 +304,7 @@ tr.open + .log-drawer { display: table-row; }
 
         <div class="route-node">
             <div class="route-box fallback">
-                <i class="ti ti-shield-check route-icon" style="color: var(--text2);"></i>
+                <i class="ti ti-shield-check route-icon" aria-hidden="true" style="color: var(--text2);"></i>
                 <div class="route-title">External Fallbacks</div>
                 <div class="route-sub">GPT / Claude / DeepSeek</div>
             </div>
@@ -287,8 +313,8 @@ tr.open + .log-drawer { display: table-row; }
 
     <div class="panel" style="padding: 0; overflow: hidden;">
         <div style="padding: 20px 24px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-            <h3 style="font-size: 16px; font-weight: 600; color: var(--accent); margin: 0;">Live AI Call Log</h3>
-            <span style="font-size: 12px; color: var(--text3);"><i class="ti ti-history"></i> Showing last 50 queries</span>
+            <h2 style="font-size: 16px; font-weight: 600; color: var(--accent); margin: 0;">Live AI Call Log</h2>
+            <span style="font-size: 12px; color: var(--text3);"><i class="ti ti-history" aria-hidden="true"></i> Showing last 50 queries</span>
         </div>
         
         <table class="admin-table call-log-table">
@@ -311,6 +337,10 @@ tr.open + .log-drawer { display: table-row; }
                     if ( $call->latency < 1.5 ) $lat_class = 'mb-fast';
                     if ( $call->latency > 3.0 ) $lat_class = 'mb-slow';
                 ?>
+                <?php
+                    $lat_word = 'mb-fast' === $lat_class ? 'fast' : ( 'mb-slow' === $lat_class ? 'slow' : 'medium' );
+                    $drawer_id = 'log-drawer-' . (int) $call->id;
+                ?>
                 <tr onclick="toggleDrawer(this)">
                     <td style="padding-left: 24px; color: var(--text3);"><?php echo kounselia_admin_clock_label( $call->created_at ); ?></td>
                     <td>
@@ -319,13 +349,13 @@ tr.open + .log-drawer { display: table-row; }
                         </div>
                     </td>
                     <td><div class="t-prompt"><?php echo esc_html( $call->user_prompt ?: '[System/Memory Init]' ); ?></div></td>
-                    <td><span class="metric-badge <?php echo $lat_class; ?>"><?php echo esc_html( $call->latency ); ?>s</span></td>
+                    <td><span class="metric-badge <?php echo $lat_class; ?>"><?php echo esc_html( $call->latency ); ?>s<span class="sr-only"> (<?php echo esc_html( $lat_word ); ?>)</span></span></td>
                     <td class="t-metric"><?php echo number_format($call->tokens); ?></td>
                     <td style="text-align: right; padding-right: 24px;">
-                        <button class="btn-ghost" style="padding: 4px 8px; font-size: 16px; color: var(--text3);" title="View Payload"><i class="ti ti-code"></i></button>
+                        <button class="btn-ghost" style="padding: 4px 8px; font-size: 16px; color: var(--text3);" aria-expanded="false" aria-controls="<?php echo esc_attr( $drawer_id ); ?>" aria-label="View full message and reply for this call" title="View Payload"><i class="ti ti-code" aria-hidden="true"></i></button>
                     </td>
                 </tr>
-                <tr class="log-drawer">
+                <tr class="log-drawer" id="<?php echo esc_attr( $drawer_id ); ?>">
                     <td colspan="6" style="padding: 0;">
                         <div class="log-drawer-content">
                             <div class="log-pane">
@@ -359,10 +389,16 @@ function toggleDrawer(row) {
     // Close other open drawers
     const allRows = document.querySelectorAll('.call-log-table tr.open');
     allRows.forEach(r => {
-        if (r !== row) r.classList.remove('open');
+        if (r !== row) {
+            r.classList.remove('open');
+            const btn = r.querySelector('button[aria-expanded]');
+            if (btn) btn.setAttribute('aria-expanded', 'false');
+        }
     });
     // Toggle current
     row.classList.toggle('open');
+    const currentBtn = row.querySelector('button[aria-expanded]');
+    if (currentBtn) currentBtn.setAttribute('aria-expanded', row.classList.contains('open') ? 'true' : 'false');
 }
 </script>
 </body>
