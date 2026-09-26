@@ -474,6 +474,32 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         </div>
       <?php endif; ?>
     </div>
+
+    <?php if ( function_exists( 'kounselia_professional_is_public' ) ) :
+        $kounselia_is_public = kounselia_professional_is_public( get_current_user_id() ); ?>
+    <div class="pro-card" style="margin-top:20px">
+      <label style="display:flex;gap:14px;align-items:flex-start;cursor:pointer">
+        <input type="checkbox" id="pro-public-toggle" <?php checked( $kounselia_is_public ); ?> style="width:20px;height:20px;margin-top:3px;accent-color:var(--accent);flex-shrink:0">
+        <span>
+          <strong style="display:block;font-size:15px;margin-bottom:4px">Show my profile on the public website</strong>
+          <span class="section-sub" style="display:block;line-height:1.55">Your name, photo, title, specialty, experience, bio, rate and reviews appear in the public directory at kounselia.com/professionals once you're verified, so new clients can find you. Your licence number is never shown, and reviews never show your clients' names. Turn this off any time — signed-in members can still book you.</span>
+          <?php if ( 'verified' === $application->status ) : ?>
+            <a href="<?php echo esc_url( kounselia_professional_url( (object) array( 'display_name' => $display_name, 'id' => $application->id ) ) ); ?>" target="_blank" style="display:inline-block;margin-top:8px;font-size:13px">View my public profile →</a>
+          <?php endif; ?>
+          <span class="inline-msg" id="pro-public-msg" style="display:block;margin-top:6px;font-size:13px"></span>
+        </span>
+      </label>
+    </div>
+    <script>
+    document.getElementById('pro-public-toggle').addEventListener('change', function(){
+      var box = this, msg = document.getElementById('pro-public-msg');
+      fetch(KOUNSELIA.ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ action: 'kounselia_set_public_profile', nonce: KOUNSELIA.nonce, show: box.checked ? '1' : '0' }) })
+        .then(function(r){ return r.json(); })
+        .then(function(res){ msg.textContent = (res.data && res.data.message) || (res.success ? 'Saved.' : 'Could not save.'); msg.style.color = res.success ? 'var(--sage)' : 'var(--rose)'; if(!res.success){ box.checked = !box.checked; } })
+        .catch(function(){ box.checked = !box.checked; msg.textContent = 'Connection problem, please try again.'; msg.style.color = 'var(--rose)'; });
+    });
+    </script>
+    <?php endif; ?>
   </div>
 
   <!-- BOOKINGS -->

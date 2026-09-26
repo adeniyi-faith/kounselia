@@ -1545,6 +1545,12 @@ function saveJournal(sourceId,msgId){
   // Links from the public pages (e.g. the Pro plans page) can open a tab directly: ?tab=upgrade
   const tabParam = params.get('tab');
   if(tabParam && /^[a-z]+$/.test(tabParam) && document.getElementById('view-' + tabParam)){ switchTab(tabParam); }
+  // "Book a session" on a public profile lands here with ?book=<professional id>: open that professional's booking.
+  const bookParam = params.get('book');
+  if(bookParam && /^\d+$/.test(bookParam)){
+    const tile = document.querySelector('.js-book-pro[data-pro-id="' + bookParam + '"]');
+    if(tile){ switchTab('professionals'); setTimeout(()=>tile.click(), 350); }
+  }
   const subResult = params.get('sub');
   if(subResult === 'success'){
     toast("Payment confirmed — you're all set.");
