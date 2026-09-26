@@ -6,7 +6,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { memo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { AppMessage } from '@/chat/useChat';
 import { colors, fonts } from '@/theme';
 import { CounselorAvatar } from '../CounselorAvatar';
@@ -19,6 +19,9 @@ interface Props {
   onRate: (message: AppMessage, rating: 'up' | 'down') => void;
   onRetry: (message: AppMessage) => void;
   onNotify: (text: string) => void;
+  // 'loading' / 'playing' while this reply is being read aloud.
+  playPhase?: 'loading' | 'playing';
+  onListen: (message: AppMessage) => void;
 }
 
 // A reply's "**Heading**" paragraphs become headings and blank lines
@@ -45,7 +48,7 @@ function FormattedText({ text }: { text: string }) {
   );
 }
 
-export const MessageBubble = memo(function MessageBubble({ message, counselor, onRate, onRetry, onNotify }: Props) {
+export const MessageBubble = memo(function MessageBubble({ message, counselor, onRate, onRetry, onNotify, playPhase, onListen }: Props) {
   async function copy() {
     try {
       await Clipboard.setStringAsync(message.text);
@@ -107,7 +110,24 @@ export const MessageBubble = memo(function MessageBubble({ message, counselor, o
           </View>
         </Pressable>
         <View style={styles.aiFooter}>
-          <Text style={styles.time}>{formatTime(message.createdAt)}</Text>
+          <View style={styles.timeRow}>
+            <Text style={styles.time}>{formatTime(message.createdAt)}</Text>
+            {canRate && (
+              <Pressable
+                onPress={() => onListen(message)}
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel={playPhase === 'playing' ? 'Stop listening' : 'Listen'}
+                style={styles.listen}
+              >
+                {playPhase === 'loading' ? (
+                  <ActivityIndicator size="small" color={colors.accent} />
+                ) : (
+                  <TablerIcon name={playPhase === 'playing' ? 'player-stop-filled' : 'volume'} size={15} color={playPhase ? colors.accent : colors.text3} />
+                )}
+              </Pressable>
+            )}
+          </View>
           <View style={styles.actions}>
             <ActionButton icon="copy" label="Copy" onPress={copy} />
             {canRate && (
@@ -169,6 +189,8 @@ const styles = StyleSheet.create({
   consulted: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
   consultedText: { fontFamily: fonts.semibold, fontSize: 10, letterSpacing: 0.5, textTransform: 'uppercase', color: colors.gold },
   aiFooter: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  timeRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  listen: { width: 26, height: 26, marginTop: 6, alignItems: 'center', justifyContent: 'center' },
   actions: { flexDirection: 'row', gap: 4, marginTop: 4 },
   action: { width: 30, height: 30, borderRadius: 15, alignItems: 'center', justifyContent: 'center' },
 });

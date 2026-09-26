@@ -733,8 +733,12 @@ function kounselia_ajax_get_professional_slots() {
         }
     }
 
+    $slots = kounselia_get_available_slots( $professional_id, $exclude_booking_id );
     wp_send_json_success( array(
-        'slots'           => kounselia_get_available_slots( $professional_id, $exclude_booking_id ),
+        'slots'           => $slots,
+        // The same slots in UTC, for the mobile app to show in the
+        // member's own time zone (it sends back the `slots` form).
+        'slots_utc'       => array_map( 'kounselia_app_utc', $slots ),
         'session_minutes' => kounselia_session_length_minutes(),
     ) );
 }
@@ -1031,6 +1035,7 @@ function kounselia_ajax_get_booking_messages() {
             'id'          => (int) $m->id,
             'content'     => $m->content,
             'created_at'  => $m->created_at,
+            'sent_at'     => kounselia_app_utc( $m->created_at ), // UTC, for the mobile app
             'sender_name' => $m->sender_name,
             'is_mine'     => ( (int) $m->sender_user_id === (int) $user_id ),
         );
