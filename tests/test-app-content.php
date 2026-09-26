@@ -80,13 +80,16 @@ class Test_App_Content extends WP_Ajax_UnitTestCase {
         $this->assertSame( 'Ada', $res['data']['user']['name'] );
         $this->assertNull( $res['data']['user']['avatar'] );
         $this->assertSame( 'Free', $res['data']['plan']['title'] );
-        $this->assertFalse( $res['data']['emails']['newsletter'] );
+        $this->assertTrue( $res['data']['emails']['newsletter'] ); // members are signed up when they join
         $this->assertNull( $res['data']['memory'] );
         $this->assertStringEndsWith( '/page/safety-resources', $res['data']['links']['safety'] );
 
+        $this->ajax( 'kounselia_save_email_prefs', array( 'blog' => '1' ) );
         update_user_meta( $user, 'kounselia_plan', 'pro' );
         $this->ajax( 'kounselia_edit_memory', array( 'identity' => 'A nurse in Lagos', 'goals' => 'Sleep more, Run a 5k' ) );
         $res = $this->ajax( 'kounselia_app_account' );
+        $this->assertFalse( $res['data']['emails']['newsletter'] );
+        $this->assertTrue( $res['data']['emails']['blog'] );
         $this->assertSame( 'gifted', $res['data']['plan']['state'] );
         $this->assertSame( 'A nurse in Lagos', $res['data']['memory']['identity'] );
         $this->assertSame( array( 'Sleep more', 'Run a 5k' ), $res['data']['memory']['goals'] );
