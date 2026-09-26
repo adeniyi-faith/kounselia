@@ -1,8 +1,9 @@
-import { dismissCheckin, fetchHome, saveMood, type HomeData } from '@kounselia/core';
+import { dismissCheckin, fetchBlog, fetchHome, saveMood, type BlogCard, type HomeData } from '@kounselia/core';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { ArticleCard } from '@/components/articles/ArticleCard';
 import { Button } from '@/components/Button';
 import { SectionHead } from '@/components/dashboard/Card';
 import { CareTeamCard } from '@/components/dashboard/CareTeamCard';
@@ -19,11 +20,13 @@ import { useSession } from '@/session';
 import { colors, fonts } from '@/theme';
 
 // The website dashboard's Home, in the same order: welcome, mood,
-// numbers, a suggested counselor, and today's private reflection.
+// numbers, a suggested counselor, and today's private reflection (with a
+// link to past entries), then the newest articles from the blog.
 export default function Home() {
   const { user, config } = useSession();
   const { bySlug } = useCounselors();
   const [home, setHome] = useState<HomeData | null>(null);
+  const [articles, setArticles] = useState<BlogCard[]>([]);
   const [failed, setFailed] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [savingMood, setSavingMood] = useState<string | null>(null);
@@ -31,6 +34,10 @@ export default function Home() {
   const toast = useToast();
 
   const load = useCallback(async () => {
+    // The articles are a bonus: if they don't load, Home still does.
+    fetchBlog(config).then((blog) => {
+      if (blog.ok) setArticles(blog.data.posts.slice(0, 5));
+    });
     const res = await fetchHome(config);
     if (res.ok) {
       setHome(res.data);
@@ -131,8 +138,25 @@ export default function Home() {
               </>
             )}
 
-            <SectionHead title="Today's reflection" note="Private, never shared" />
+            <SectionHead title="Today's reflection" action={{ label: 'Past entries', onPress: () => router.push('/journal') }} />
             <JournalCard config={config} initial={home.journal} />
+
+            {articles.length > 0 && (
+              <>
+                <SectionHead title="Read and reflect" action={{ label: 'See all', onPress: () => router.push('/articles') }} />
+                <FlatList
+                  horizontal
+                  data={articles}
+                  keyExtractor={(a) => String(a.id)}
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.articles}
+                  contentContainerStyle={styles.articlesRow}
+                  renderItem={({ item }) => (
+                    <ArticleCard compact post={item} onPress={() => router.push({ pathname: '/articles/[slug]', params: { slug: item.slug } })} />
+                  )}
+                />
+              </>
+            )}
           </>
         )}
       </ScrollView>
@@ -148,4 +172,7 @@ const styles = StyleSheet.create({
   loading: { marginTop: 40 },
   center: { marginTop: 32, gap: 16 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
+  // Runs edge to edge so cards slide in from the side of the screen.
+  articles: { marginHorizontal: -16 },
+  articlesRow: { gap: 12, paddingHorizontal: 16, paddingBottom: 6 },
 });
