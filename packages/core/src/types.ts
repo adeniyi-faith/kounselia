@@ -1,4 +1,4 @@
-// Shapes shared by the web chat and, later, the React Native app.
+// Shapes shared by the web chat and the React Native app.
 // Nothing in this file talks to the DOM or the browser.
 
 export interface Counselor {
@@ -44,15 +44,17 @@ export interface HistoryMessage {
 
 export interface KounseliaConfig {
   ajaxUrl: string;
-  nonce: string;
+  // Website only: the security code the page is printed with. The mobile
+  // app leaves this out and signs requests with `authToken` instead.
+  nonce?: string;
   loggedIn: boolean;
+  // 'app' marks requests as coming from the mobile app (see http.ts).
+  client?: 'web' | 'app';
+  authToken?: string | null;
 }
 
-declare global {
-  interface Window {
-    KOUNSELIA: KounseliaConfig;
-    C: CounselorMap;
-    kounseliaMountChat?: () => void;
-    __kounseliaDeferMount?: boolean;
-  }
+export interface AppUser {
+  id: number;
+  name: string;
+  email: string;
 }

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useDictation } from '../hooks/useDictation';
-import type { KounseliaConfig } from '../core/types';
+import type { KounseliaConfig } from '@kounselia/core';
 
 interface Props {
   config: KounseliaConfig;

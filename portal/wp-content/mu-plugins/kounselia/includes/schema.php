@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.21.0'; // Bumped version: merged CMS/blog/newsletter/mail log/renewals with message feedback, payouts, multi-currency
+    $current_version   = '1.22.0'; // Bumped version: mobile app sign-in tokens
 
     if ( $installed_version === $current_version ) {
         return;
@@ -589,6 +589,24 @@ function kounselia_install_tables() {
         KEY user_id (user_id)
     ) {$charset_collate};";
 
+    // A mobile app sign-in. The app can't use browser cookies, so signing
+    // in hands it a random token instead; only a SHA-256 hash of that token
+    // is kept here, so a leaked database can't be used to sign in as anyone.
+    // One row per signed-in device, so signing out on one phone leaves the
+    // others signed in.
+    $sql_app_tokens = "CREATE TABLE {$prefix}kounselia_app_tokens (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        token_hash CHAR(64) NOT NULL,
+        device_name VARCHAR(100) NOT NULL DEFAULT '',
+        created_at DATETIME NOT NULL,
+        last_used_at DATETIME NOT NULL,
+        expires_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY token_hash (token_hash),
+        KEY user_id (user_id)
+    ) {$charset_collate};";
+
     // A member's thumbs up/down on one counselor reply. One row per
     // message (re-rating replaces the old rating) so staff can see which
     // replies landed and which didn't.
@@ -815,6 +833,7 @@ function kounselia_install_tables() {
     dbDelta( $sql_campaign_recipients );
     dbDelta( $sql_mail_log );
     dbDelta( $sql_message_feedback );
+    dbDelta( $sql_app_tokens );
 
     if ( function_exists( 'kounselia_ensure_professional_docs_dir' ) ) {
         kounselia_ensure_professional_docs_dir();

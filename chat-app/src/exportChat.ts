@@ -1,4 +1,4 @@
-import type { ChatMessage, Counselor } from './core/types';
+import type { ChatMessage, Counselor } from '@kounselia/core';
 
 // Triggers a browser file download, so this stays out of core/ (a
 // React Native build would save the transcript a different way).

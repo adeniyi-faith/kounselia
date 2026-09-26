@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { ChatMessage, Counselor } from '../core/types';
+import type { ChatMessage, Counselor } from '@kounselia/core';
 
 interface Props {
   message: ChatMessage;

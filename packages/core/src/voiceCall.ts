@@ -1,3 +1,4 @@
+import { postAction } from './http';
 import type { KounseliaConfig } from './types';
 
 export interface VoiceTokenResult {
@@ -15,19 +16,8 @@ export async function fetchVoiceToken(
   counselor: string,
   sessionId: number,
 ): Promise<VoiceTokenResult> {
-  const body = new URLSearchParams({
-    action: 'kounselia_voice_token',
-    nonce: config.nonce,
-    counselor,
-    session_id: String(sessionId || 0),
-  });
   try {
-    const res = await fetch(config.ajaxUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body,
-    });
-    const json = await res.json();
+    const json = await postAction(config, 'kounselia_voice_token', { counselor, session_id: sessionId || 0 });
     if (!json.success) return { success: false, message: json.data?.message };
     const data = json.data ?? {};
     return {
@@ -45,14 +35,5 @@ export async function fetchVoiceToken(
 
 export function logVoiceTurn(config: KounseliaConfig, sessionId: number, sender: 'user' | 'bot', text: string) {
   if (!sessionId) return;
-  const body = new URLSearchParams({
-    action: 'kounselia_log_voice_turn',
-    nonce: config.nonce,
-    session_id: String(sessionId),
-    sender,
-    text,
-  });
-  fetch(config.ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body }).catch(
-    () => undefined,
-  );
+  postAction(config, 'kounselia_log_voice_turn', { session_id: sessionId, sender, text }).catch(() => undefined);
 }
