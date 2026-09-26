@@ -3,16 +3,18 @@
 import { fetchBlog, type BlogCard, type BlogTag } from '@kounselia/core';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArticleCard } from '@/components/articles/ArticleCard';
 import { Button } from '@/components/Button';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
-import { colors, fonts, radius } from '@/theme';
+import { fonts, makeStyles, radius, useColors } from '@/theme';
 
 export default function Articles() {
+  const styles = useStyles();
+  const colors = useColors();
   const { config } = useSession();
   const [posts, setPosts] = useState<BlogCard[] | null>(null);
   const [title, setTitle] = useState('The Kounselia Journal');
@@ -120,7 +122,7 @@ export default function Articles() {
               <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
             </>
           ) : (
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color={colors.accentText} />
           )}
         </View>
       ) : (
@@ -130,7 +132,7 @@ export default function Articles() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
           onEndReached={more}
           onEndReachedThreshold={0.5}
           ListHeaderComponent={header}
@@ -141,7 +143,7 @@ export default function Articles() {
               <Text style={styles.notice}>{search || tag ? 'No articles match that. Try another word or topic.' : 'No articles yet. Check back soon.'}</Text>
             </View>
           }
-          ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} /> : null}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.accentText} style={{ marginTop: 20 }} /> : null}
           renderItem={({ item }) => (
             <ArticleCard post={item} onPress={() => router.push({ pathname: '/articles/[slug]', params: { slug: item.slug } })} />
           )}
@@ -152,6 +154,7 @@ export default function Articles() {
 }
 
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const styles = useStyles();
   return (
     <Pressable
       onPress={onPress}
@@ -164,7 +167,7 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
@@ -198,4 +201,4 @@ const styles = StyleSheet.create({
   chipText: { fontFamily: fonts.medium, fontSize: 13, color: colors.text2 },
   chipTextActive: { color: '#fff' },
   empty: { alignItems: 'center', gap: 12, paddingVertical: 40, paddingHorizontal: 24 },
-});
+}));

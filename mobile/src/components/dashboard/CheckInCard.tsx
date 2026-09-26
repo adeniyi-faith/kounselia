@@ -1,6 +1,6 @@
 import type { CheckIn, CounselorSummary } from '@kounselia/core';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '@/theme';
+import { Pressable, Text, View } from 'react-native';
+import { fonts, makeStyles, useColors } from '@/theme';
 import { CounselorAvatar } from '../CounselorAvatar';
 import { Card } from './Card';
 
@@ -8,6 +8,8 @@ import { Card } from './Card';
 // card): something the member mentioned was coming up. "Tell them"
 // opens the chat with the question as the counselor's opening line.
 export function CheckInCard(props: { checkin: CheckIn; counselor: CounselorSummary; onTell: () => void; onLater: () => void }) {
+  const styles = useStyles();
+  const colors = useColors();
   const { checkin, counselor, onTell, onLater } = props;
   return (
     <Card style={styles.card}>
@@ -30,7 +32,7 @@ export function CheckInCard(props: { checkin: CheckIn; counselor: CounselorSumma
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   card: { gap: 14, marginBottom: 16 },
   top: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   meta: { flex: 1 },
@@ -41,4 +43,4 @@ const styles = StyleSheet.create({
   btnText: { fontFamily: fonts.medium, fontSize: 14, color: '#fff' },
   later: { paddingVertical: 8 },
   laterText: { fontFamily: fonts.regular, fontSize: 13, color: colors.text3 },
-});
+}));

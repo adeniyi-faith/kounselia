@@ -16,7 +16,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBrowser } from '@/browser/BrowserProvider';
 import { Button } from '@/components/Button';
@@ -27,10 +27,20 @@ import { Sheet } from '@/components/Sheet';
 import { TablerIcon } from '@/components/TablerIcon';
 import { TextField } from '@/components/TextField';
 import { useSession } from '@/session';
-import { colors, fonts, radius, shadows } from '@/theme';
+import { type Appearance, counselorColors, fonts, makeStyles, radius, shadows, useColors, useTheme } from '@/theme';
+
+const APPEARANCES: { key: Appearance; label: string; icon: string }[] = [
+  { key: 'light', label: 'Light', icon: 'sun' },
+  { key: 'dark', label: 'Dark', icon: 'moon' },
+  { key: 'system', label: 'Device', icon: 'device-mobile' },
+];
 
 export default function Settings() {
+  const styles = useStyles();
+  const colors = useColors();
   const { user, config, signOut, updateUser } = useSession();
+  const { appearance, setAppearance, scheme } = useTheme();
+  const appearanceNote = appearance === 'system' ? `Matches your phone, which is using ${scheme} mode now.` : undefined;
   const { openInApp } = useBrowser();
   const toast = useToast();
   const [account, setAccount] = useState<Account | null>(null);
@@ -40,7 +50,7 @@ export default function Settings() {
 
   const load = useCallback(async () => {
     const res = await fetchAccount(config);
-    if (res.ok) setAccount(res.data);
+    if (res.ok && res.data.user) setAccount(res.data);
   }, [config]);
 
   // Fresh every time Settings is opened (e.g. after editing memory).
@@ -110,7 +120,7 @@ export default function Settings() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView
         contentContainerStyle={styles.content}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
       >
         <Text style={styles.title} accessibilityRole="header">
           Settings
@@ -190,6 +200,31 @@ export default function Settings() {
             </View>
           </Group>
         )}
+
+        <Group title="Appearance" note={appearanceNote}>
+          <View style={styles.segment} accessibilityRole="radiogroup">
+            {APPEARANCES.map((a) => {
+              const on = appearance === a.key;
+              return (
+                <Pressable
+                  key={a.key}
+                  onPress={() => {
+                    Haptics.selectionAsync().catch(() => undefined);
+                    setAppearance(a.key);
+                  }}
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: on }}
+                  aria-checked={on}
+                  accessibilityLabel={a.label}
+                  style={[styles.segmentItem, on && styles.segmentOn]}
+                >
+                  <TablerIcon name={a.icon} size={20} color={on ? colors.accentText : colors.text3} />
+                  <Text style={[styles.segmentText, on && styles.segmentTextOn]}>{a.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Group>
 
         <Group title="Account">
           <Row icon="user" label="Name" value={name} onPress={() => setSheet('name')} />
@@ -298,6 +333,7 @@ export default function Settings() {
 // ---- Building blocks ---------------------------------------------------------
 
 function Group({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.group}>
       <Text style={styles.groupTitle} accessibilityRole="header">
@@ -309,13 +345,7 @@ function Group({ title, note, children }: { title: string; note?: string; childr
   );
 }
 
-const tints: Record<string, { fg: string; bg: string }> = {
-  blue: { fg: colors.accent, bg: colors.accentLight },
-  sage: { fg: colors.sage, bg: colors.sageLight },
-  gold: { fg: colors.gold, bg: colors.goldLight },
-  rose: { fg: colors.rose, bg: colors.roseLight },
-  plum: { fg: colors.plum, bg: colors.plumLight },
-};
+type Tint = 'blue' | 'sage' | 'gold' | 'rose' | 'plum';
 
 function Row({
   icon,
@@ -333,10 +363,12 @@ function Row({
   value?: string;
   right?: ReactNode;
   onPress?: () => void;
-  tint?: keyof typeof tints;
+  tint?: Tint;
   last?: boolean;
 }) {
-  const t = tints[tint];
+  const styles = useStyles();
+  const colors = useColors();
+  const t = counselorColors(tint, colors);
   const body = (
     <>
       <View style={[styles.tile, { backgroundColor: t.bg }]}>
@@ -378,6 +410,7 @@ function NameSheet({
   onClose: () => void;
   onSave: (name: string) => Promise<string | null>;
 }) {
+  const styles = useStyles();
   const [name, setName] = useState(current);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -421,6 +454,7 @@ function PasswordSheet({
   onClose: () => void;
   onSave: (current: string, next: string) => Promise<string | null>;
 }) {
+  const styles = useStyles();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -459,7 +493,7 @@ function PasswordSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 48 },
   title: { fontFamily: fonts.serifMedium, fontSize: 30, color: colors.text, marginTop: 16, marginBottom: 16, marginLeft: 4 },
@@ -484,8 +518,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   avatarImg: { width: 88, height: 88 },
-  avatarText: { fontFamily: fonts.semibold, fontSize: 32, color: colors.accent },
-  avatarBusy: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(24,22,15,0.35)', alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontFamily: fonts.semibold, fontSize: 32, color: colors.accentText },
+  avatarBusy: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.backdrop, alignItems: 'center', justifyContent: 'center' },
   cameraBadge: {
     position: 'absolute',
     right: -2,
@@ -516,7 +550,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.r,
     backgroundColor: colors.roseLight,
     borderWidth: 1,
-    borderColor: 'rgba(139,58,82,0.18)',
+    borderColor: colors.roseBorder,
   },
   helpIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   helpTitle: { fontFamily: fonts.semibold, fontSize: 15, color: colors.rose },
@@ -539,9 +573,14 @@ const styles = StyleSheet.create({
   rowLabel: { fontFamily: fonts.medium, fontSize: 15, color: colors.text },
   rowSub: { fontFamily: fonts.regular, fontSize: 13, lineHeight: 18, color: colors.text2, marginTop: 1 },
   rowValue: { fontFamily: fonts.regular, fontSize: 14, color: colors.text3, maxWidth: '45%' },
+  segment: { flexDirection: 'row', padding: 6, gap: 6 },
+  segmentItem: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 12, borderRadius: 14 },
+  segmentOn: { backgroundColor: colors.accentLight, borderWidth: 1, borderColor: colors.accentBorder },
+  segmentText: { fontFamily: fonts.medium, fontSize: 13, color: colors.text2 },
+  segmentTextOn: { color: colors.accentText, fontFamily: fonts.semibold },
   planRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
   signOut: { marginTop: 32 },
   footer: { fontFamily: fonts.regular, fontSize: 12, color: colors.text3, textAlign: 'center', marginTop: 18 },
   sheetText: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.text2, marginBottom: 16 },
   sheetButton: { marginTop: 8 },
-});
+}));

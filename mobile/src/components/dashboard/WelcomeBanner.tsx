@@ -3,8 +3,8 @@
 // italic gold, and the two buttons.
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, fonts } from '@/theme';
+import { AccessibilityInfo, Animated, Easing, Pressable, Text, View } from 'react-native';
+import { fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 
 function greeting(): string {
@@ -23,6 +23,8 @@ interface Props {
 }
 
 export function WelcomeBanner({ firstName, onTalk, onSessions }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const [breathe] = useState(() => new Animated.Value(0));
   useEffect(() => {
     let loop: Animated.CompositeAnimation | undefined;
@@ -43,7 +45,7 @@ export function WelcomeBanner({ firstName, onTalk, onSessions }: Props) {
   const opacity = breathe.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] });
 
   return (
-    <LinearGradient colors={[colors.accent, colors.navy]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
+    <LinearGradient colors={[colors.accent, colors.navyFill]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.banner}>
       <Animated.View pointerEvents="none" style={[styles.orb, { opacity, transform: [{ scale }] }]}>
         {/* A soft gold glow (the website's radial gradient), built from
             stacked see-through circles that fade towards the edge. */}
@@ -60,8 +62,8 @@ export function WelcomeBanner({ firstName, onTalk, onSessions }: Props) {
       </Text>
       <View style={styles.actions}>
         <Pressable onPress={onTalk} accessibilityRole="button" style={({ pressed }) => [styles.btn, styles.btnPrimary, pressed && styles.pressed]}>
-          <TablerIcon name="message-2-plus" size={16} color={colors.navy} />
-          <Text style={[styles.btnText, { color: colors.navy }]}>Talk to someone now</Text>
+          <TablerIcon name="message-2-plus" size={16} color={colors.navyFill} />
+          <Text style={[styles.btnText, { color: colors.navyFill }]}>Talk to someone now</Text>
         </Pressable>
         <Pressable onPress={onSessions} accessibilityRole="button" style={({ pressed }) => [styles.btn, styles.btnGhost, pressed && styles.pressed]}>
           <TablerIcon name="history" size={16} color="#fff" />
@@ -72,7 +74,7 @@ export function WelcomeBanner({ firstName, onTalk, onSessions }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   banner: { borderRadius: 28, padding: 26, overflow: 'hidden' },
   orb: { position: 'absolute', width: 300, height: 300, top: -130, right: -90, alignItems: 'center', justifyContent: 'center' },
   glow: { position: 'absolute', backgroundColor: 'rgba(176,125,58,0.07)' },
@@ -86,4 +88,4 @@ const styles = StyleSheet.create({
   btnGhost: { borderWidth: 1, borderColor: 'rgba(255,255,255,0.35)' },
   btnText: { fontFamily: fonts.medium, fontSize: 14 },
   pressed: { transform: [{ scale: 0.97 }] },
-});
+}));

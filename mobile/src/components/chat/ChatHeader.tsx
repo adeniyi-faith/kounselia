@@ -5,7 +5,7 @@ import type { CounselorSummary } from '@kounselia/core';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles, useColors } from '@/theme';
 import { openSafetyResources } from '../openSafety';
 import { CounselorAvatar } from '../CounselorAvatar';
 import { TablerIcon } from '../TablerIcon';
@@ -20,6 +20,8 @@ interface Props {
 }
 
 export function ChatHeader({ counselor, onBack, onShare, onClear, onCall }: Props) {
+  const styles = useStyles();
+  const colors = useColors();
   const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -76,6 +78,8 @@ export function ChatHeader({ counselor, onBack, onShare, onClear, onCall }: Prop
 }
 
 function MenuItem({ icon, label, color, onPress, last }: { icon: string; label: string; color?: string; onPress: () => void; last?: boolean }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
@@ -88,14 +92,14 @@ function MenuItem({ icon, label, color, onPress, last }: { icon: string; label: 
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   nav: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingHorizontal: 16,
     paddingBottom: 12,
-    backgroundColor: 'rgba(255,255,255,0.97)',
+    backgroundColor: colors.glass,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     zIndex: 2,
@@ -138,4 +142,4 @@ const styles = StyleSheet.create({
   item: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 14, paddingHorizontal: 18 },
   itemBorder: { borderBottomWidth: 1, borderBottomColor: colors.surface2 },
   itemText: { fontFamily: fonts.medium, fontSize: 15, color: colors.text },
-});
+}));

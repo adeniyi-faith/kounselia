@@ -2,18 +2,20 @@ import { fetchBookingMessages, sendBookingMessage, type BookingMessage } from '@
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, KeyboardAvoidingView, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, KeyboardAvoidingView, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatTime } from '@/components/chat/formatTime';
 import { Toast, useToast } from '@/components/chat/Toast';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles, useColors } from '@/theme';
 
 // Messages with the professional for one booked session (the website's
 // "Message" button on a booking). New messages are checked every 15
 // seconds while this screen is open.
 export default function BookingMessages() {
+  const styles = useStyles();
+  const colors = useColors();
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const bookingId = Number(id);
   const { config } = useSession();
@@ -69,7 +71,7 @@ export default function BookingMessages() {
       </View>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         {messages === null ? (
-          <ActivityIndicator color={colors.accent} style={{ flex: 1 }} />
+          <ActivityIndicator color={colors.accentText} style={{ flex: 1 }} />
         ) : (
           <FlatList
             inverted
@@ -119,7 +121,7 @@ export default function BookingMessages() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   nav: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.surface },
   back: { width: 40, height: 40, borderRadius: 12, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' },
@@ -132,10 +134,10 @@ const styles = StyleSheet.create({
   theirs: { alignSelf: 'flex-start' },
   bubble: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 18 },
   bubbleMine: { backgroundColor: colors.accent, borderBottomRightRadius: 6 },
-  bubbleTheirs: { backgroundColor: '#F0F4F8', borderWidth: 1, borderColor: '#DCE4EC', borderBottomLeftRadius: 4 },
-  msgText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: '#1E293B' },
+  bubbleTheirs: { backgroundColor: colors.chatBubble, borderWidth: 1, borderColor: colors.chatBubbleBorder, borderBottomLeftRadius: 4 },
+  msgText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.chatText },
   time: { fontFamily: fonts.regular, fontSize: 11, color: colors.text3, marginTop: 4, marginHorizontal: 4 },
-  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, padding: 12, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: '#EFEAE2' },
+  composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 10, padding: 12, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.chatFooter },
   input: {
     flex: 1,
     maxHeight: 120,
@@ -149,7 +151,7 @@ const styles = StyleSheet.create({
     paddingBottom: 11,
     fontFamily: fonts.regular,
     fontSize: 16,
-    color: '#1E293B',
+    color: colors.chatText,
   },
   send: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-});
+}));

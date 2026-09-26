@@ -1,10 +1,12 @@
 import type { HomeData } from '@kounselia/core';
-import { StyleSheet, Text, View } from 'react-native';
-import { colors, counselorColors, fonts, radius, shadows } from '@/theme';
+import { Text, View } from 'react-native';
+import { counselorColors, fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 
 // The three numbers under the mood card (.stats-row).
 export function StatsRow({ stats }: { stats: HomeData['stats'] }) {
+  const styles = useStyles();
+  const colors = useColors();
   const items = [
     { icon: 'message-circle', color: 'blue', num: stats.conversations, label: 'Conversations' },
     { icon: 'calendar-week', color: 'sage', num: stats.messages_this_week, label: 'Messages this week' },
@@ -13,7 +15,7 @@ export function StatsRow({ stats }: { stats: HomeData['stats'] }) {
   return (
     <View style={styles.row}>
       {items.map((s) => {
-        const { fg, bg } = counselorColors(s.color);
+        const { fg, bg } = counselorColors(s.color, colors);
         return (
           <View key={s.label} style={styles.card} accessible accessibilityLabel={`${s.num} ${s.label}`}>
             <View style={[styles.icon, { backgroundColor: bg }]}>
@@ -28,10 +30,10 @@ export function StatsRow({ stats }: { stats: HomeData['stats'] }) {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   row: { flexDirection: 'row', gap: 10, marginTop: 16 },
   card: { flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.sm, padding: 14, ...shadows.soft },
   icon: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
   num: { fontFamily: fonts.serifMedium, fontSize: 28, lineHeight: 30, color: colors.text },
   label: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, color: colors.text2, marginTop: 4 },
-});
+}));

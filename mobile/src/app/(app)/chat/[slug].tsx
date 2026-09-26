@@ -2,7 +2,7 @@ import { fetchCheckinQuestion, type CounselorSummary } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Keyboard, KeyboardAvoidingView, Platform, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Keyboard, KeyboardAvoidingView, Platform, Share, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReplyPlayer } from '@/audio/useReplyPlayer';
 import { useVoiceCall } from '@/audio/useVoiceCall';
@@ -17,7 +17,7 @@ import { Toast, useToast } from '@/components/chat/Toast';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { useCounselors } from '@/counselors';
 import { useSession } from '@/session';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles, useColors } from '@/theme';
 
 function goBack() {
   if (router.canGoBack()) router.back();
@@ -26,6 +26,8 @@ function goBack() {
 
 // Waits for the counselor list, then opens the conversation.
 export default function ChatRoute() {
+  const styles = useStyles();
+  const colors = useColors();
   const { slug, checkin } = useLocalSearchParams<{ slug: string; checkin?: string }>();
   const { status, bySlug } = useCounselors();
   const counselor = bySlug(slug);
@@ -35,7 +37,7 @@ export default function ChatRoute() {
   return (
     <View style={styles.centerScreen}>
       {status === 'loading' ? (
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator color={colors.accentText} />
       ) : (
         <>
           <Text style={styles.notice}>
@@ -66,6 +68,8 @@ function useKeyboardOpen() {
 }
 
 function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; checkinId?: number }) {
+  const styles = useStyles();
+  const colors = useColors();
   const { config } = useSession();
   const chat = useChat(config, counselor);
   const toast = useToast();
@@ -176,7 +180,7 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
       <KeyboardAvoidingView style={styles.flex} behavior="padding">
         {chat.phase === 'loading' ? (
           <View style={styles.centerFill}>
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color={colors.accentText} />
             <Text style={styles.loadingText}>Connecting you with {counselor.name}…</Text>
           </View>
         ) : (
@@ -225,16 +229,16 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   screen: { flex: 1, backgroundColor: colors.bg },
   flex: { flex: 1 },
   list: { paddingHorizontal: 16, paddingVertical: 20 },
   separator: { height: 18 },
   typingGap: { marginTop: 18 },
   // .chat-footer (the website's warm sand dock)
-  footer: { backgroundColor: '#EFEAE2', borderTopWidth: 1, borderTopColor: colors.border },
+  footer: { backgroundColor: colors.chatFooter, borderTopWidth: 1, borderTopColor: colors.border },
   centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   loadingText: { fontFamily: fonts.regular, fontSize: 14, color: colors.text2 },
   centerScreen: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
-});
+}));

@@ -8,7 +8,7 @@ import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { Toast, useToast } from '@/components/chat/Toast';
@@ -16,7 +16,7 @@ import { FormMessage } from '@/components/FormMessage';
 import { HeaderButton, ScreenHeader } from '@/components/ScreenHeader';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
-import { colors, fonts, radius, shadows } from '@/theme';
+import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 
 const IMPORT_PROMPT =
   'Please summarize everything you know about me as a person. Include my life timeline (dates and events), my emotional patterns and feelings about specific things in my life, my relationships, my work situation and goals, and any mental health themes. Write it as a clear factual summary.';
@@ -54,6 +54,8 @@ function splitList(text: string) {
 }
 
 export default function Memory() {
+  const styles = useStyles();
+  const colors = useColors();
   const { config } = useSession();
   const toast = useToast();
   const [memory, setMemory] = useState<MemoryProfile | null | undefined>(undefined);
@@ -166,7 +168,7 @@ export default function Memory() {
               <Button title="Try again" variant="ghost" onPress={load} />
             </>
           ) : (
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color={colors.accentText} />
           )}
         </View>
       </SafeAreaView>
@@ -243,7 +245,7 @@ export default function Memory() {
               <Step n={1} title="Copy this message">
                 <Text style={styles.prompt}>{IMPORT_PROMPT}</Text>
                 <Pressable onPress={copyPrompt} accessibilityRole="button" style={({ pressed }) => [styles.copy, pressed && { opacity: 0.85 }]}>
-                  <TablerIcon name={copied ? 'check' : 'copy'} size={16} color={colors.accent} />
+                  <TablerIcon name={copied ? 'check' : 'copy'} size={16} color={colors.accentText} />
                   <Text style={styles.copyText}>{copied ? 'Copied' : 'Copy message'}</Text>
                 </Pressable>
               </Step>
@@ -277,6 +279,8 @@ export default function Memory() {
 }
 
 function Section({ icon, label, children }: { icon: string; label: string; children: ReactNode }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <View style={styles.section}>
       <View style={styles.sectionHead}>
@@ -289,6 +293,7 @@ function Section({ icon, label, children }: { icon: string; label: string; child
 }
 
 function Step({ n, title, children }: { n: number; title: string; children: ReactNode }) {
+  const styles = useStyles();
   return (
     <View style={styles.step}>
       <View style={styles.stepNum}>
@@ -303,6 +308,7 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 }
 
 function Field({ label, value, onChange, multiline }: { label: string; value: string; onChange: (v: string) => void; multiline?: boolean }) {
+  const styles = useStyles();
   const [focused, setFocused] = useState(false);
   return (
     <View style={{ marginTop: 16 }}>
@@ -321,7 +327,7 @@ function Field({ label, value, onChange, multiline }: { label: string; value: st
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
@@ -373,7 +379,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: colors.accentLight,
   },
-  copyText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accent },
+  copyText: { fontFamily: fonts.medium, fontSize: 13, color: colors.accentText },
   paste: {
     minHeight: 140,
     borderWidth: 1.5,
@@ -402,4 +408,4 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   fieldFocused: { borderColor: colors.accent, backgroundColor: colors.surface },
-});
+}));

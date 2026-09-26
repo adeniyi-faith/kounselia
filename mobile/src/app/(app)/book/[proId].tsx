@@ -2,7 +2,7 @@ import { createBooking, fetchBookings, fetchBookingStatus, fetchSlots, reschedul
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBrowser } from '@/browser/BrowserProvider';
 import { Button } from '@/components/Button';
@@ -10,7 +10,7 @@ import { ProfessionalAvatar } from '@/components/dashboard/ProfessionalAvatar';
 import { FormMessage } from '@/components/FormMessage';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
-import { colors, fonts, radius } from '@/theme';
+import { fonts, makeStyles, radius, useColors } from '@/theme';
 
 interface Slot {
   value: string; // site time, sent back to the server
@@ -24,6 +24,8 @@ function dayKey(d: Date) {
 // Pick a time with a professional, then pay — or, with ?reschedule=<id>,
 // move an existing booking to a new time (no payment).
 export default function BookProfessional() {
+  const styles = useStyles();
+  const colors = useColors();
   const { proId, reschedule, pro: proParam } = useLocalSearchParams<{ proId: string; reschedule?: string; pro?: string }>();
   const professionalId = Number(proId);
   const rescheduleId = reschedule ? Number(reschedule) : undefined;
@@ -179,7 +181,7 @@ export default function BookProfessional() {
   if (!slots) {
     return (
       <SafeAreaView style={[styles.safe, styles.center]}>
-        <ActivityIndicator color={colors.accent} />
+        <ActivityIndicator color={colors.accentText} />
       </SafeAreaView>
     );
   }
@@ -287,7 +289,7 @@ export default function BookProfessional() {
       {waiting ? (
         <View style={[styles.footer, { gap: 10 }]}>
           <View style={styles.waitRow} accessibilityLiveRegion="polite">
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color={colors.accentText} />
             <Text style={styles.waitText}>Waiting for your payment… This updates by itself once Paystack confirms it.</Text>
           </View>
           <Button title="I've paid — check now" onPress={() => checkPayment(true)} busy={checking} />
@@ -307,7 +309,7 @@ export default function BookProfessional() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   center: { alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
@@ -327,7 +329,7 @@ const styles = StyleSheet.create({
   proRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   proName: { fontFamily: fonts.serifMedium, fontSize: 24, color: colors.text },
   proSpec: { fontFamily: fonts.regular, fontSize: 13, color: colors.text2, marginTop: 2 },
-  price: { fontFamily: fonts.semibold, fontSize: 13, color: colors.accent, marginTop: 4 },
+  price: { fontFamily: fonts.semibold, fontSize: 13, color: colors.accentText, marginTop: 4 },
   label: { fontFamily: fonts.medium, fontSize: 13, color: colors.text2, marginTop: 24, marginBottom: 10 },
   days: { gap: 8, paddingRight: 20 },
   chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 50, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
@@ -362,4 +364,4 @@ const styles = StyleSheet.create({
   waitRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 4 },
   waitText: { flex: 1, fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.text2 },
   footer: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.bg },
-});
+}));

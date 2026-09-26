@@ -10,10 +10,10 @@
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Linking, Modal, Platform, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Modal, Platform, Pressable, Share, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { TablerIcon } from '@/components/TablerIcon';
-import { colors, fonts } from '@/theme';
+import { fonts, makeStyles, useColors } from '@/theme';
 import { WebFrame, type NavState, type WebFrameHandle } from './WebFrame';
 
 interface OpenOptions {
@@ -120,6 +120,8 @@ function InAppBrowser({
   onClose: () => void;
   backRef: { current: () => boolean };
 }) {
+  const styles = useStyles();
+  const colors = useColors();
   const frame = useRef<WebFrameHandle | null>(null);
   const [nav, setNav] = useState<NavState>({ url, title: '', canGoBack: false, canGoForward: false });
   const [progress, setProgress] = useState(0);
@@ -214,7 +216,7 @@ function InAppBrowser({
         />
         {progress === 0 && !failed && (
           <View style={styles.cover} pointerEvents="none">
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color={colors.accentText} />
           </View>
         )}
         {failed && (
@@ -254,6 +256,8 @@ function InAppBrowser({
 }
 
 function ToolButton({ icon, label, onPress, disabled }: { icon: string; label: string; onPress: () => void; disabled?: boolean }) {
+  const styles = useStyles();
+  const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
@@ -269,7 +273,7 @@ function ToolButton({ icon, label, onPress, disabled }: { icon: string; label: s
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   wrap: { flex: 1, backgroundColor: colors.surface },
   header: { backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
   headRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 10, paddingVertical: 8 },
@@ -301,4 +305,4 @@ const styles = StyleSheet.create({
   toolbar: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border },
   toolRow: { flexDirection: 'row', justifyContent: 'space-around', paddingVertical: 6 },
   tool: { width: 48, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
-});
+}));

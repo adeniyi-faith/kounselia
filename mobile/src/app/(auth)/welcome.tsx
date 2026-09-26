@@ -1,19 +1,10 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import {
-  FlatList,
-  Image,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-  type ImageSourcePropType,
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-} from 'react-native';
+import { FlatList, Image, useWindowDimensions, View, type ImageSourcePropType, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
-import { colors, radius, shadows } from '@/theme';
+import { makeStyles, radius, shadows } from '@/theme';
 
 // The campaign posters, shown whole: each is sized to the largest it can
 // be inside the space above the buttons, so nothing is ever cropped on
@@ -42,6 +33,7 @@ const POSTER_RATIO = 1200 / 1553;
 const SIDE_GAP = 24;
 
 export default function Welcome() {
+  const styles = useStyles();
   const { width: screenWidth } = useWindowDimensions();
   const [areaHeight, setAreaHeight] = useState(0);
   const [page, setPage] = useState(0);
@@ -105,7 +97,7 @@ export default function Welcome() {
   );
 }
 
-const styles = StyleSheet.create({
+const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   slides: { flex: 1, marginTop: 12 },
   slide: { alignItems: 'center', justifyContent: 'center' },
@@ -115,4 +107,4 @@ const styles = StyleSheet.create({
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
   dotActive: { width: 22, backgroundColor: colors.brandNavy },
   actions: { gap: 12, paddingHorizontal: SIDE_GAP, paddingBottom: 16 },
-});
+}));
