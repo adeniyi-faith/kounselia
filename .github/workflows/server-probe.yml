@@ -21,33 +21,22 @@ jobs:
             grep -iE '^(server|content-type|x-|set-cookie: ?(ak|__cf|incap|visid))' headers.txt || true
             echo "--- body (first 600 bytes):"; head -c 600 body.txt; echo; echo
           }
-          CH="Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Mobile Safari/537.36"
-          probe "POST counselors (no password, nothing unusual)" -X POST "$URL" \
+          O=(-H "Origin: https://kounselia.com" -H "Referer: https://kounselia.com/")
+          probe "app login + Origin/Referer (exactly as the fixed app)" -X POST "$URL" "${O[@]}" \
+            -H "User-Agent: okhttp/4.12.0" -H "Content-Type: application/x-www-form-urlencoded" -H "X-Kounselia-Client: app" \
+            --data "action=kounselia_app_login&email=probe-nobody%40example.com&password=not-a-real-password&device_name=probe"
+          probe "app register validation + Origin/Referer (short password, creates nothing)" -X POST "$URL" "${O[@]}" \
+            -H "User-Agent: okhttp/4.12.0" -H "Content-Type: application/x-www-form-urlencoded" -H "X-Kounselia-Client: app" \
+            --data "action=kounselia_app_register&name=Probe&email=not-an-email&password=x"
+          probe "app_me POST + token + Origin/Referer" -X POST "$URL" "${O[@]}" \
             -H "User-Agent: okhttp/4.12.0" -H "Content-Type: application/x-www-form-urlencoded" \
-            --data "action=kounselia_get_counselors"
-          probe "POST counselors, full browser headers" -X POST "$URL" \
-            -H "User-Agent: $CH" -H "Accept: */*" -H "Accept-Language: en-US,en;q=0.9" \
-            -H "Origin: https://kounselia.com" -H "Referer: https://kounselia.com/talk.php" \
-            -H "Content-Type: application/x-www-form-urlencoded" --data "action=kounselia_get_counselors"
-          probe "POST counselors, Origin+Referer only" -X POST "$URL" \
-            -H "User-Agent: okhttp/4.12.0" -H "Origin: https://kounselia.com" -H "Referer: https://kounselia.com/" \
-            -H "Content-Type: application/x-www-form-urlencoded" --data "action=kounselia_get_counselors"
-          probe "POST counselors, Accept-Language only" -X POST "$URL" \
-            -H "User-Agent: okhttp/4.12.0" -H "Accept-Language: en-US,en;q=0.9" \
-            -H "Content-Type: application/x-www-form-urlencoded" --data "action=kounselia_get_counselors"
-          probe "POST counselors, multipart" -X POST "$URL" -H "User-Agent: okhttp/4.12.0" -F "action=kounselia_get_counselors"
-          probe "POST counselors, JSON body" -X POST "$URL?action=kounselia_get_counselors" \
-            -H "User-Agent: okhttp/4.12.0" -H "Content-Type: application/json" --data '{}'
-          probe "POST counselors, empty body, action in URL" -X POST "$URL?action=kounselia_get_counselors" \
-            -H "User-Agent: okhttp/4.12.0" -H "Content-Length: 0"
-          probe "POST counselors, action in URL, form body" -X POST "$URL?action=kounselia_get_counselors" \
-            -H "User-Agent: okhttp/4.12.0" -H "Content-Type: application/x-www-form-urlencoded" --data "x=1"
-          probe "POST to site root (not admin-ajax)" -X POST "https://kounselia.com/" \
-            -H "User-Agent: okhttp/4.12.0" -H "Content-Type: application/x-www-form-urlencoded" --data "x=1"
-          probe "POST to wp-login.php" -X POST "https://kounselia.com/portal/wp-login.php" \
-            -H "User-Agent: $CH" -H "Content-Type: application/x-www-form-urlencoded" --data "log=probe&pwd=probe"
-          probe "POST to REST API" -X POST "https://kounselia.com/portal/wp-json/" \
-            -H "User-Agent: okhttp/4.12.0" -H "Content-Type: application/json" --data '{}'
-          probe "GET REST API root" "https://kounselia.com/portal/wp-json/" -H "User-Agent: okhttp/4.12.0"
-          probe "GET app_me with app header" "$URL?action=kounselia_app_me" \
-            -H "User-Agent: okhttp/4.12.0" -H "X-Kounselia-Client: app" -H "X-Kounselia-Token: $(printf 'a%.0s' $(seq 64))"
+            -H "X-Kounselia-Client: app" -H "X-Kounselia-Token: $(printf 'a%.0s' $(seq 64))" --data "action=kounselia_app_me"
+          probe "Referer only" -X POST "$URL" -H "Referer: https://kounselia.com/" \
+            -H "User-Agent: okhttp/4.12.0" -H "Content-Type: application/x-www-form-urlencoded" --data "action=kounselia_get_counselors"
+          probe "Origin only" -X POST "$URL" -H "Origin: https://kounselia.com" \
+            -H "User-Agent: okhttp/4.12.0" -H "Content-Type: application/x-www-form-urlencoded" --data "action=kounselia_get_counselors"
+          B64=$(head -c 60000 /dev/urandom | base64 -w0 | sed 's/+/%2B/g;s/\//%2F/g;s/=/%3D/g')
+          probe "big base64 body (like voice/photo upload) + Origin/Referer" -X POST "$URL" "${O[@]}" \
+            -H "User-Agent: okhttp/4.12.0" -H "Content-Type: application/x-www-form-urlencoded" -H "X-Kounselia-Client: app" \
+            --data "action=kounselia_get_counselors&audio_b64=$B64"
+          exit 0
