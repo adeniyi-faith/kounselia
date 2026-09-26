@@ -5,3 +5,4 @@ export * from './auth';
 export * from './appAuth';
 export * from './voiceCall';
 export * from './transcription';
+export * from './dashboard';

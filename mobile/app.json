@@ -48,7 +48,9 @@
             "android.permission.MODIFY_AUDIO_SETTINGS"
           ]
         }
-      ]
+      ],
+      "expo-web-browser",
+      "expo-image"
     ],
     "experiments": {
       "typedRoutes": true

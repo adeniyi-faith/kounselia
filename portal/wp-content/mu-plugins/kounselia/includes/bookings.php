@@ -1035,6 +1035,7 @@ function kounselia_ajax_get_booking_messages() {
             'id'          => (int) $m->id,
             'content'     => $m->content,
             'created_at'  => $m->created_at,
+            'sent_at'     => kounselia_app_utc( $m->created_at ), // UTC, for the mobile app
             'sender_name' => $m->sender_name,
             'is_mine'     => ( (int) $m->sender_user_id === (int) $user_id ),
         );
