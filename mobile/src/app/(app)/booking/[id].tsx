@@ -81,7 +81,7 @@ export default function BookingMessages() {
             contentContainerStyle={styles.list}
             ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
             ListEmptyComponent={
-              <Text style={[styles.empty, { transform: [{ scaleY: -1 }] }]}>
+              <Text style={styles.empty}>
                 No messages yet. Say hello, or share anything they should know before your session.
               </Text>
             }
