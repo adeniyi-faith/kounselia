@@ -343,6 +343,32 @@ function kounselia_safety_escalation_context( $escalation ) {
         );
     }
 
+    if ( 'article_comment' === $escalation->source ) {
+        $row = $wpdb->get_row( $wpdb->prepare(
+            "SELECT c.content, p.title AS post_title
+             FROM {$wpdb->prefix}kounselia_post_comments c
+             INNER JOIN {$wpdb->prefix}kounselia_posts p ON p.id = c.post_id
+             WHERE c.id = %d",
+            $escalation->comment_id
+        ) );
+        if ( ! $row ) {
+            return null;
+        }
+
+        $who = 'a member';
+        if ( $escalation->user_id ) {
+            $user = get_userdata( $escalation->user_id );
+            $who  = $user ? ( $user->display_name ?: $user->user_email ) : ( 'member #' . $escalation->user_id );
+        }
+
+        return array(
+            'who'            => $who,
+            'where_html'     => 'in a comment on the article <strong>' . esc_html( $row->post_title ) . '</strong> (held back from the public)',
+            'content'        => $row->content,
+            'transcript_url' => rtrim( $site_url, '/' ) . '/portal/admin/pages/articles.php?tab=community&status=safety',
+        );
+    }
+
     // Default / legacy: the AI counselor chat.
     $row = $wpdb->get_row( $wpdb->prepare(
         "SELECT m.content AS message_content, s.counselor_slug

@@ -50,3 +50,4 @@ vendor/
 # served by the website (the whole repo is deployed to the web root)
 !mobile/.htaccess
 !packages/.htaccess
+.phpunit.result.cache

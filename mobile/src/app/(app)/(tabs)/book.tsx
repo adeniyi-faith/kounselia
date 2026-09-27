@@ -227,7 +227,7 @@ function ProfessionalTile({ pro }: { pro: Professional }) {
     <Pressable
       onPress={() => router.push({ pathname: '/book/[proId]', params: { proId: String(pro.id), pro: JSON.stringify(pro) } })}
       accessibilityRole="button"
-      accessibilityLabel={`${pro.name}, ${pro.title}. ${pro.price ? `${pro.price} per session.` : ''} Book a session`}
+      accessibilityLabel={`${pro.name}, ${pro.title}. ${pro.free_label ? `${pro.free_label}. ` : ''}${pro.price ? `${pro.price} per session.` : ''} Book a session`}
       style={({ pressed }) => [styles.tile, pressed && { transform: [{ scale: 0.97 }] }]}
     >
       <ProfessionalAvatar pro={pro} size={48} />
@@ -241,6 +241,8 @@ function ProfessionalTile({ pro }: { pro: Professional }) {
       <Text style={[styles.tileSpec, { color: pro.review_count ? colors.gold : colors.text3, marginTop: 4 }]}>
         {pro.review_count ? `★ ${pro.rating.toFixed(1)} (${pro.review_count})` : 'No reviews yet'}
       </Text>
+      {pro.free_label ? <Text style={styles.free}>{pro.free_label}</Text> : null}
+      {pro.video_provider ? <Text style={styles.video}>Sessions on {pro.video_provider}</Text> : null}
       {pro.price ? <Text style={styles.price}>{pro.price} / session</Text> : null}
       {pro.full_price ? (
         // Pro members pay less; show what it would have been, as the website does.
@@ -307,6 +309,8 @@ const useStyles = makeStyles((colors) => ({
   tileName: { fontFamily: fonts.serifMedium, fontSize: 17, color: colors.text, marginTop: 10, textAlign: 'center' },
   tileSpec: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, color: colors.text3, textAlign: 'center', marginTop: 2 },
   price: { fontFamily: fonts.semibold, fontSize: 13, color: colors.accentText, marginTop: 6, textAlign: 'center' },
+  free: { fontFamily: fonts.semibold, fontSize: 12.5, color: colors.sage, marginTop: 4 },
+  video: { fontFamily: fonts.regular, fontSize: 12.5, color: colors.text3, marginTop: 2 },
   proPrice: { fontFamily: fonts.medium, fontSize: 12, color: colors.gold, marginTop: 2, textAlign: 'center' },
   fullPrice: { fontFamily: fonts.regular, color: colors.text3, textDecorationLine: 'line-through' },
 }));

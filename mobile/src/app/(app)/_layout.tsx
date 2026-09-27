@@ -26,6 +26,7 @@ export default function AppLayout() {
         <Stack.Screen name="journal" />
         <Stack.Screen name="articles/index" />
         <Stack.Screen name="articles/[slug]" />
+        <Stack.Screen name="comments/[postId]" />
         <Stack.Screen name="memory" />
       </Stack>
     </CounselorsProvider>

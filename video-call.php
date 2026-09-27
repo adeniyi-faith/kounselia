@@ -18,6 +18,12 @@
  * Joining is only allowed in a window around the scheduled time (see
  * kounselia_booking_is_joinable() in bookings.php) — outside that window
  * this page shows the scheduled time instead of the call.
+ *
+ * A professional an admin has allowed can hold sessions on their own
+ * Zoom / Google Meet / Teams / Whereby link instead (video-links.php).
+ * Then, inside the same window and for the same two people, this page
+ * shows a "Join on Zoom" button in place of the Kounselia room — the
+ * link is never shown anywhere else.
  */
 define( 'WP_USE_THEMES', false );
 define( 'COOKIEPATH', '/' );
@@ -48,6 +54,7 @@ $window       = kounselia_booking_join_window( $booking );
 
 $dashboard_url = $is_professional_side ? '/pro-dashboard.php' : '/dashboard.php';
 $room_name     = 'kounselia-' . $booking->room_token;
+$video         = function_exists( 'kounselia_booking_video' ) ? kounselia_booking_video( $booking ) : array( 'external' => false, 'provider' => 'Kounselia', 'url' => '' );
 
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_auth' );
@@ -75,6 +82,10 @@ body{font-family:'Outfit',sans-serif;color:#fff;margin:0;display:flex;flex-direc
 .wait-screen h1{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:30px;margin-bottom:10px}
 .wait-screen p{color:rgba(255,255,255,.7);font-size:15px;max-width:420px;line-height:1.6}
 .wait-screen .btn-w{margin-top:24px;background:#fff;color:var(--navy,#1F2937);padding:13px 24px;border-radius:50px;text-decoration:none;font-size:14px;font-weight:500}
+.wait-screen .btn-w.big{font-size:16px;padding:16px 30px;display:inline-flex;align-items:center;gap:8px}
+.wait-screen .btn-w.ghost{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.35);margin-top:12px}
+.ext-note{margin-top:26px;max-width:420px;font-size:13px;color:rgba(255,255,255,.6);line-height:1.6}
+.ext-note b{color:rgba(255,255,255,.85)}
 </style>
 </head>
 <body>
@@ -84,7 +95,16 @@ body{font-family:'Outfit',sans-serif;color:#fff;margin:0;display:flex;flex-direc
   <div class="call-with">Session with <?php echo esc_html( $other_party_name ); ?></div>
 </div>
 
-<?php if ( $can_join ) : ?>
+<?php if ( $can_join && $video['external'] ) : ?>
+  <div class="wait-screen">
+    <i class="ti ti-video"></i>
+    <h1>Your session is on <?php echo esc_html( $video['provider'] ); ?></h1>
+    <p><?php echo esc_html( $is_professional_side ? 'You chose to hold this session on ' . $video['provider'] . '.' : $other_party_name . ' holds sessions on ' . $video['provider'] . '.' ); ?> It opens in <?php echo esc_html( $video['provider'] ); ?>, or in your browser if you don't have the app.</p>
+    <a class="btn-w big" href="<?php echo esc_url( $video['url'] ); ?>" target="_blank" rel="noopener noreferrer"><i class="ti ti-external-link"></i> Join on <?php echo esc_html( $video['provider'] ); ?></a>
+    <a class="btn-w ghost" href="<?php echo esc_url( $dashboard_url ); ?>">Message <?php echo esc_html( $other_party_name ); ?> on Kounselia</a>
+    <p class="ext-note"><b>Your booking, payment and messages stay on Kounselia.</b> If the link doesn't work, message each other here. Kounselia's safety checks only cover what's said on Kounselia, so if you are in danger, please use our <a href="/page/safety-resources" style="color:#fff">safety resources</a>.</p>
+  </div>
+<?php elseif ( $can_join ) : ?>
   <div id="jitsi-container"></div>
   <script src="https://meet.jit.si/external_api.js"></script>
   <script>
@@ -101,6 +121,7 @@ body{font-family:'Outfit',sans-serif;color:#fff;margin:0;display:flex;flex-direc
     <i class="ti ti-clock"></i>
     <?php if ( current_time( 'timestamp' ) < $window['opens_at'] ) : ?>
       <h1>Not quite time yet</h1>
+      <?php if ( $video['external'] ) : ?><p style="margin-bottom:8px">This session will be on <strong><?php echo esc_html( $video['provider'] ); ?></strong>. The link appears here when it's time.</p><?php endif; ?>
       <p>This room opens 10 minutes before your session, at <strong><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?></strong>. Come back then to join.</p>
     <?php else : ?>
       <h1>This session has ended</h1>

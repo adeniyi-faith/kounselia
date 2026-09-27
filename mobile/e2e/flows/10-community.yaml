@@ -1,0 +1,55 @@
+# A professional's article: the bar underneath (love, conversation,
+# follow, book), then the conversation screen, choosing how your name is
+# shown the first time, and posting a comment.
+appId: com.kounselia.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Talk to someone now"
+    timeout: 60000
+- scrollUntilVisible:
+    element: "See all"
+    direction: DOWN
+- tapOn: "See all"
+- extendedWaitUntil:
+    visible: "How to sleep when your mind races"
+    timeout: 15000
+- tapOn: "From our professionals"
+- extendedWaitUntil:
+    visible: "Grief comes in waves"
+    timeout: 15000
+- takeScreenshot: ${P}22-articles-professionals
+- tapOn: "Grief comes in waves"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "Follow"
+    timeout: 15000
+- tapOn: "Follow"
+- extendedWaitUntil:
+    visible: "Following"
+    timeout: 10000
+- takeScreenshot: ${P}23-article-actions
+- tapOn:
+    text: "Conversation.*"
+- waitForAnimationToEnd
+# The first run (light mode) chooses how the name is shown; the second run
+# (dark mode) talks to the same stand-in server, so it's already chosen.
+- runFlow:
+    when:
+      visible: "Join the conversation"
+    commands:
+      - tapOn: "Join the conversation"
+      - waitForAnimationToEnd
+      - takeScreenshot: ${P}24-choose-name
+      - tapOn: "Save"
+- extendedWaitUntil:
+    visible: "Posting as Samson.*"
+    timeout: 10000
+- tapOn: "Your comment"
+- inputText: "Thank you for writing this."
+- hideKeyboard
+- tapOn: "Post"
+- extendedWaitUntil:
+    visible: "Thank you for writing this."
+    timeout: 10000
+- takeScreenshot: ${P}25-conversation

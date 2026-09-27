@@ -237,9 +237,11 @@ function kounselia_ajax_app_bookings() {
         $rating = function_exists( 'kounselia_get_professional_rating_summary' )
             ? kounselia_get_professional_rating_summary( $pro->id )
             : array( 'average' => 0, 'count' => 0 );
-        $price = null;
-        $full  = null;
-        if ( $pro->rate_amount ) {
+        $price     = null;
+        $full      = null;
+        $free_left = function_exists( 'kounselia_free_sessions_left' ) ? kounselia_free_sessions_left( $pro, $user_id ) : 0;
+        $all_free  = defined( 'KOUNSELIA_FREE_ALWAYS' ) && $free_left >= KOUNSELIA_FREE_ALWAYS;
+        if ( $pro->rate_amount && ! $all_free ) {
             $full_amount  = kounselia_convert_ngn( $pro->rate_amount, $currency );
             $price_amount = round( $full_amount * ( 1 - $discount / 100 ), 2 );
             $price        = kounselia_format_money( $price_amount, $currency );
@@ -256,6 +258,10 @@ function kounselia_ajax_app_bookings() {
             'review_count' => (int) $rating['count'],
             'price'        => $price, // e.g. "₦15,000", already with any Pro discount
             'full_price'   => $full,  // the undiscounted price, only when a discount applies
+            // e.g. "Your next session is free"; null when there's nothing free left.
+            'free_label'   => $free_left && function_exists( 'kounselia_free_sessions_label' ) ? kounselia_free_sessions_label( $pro, $user_id ) : null,
+            // "Zoom", "Google Meet"... when their sessions aren't in Kounselia's own room.
+            'video_provider' => function_exists( 'kounselia_professional_video_provider' ) ? ( kounselia_professional_video_provider( $pro ) ?: null ) : null,
         );
     }
 
@@ -291,13 +297,20 @@ function kounselia_ajax_get_booking_room() {
         wp_send_json_error( array( 'message' => 'This room opens 10 minutes before your session.' ), 400 );
     }
 
+    // The professional's own Zoom / Meet / Teams / Whereby link, if they
+    // use one (video-links.php). Same rules got us here either way.
+    $video = function_exists( 'kounselia_booking_video' ) ? kounselia_booking_video( $booking ) : array( 'external' => false );
+    if ( $video['external'] ) {
+        wp_send_json_success( array( 'url' => $video['url'], 'external' => true, 'provider' => $video['provider'] ) );
+    }
+
     $user = wp_get_current_user();
     $name = $user->display_name ? $user->display_name : $user->user_login;
     $url  = 'https://meet.jit.si/kounselia-' . rawurlencode( $booking->room_token )
         . '#config.prejoinPageEnabled=true&config.disableDeepLinking=true'
         . '&userInfo.displayName=' . rawurlencode( wp_json_encode( $name ) );
 
-    wp_send_json_success( array( 'url' => $url ) );
+    wp_send_json_success( array( 'url' => $url, 'external' => false, 'provider' => 'Kounselia' ) );
 }
 add_action( 'wp_ajax_kounselia_get_booking_room', 'kounselia_ajax_get_booking_room' );
 add_action( 'wp_ajax_nopriv_kounselia_get_booking_room', 'kounselia_ajax_get_booking_room' );

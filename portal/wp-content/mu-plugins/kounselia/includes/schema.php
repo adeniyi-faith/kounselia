@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.22.0'; // Bumped version: mobile app sign-in tokens
+    $current_version   = '1.25.0'; // Bumped version: professionals' own video links
 
     if ( $installed_version === $current_version ) {
         return;
@@ -234,6 +234,7 @@ function kounselia_install_tables() {
         session_id BIGINT UNSIGNED NULL,
         booking_id BIGINT UNSIGNED NULL,
         booking_message_id BIGINT UNSIGNED NULL,
+        comment_id BIGINT UNSIGNED NULL,
         user_id BIGINT UNSIGNED NULL,
         guest_token VARCHAR(64) NULL,
         severity VARCHAR(10) NOT NULL DEFAULT 'elevated',
@@ -291,6 +292,15 @@ function kounselia_install_tables() {
         rate_currency VARCHAR(8) NOT NULL DEFAULT 'NGN',
         status VARCHAR(16) NOT NULL DEFAULT 'pending',
         rejection_reason VARCHAR(500) NULL,
+        publishing VARCHAR(16) NOT NULL DEFAULT 'default',
+        publishing_note VARCHAR(500) NULL,
+        admin_hidden TINYINT(1) NOT NULL DEFAULT 0,
+        suspended_reason VARCHAR(500) NULL,
+        suspended_at DATETIME NULL,
+        free_sessions_per_client SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+        video_link_allowed TINYINT(1) NOT NULL DEFAULT 0,
+        video_mode VARCHAR(16) NOT NULL DEFAULT 'kounselia',
+        video_link VARCHAR(500) NULL,
         submitted_at DATETIME NOT NULL,
         reviewed_at DATETIME NULL,
         reviewed_by BIGINT UNSIGNED NULL,
@@ -400,12 +410,15 @@ function kounselia_install_tables() {
         cancel_reason VARCHAR(500) NULL,
         room_token VARCHAR(64) NULL,
         series_id BIGINT UNSIGNED NULL,
+        is_free TINYINT(1) NOT NULL DEFAULT 0,
+        video_link VARCHAR(500) NULL,
         reminder_sent_at DATETIME NULL,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
         PRIMARY KEY  (id),
         KEY professional_id (professional_id),
         KEY client_user_id (client_user_id),
+        KEY pro_client_free (professional_id, client_user_id, is_free),
         KEY scheduled_start (scheduled_start),
         KEY status (status),
         KEY series_id (series_id)
@@ -672,13 +685,106 @@ function kounselia_install_tables() {
         views INT UNSIGNED NOT NULL DEFAULT 0,
         previous_slugs TEXT NULL,
         notify_campaign_id BIGINT UNSIGNED NULL,
+        author_type VARCHAR(16) NOT NULL DEFAULT 'staff',
+        professional_id BIGINT UNSIGNED NULL,
+        review_status VARCHAR(20) NULL,
+        review_note VARCHAR(1000) NULL,
+        pending_changes LONGTEXT NULL,
+        first_submitted_at DATETIME NULL,
+        submitted_at DATETIME NULL,
+        reviewed_at DATETIME NULL,
+        reviewed_by BIGINT UNSIGNED NULL,
+        allow_comments TINYINT(1) NOT NULL DEFAULT 1,
+        love_count INT UNSIGNED NOT NULL DEFAULT 0,
+        comment_count INT UNSIGNED NOT NULL DEFAULT 0,
+        followers_notified_at DATETIME NULL,
         published_at DATETIME NULL,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
         PRIMARY KEY  (id),
         UNIQUE KEY slug (slug),
         KEY status_published (status, published_at),
-        KEY featured (featured)
+        KEY featured (featured),
+        KEY author_type (author_type),
+        KEY professional_id (professional_id),
+        KEY review_status (review_status)
+    ) {$charset_collate};";
+
+    /*
+     * The community around the Journal (community.php): members follow
+     * professionals, love articles and comments, and comment on
+     * articles (one level of replies). Comments never show a member's
+     * full name or photo: they choose a first name or a nickname.
+     */
+    $sql_follows = "CREATE TABLE {$prefix}kounselia_follows (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        follower_user_id BIGINT UNSIGNED NOT NULL,
+        professional_id BIGINT UNSIGNED NOT NULL,
+        created_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY follower_pro (follower_user_id, professional_id),
+        KEY professional_id (professional_id)
+    ) {$charset_collate};";
+
+    $sql_post_loves = "CREATE TABLE {$prefix}kounselia_post_loves (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        post_id BIGINT UNSIGNED NOT NULL,
+        user_id BIGINT UNSIGNED NOT NULL,
+        created_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY post_user (post_id, user_id),
+        KEY user_id (user_id)
+    ) {$charset_collate};";
+
+    // status: visible | pending (held for a moderator, or by the safety
+    // check) | hidden (by the author, a moderator or reports) | removed
+    // (deleted by the person who wrote it, kept only while it has replies).
+    $sql_post_comments = "CREATE TABLE {$prefix}kounselia_post_comments (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        post_id BIGINT UNSIGNED NOT NULL,
+        parent_id BIGINT UNSIGNED NULL,
+        user_id BIGINT UNSIGNED NOT NULL,
+        content TEXT NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'visible',
+        hidden_reason VARCHAR(16) NULL,
+        flag_reason VARCHAR(255) NULL,
+        is_author TINYINT(1) NOT NULL DEFAULT 0,
+        pinned TINYINT(1) NOT NULL DEFAULT 0,
+        love_count INT UNSIGNED NOT NULL DEFAULT 0,
+        report_count INT UNSIGNED NOT NULL DEFAULT 0,
+        moderated_by BIGINT UNSIGNED NULL,
+        moderated_at DATETIME NULL,
+        created_at DATETIME NOT NULL,
+        updated_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        KEY post_status (post_id, status),
+        KEY parent_id (parent_id),
+        KEY user_id (user_id),
+        KEY status (status)
+    ) {$charset_collate};";
+
+    $sql_comment_loves = "CREATE TABLE {$prefix}kounselia_comment_loves (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        comment_id BIGINT UNSIGNED NOT NULL,
+        user_id BIGINT UNSIGNED NOT NULL,
+        created_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY comment_user (comment_id, user_id)
+    ) {$charset_collate};";
+
+    $sql_comment_reports = "CREATE TABLE {$prefix}kounselia_comment_reports (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        comment_id BIGINT UNSIGNED NOT NULL,
+        user_id BIGINT UNSIGNED NOT NULL,
+        reason VARCHAR(32) NOT NULL,
+        note VARCHAR(500) NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'open',
+        resolved_by BIGINT UNSIGNED NULL,
+        resolved_at DATETIME NULL,
+        created_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY comment_user (comment_id, user_id),
+        KEY status (status)
     ) {$charset_collate};";
 
     // Every email contact: newsletter sign-ups from the website AND
@@ -834,6 +940,11 @@ function kounselia_install_tables() {
     dbDelta( $sql_mail_log );
     dbDelta( $sql_message_feedback );
     dbDelta( $sql_app_tokens );
+    dbDelta( $sql_follows );
+    dbDelta( $sql_post_loves );
+    dbDelta( $sql_post_comments );
+    dbDelta( $sql_comment_loves );
+    dbDelta( $sql_comment_reports );
 
     if ( function_exists( 'kounselia_ensure_professional_docs_dir' ) ) {
         kounselia_ensure_professional_docs_dir();

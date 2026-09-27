@@ -47,7 +47,7 @@ $status_labels = array(
     'cancelled'        => 'Cancelled',
     'payment_conflict' => 'Payment conflict',
 );
-$payment_labels = array( 'pending' => 'Pending', 'success' => 'Paid', 'failed' => 'Failed', 'refunded' => 'Refunded' );
+$payment_labels = array( 'pending' => 'Pending', 'success' => 'Paid', 'failed' => 'Failed', 'refunded' => 'Refunded', 'free' => 'Free session' );
 ?>
 <!DOCTYPE html>
 <html lang="en">

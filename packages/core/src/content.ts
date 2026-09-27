@@ -19,12 +19,26 @@ export interface BlogCard {
   title: string;
   summary: string;
   cover: string | null;
-  author: { name: string; avatar: string | null };
+  author: BlogAuthor;
   published_utc: string | null;
   reading_minutes: number;
   tags: BlogTag[];
   url: string; // the article on the website, for sharing
+  love_count: number;
+  comment_count: number;
 }
+
+export interface BlogAuthor {
+  name: string;
+  avatar: string | null;
+  // Set when a verified professional wrote it (not the Kounselia team).
+  is_professional: boolean;
+  professional_id: number | null;
+  title: string | null; // e.g. "Clinical Psychologist"
+}
+
+// Which article the list is narrowed to, besides topic and search.
+export type BlogFrom = '' | 'professionals' | 'following';
 
 export interface BlogPage {
   posts: BlogCard[];
@@ -33,20 +47,144 @@ export interface BlogPage {
   title?: string;
   tagline?: string;
   tags?: BlogTag[];
+  // First page only: the extra filters worth offering. `professionals` is
+  // the label to show, or null when no professional has written yet.
+  filters?: { professionals: string | null; following: boolean };
+}
+
+// What a reader can do around an article (includes/app-content.php).
+export interface PostCommunity {
+  loves_on: boolean;
+  loved: boolean;
+  love_count: number;
+  comments_on: boolean;
+  comment_count: number;
+  follows_on: boolean;
+  following: boolean;
+  followers: number;
+  book_pro_id: number | null; // the author can be booked from the article
+  disclaimer: string | null; // the care note shown under professionals' articles
 }
 
 export interface BlogPost extends BlogCard {
   subtitle: string | null;
   cover_caption: string | null;
-  author: { name: string; avatar: string | null; bio: string };
+  author: BlogAuthor & { bio: string };
   html: string; // the article body, cleaned by the server
   related: BlogCard[];
+  community: PostCommunity;
 }
 
-export const fetchBlog = (config: KounseliaConfig, options: { page?: number; tag?: string; q?: string } = {}) =>
-  callAction<BlogPage>(config, 'kounselia_app_blog', { page: options.page ?? 1, tag: options.tag || undefined, q: options.q || undefined });
+export const fetchBlog = (config: KounseliaConfig, options: { page?: number; tag?: string; q?: string; from?: BlogFrom } = {}) =>
+  callAction<BlogPage>(config, 'kounselia_app_blog', {
+    page: options.page ?? 1,
+    tag: options.tag || undefined,
+    q: options.q || undefined,
+    from: options.from || undefined,
+  });
 
 export const fetchBlogPost = (config: KounseliaConfig, slug: string) => callAction<BlogPost>(config, 'kounselia_app_blog_post', { slug });
+
+// ---- Community: follow, love, comments (includes/community.php) --------------
+
+export const setFollowing = (config: KounseliaConfig, professionalId: number, follow: boolean) =>
+  callAction<{ following: boolean; followers: number }>(config, 'kounselia_follow', { professional_id: professionalId, follow: follow ? 1 : 0 });
+
+export const setPostLove = (config: KounseliaConfig, postId: number, love: boolean) =>
+  callAction<{ loved: boolean; count: number }>(config, 'kounselia_post_love', { post_id: postId, love: love ? 1 : 0 });
+
+export const setCommentLove = (config: KounseliaConfig, commentId: number, love: boolean) =>
+  callAction<{ loved: boolean; count: number }>(config, 'kounselia_comment_love', { comment_id: commentId, love: love ? 1 : 0 });
+
+export interface CommentAuthor {
+  name: string; // a first name or chosen nickname, never a full name
+  initial: string;
+  avatar: string | null; // only ever the article's author (a professional)
+  is_author: boolean;
+  profile_url: string | null;
+}
+
+export interface Comment {
+  id: number;
+  parent_id: number | null;
+  author: CommentAuthor;
+  content: string;
+  status: 'visible' | 'pending' | 'hidden' | 'removed';
+  held: boolean; // waiting for review; only its writer sees it
+  pinned: boolean;
+  love_count: number;
+  loved: boolean;
+  is_mine: boolean;
+  created_utc: string | null;
+  time_label: string;
+  replies: Comment[];
+}
+
+export interface CommunityIdentity {
+  mode: '' | 'first_name' | 'nickname'; // '' until they choose
+  nickname: string;
+  first_name: string;
+  name: string;
+}
+
+export interface CommentViewer {
+  signed_in: boolean;
+  can_comment: boolean;
+  // Why not, when they can't: 'need_identity' means choose a name first.
+  reason: string | null;
+  message: string | null;
+  identity: CommunityIdentity | null;
+  can_moderate: boolean; // the article's author (pin/hide) or an editor
+  max_length: number;
+  held_first: boolean; // comments wait for a moderator before showing
+}
+
+export interface CommentsPage {
+  comments: Comment[];
+  has_more: boolean;
+  total: number;
+  enabled: boolean;
+  viewer: CommentViewer;
+}
+
+export const fetchComments = (config: KounseliaConfig, postId: number, page = 1) =>
+  callAction<CommentsPage>(config, 'kounselia_comments', { post_id: postId, page });
+
+export interface PostedComment {
+  comment: Comment;
+  held: boolean;
+  // The crisis check matched: show `message` and a way to get help now.
+  safety: boolean;
+  support_url: string | null;
+  message: string;
+  count: number;
+}
+
+export const addComment = (config: KounseliaConfig, postId: number, content: string, parentId?: number) =>
+  callAction<PostedComment>(config, 'kounselia_comment_add', { post_id: postId, content, parent_id: parentId || undefined });
+
+// Both send back the article's new comment count (null if it's gone).
+export const deleteComment = (config: KounseliaConfig, commentId: number) =>
+  callAction<{ message: string; count: number | null }>(config, 'kounselia_comment_delete', { comment_id: commentId });
+
+export type ModerateAction = 'hide' | 'pin' | 'unpin';
+
+export const moderateComment = (config: KounseliaConfig, commentId: number, act: ModerateAction) =>
+  callAction<{ message: string; count: number | null }>(config, 'kounselia_comment_moderate', { comment_id: commentId, act });
+
+export const REPORT_REASONS: { key: string; label: string }[] = [
+  { key: 'unkind', label: 'Unkind or bullying' },
+  { key: 'harmful', label: 'Harmful or dangerous advice' },
+  { key: 'spam', label: 'Spam or advertising' },
+  { key: 'private_info', label: "Shares someone's private information" },
+  { key: 'other', label: 'Something else' },
+];
+
+export const reportComment = (config: KounseliaConfig, commentId: number, reason: string, note = '') =>
+  callAction<{ message: string }>(config, 'kounselia_comment_report', { comment_id: commentId, reason, note });
+
+export const saveCommunityIdentity = (config: KounseliaConfig, mode: 'first_name' | 'nickname', nickname = '') =>
+  callAction<CommunityIdentity>(config, 'kounselia_community_identity', { mode, nickname });
 
 // ---- Private journal --------------------------------------------------------
 
