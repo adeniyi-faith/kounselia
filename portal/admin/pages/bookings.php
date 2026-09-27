@@ -7,9 +7,13 @@
  * thread, no way to step into a dispute ("the professional never showed
  * up," "this conversation is inappropriate"). This is that — every
  * booking, filterable by status, with a link into its conversation
- * (booking-messages.php) and an admin-override cancel that refunds the
+ * (booking-messages.php), an admin-override cancel that refunds the
  * client the same way a normal cancellation does (see
- * kounselia_admin_cancel_booking in bookings.php).
+ * kounselia_admin_cancel_booking in bookings.php), and a "Book a
+ * session" form for slotting one in by hand — any professional, any
+ * client, any time, skipping the working-hours/2-hour-notice rules the
+ * self-serve flow holds everyone else to (see
+ * kounselia_ajax_admin_create_booking in bookings.php).
  *
  * 'payment_conflict' bookings need particular attention: that status
  * means a client's payment was captured for a slot that had, in the
@@ -40,6 +44,7 @@ $total        = kounselia_count_all_bookings_admin( $status_filter );
 $total_pages  = max( 1, (int) ceil( $total / $per_page ) );
 
 $conflict_count = kounselia_count_all_bookings_admin( 'payment_conflict' );
+$professionals  = kounselia_get_verified_professionals();
 
 $status_labels = array(
     'confirmed'        => 'Confirmed',
@@ -71,6 +76,21 @@ $payment_labels = array( 'pending' => 'Pending', 'success' => 'Paid', 'failed' =
 .cancel-btn{background:none;border:1px solid var(--rose);color:var(--rose);border-radius:var(--r-sm);padding:6px 12px;font-size:12px;cursor:pointer;font-family:inherit}
 .cancel-btn:hover{background:var(--rose);color:#fff}
 .cancel-btn:disabled{opacity:.5;cursor:not-allowed}
+.book-toggle{display:inline-flex;align-items:center;gap:6px;background:var(--accent);color:#fff;border:none;border-radius:var(--r-sm);padding:9px 16px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:20px}
+.book-panel{display:none;background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:18px 20px;margin-bottom:20px}
+.book-panel.open{display:block}
+.book-panel h2{font-size:15px;margin:0 0 4px}
+.book-panel .hint{font-size:12.5px;color:var(--text3);margin:0 0 16px}
+.book-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+.book-field{flex:1;min-width:180px;display:flex;flex-direction:column;gap:5px}
+.book-field label{font-size:12px;font-weight:600;color:var(--text2)}
+.book-field select,.book-field input,.book-field textarea{border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 10px;font-size:13.5px;font-family:inherit;background:#fff}
+.book-now-btn{background:none;border:1px solid var(--border);border-radius:var(--r-sm);padding:8px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;white-space:nowrap;align-self:flex-end}
+.book-submit{background:var(--accent);color:#fff;border:none;border-radius:var(--r-sm);padding:9px 18px;font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.book-submit:disabled{opacity:.5;cursor:not-allowed}
+.book-msg{font-size:13px;margin-top:10px}
+.book-msg.error{color:var(--rose)}
+.book-msg.success{color:var(--sage)}
 </style>
 </head>
 <body>
@@ -86,6 +106,43 @@ $payment_labels = array( 'pending' => 'Pending', 'success' => 'Paid', 'failed' =
       ⚠ <?php echo (int) $conflict_count; ?> booking<?php echo 1 === $conflict_count ? '' : 's'; ?> with a payment conflict — a client was charged for a slot someone else ended up with. Refund or reschedule them directly in Paystack, then cancel the booking here to close it out.
     </div>
   <?php endif; ?>
+
+  <button type="button" class="book-toggle" onclick="document.getElementById('book-panel').classList.toggle('open')">+ Book a session</button>
+
+  <div id="book-panel" class="book-panel">
+    <h2>Book a session</h2>
+    <p class="hint">For arranging a session by hand — a phone booking, an emergency session, covering for a broken payment. Unlike the normal booking flow, this isn't limited to the professional's own working hours or the usual 2-hour notice period, and it's confirmed immediately with no payment step.</p>
+    <div class="book-row">
+      <div class="book-field">
+        <label for="book-pro">Professional</label>
+        <select id="book-pro">
+          <option value="">Choose one…</option>
+          <?php foreach ( $professionals as $p ) : ?>
+            <option value="<?php echo (int) $p->id; ?>"><?php echo esc_html( $p->display_name ); ?><?php echo $p->title ? ' — ' . esc_html( $p->title ) : ''; ?></option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+      <div class="book-field">
+        <label for="book-client-email">Client's email</label>
+        <input type="email" id="book-client-email" placeholder="member@example.com">
+      </div>
+    </div>
+    <div class="book-row">
+      <div class="book-field">
+        <label for="book-time">Date &amp; time</label>
+        <input type="datetime-local" id="book-time">
+      </div>
+      <button type="button" class="book-now-btn" onclick="adminFillBookingNow()">Fill in "now"</button>
+    </div>
+    <div class="book-row">
+      <div class="book-field">
+        <label for="book-note">Note (optional)</label>
+        <textarea id="book-note" rows="2" placeholder="Anything the professional should know first"></textarea>
+      </div>
+    </div>
+    <button type="button" class="book-submit" id="book-submit-btn" onclick="adminCreateBooking()">Book session</button>
+    <div id="book-msg"></div>
+  </div>
 
   <div class="tab-row">
     <a class="tab-link <?php echo 'all' === $status_filter ? 'active' : ''; ?>" href="?status=all">All</a>
@@ -177,6 +234,70 @@ function adminCancelBooking(id, btn) {
     alert('Something went wrong, please check your connection.');
     btn.disabled = false;
     btn.textContent = 'Cancel';
+  });
+}
+
+// Local time, formatted for a <input type="datetime-local"> value
+// (YYYY-MM-DDTHH:MM) — Date#toISOString() would shift it to UTC instead.
+function adminLocalDatetimeValue(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function adminFillBookingNow() {
+  document.getElementById('book-time').value = adminLocalDatetimeValue(new Date());
+}
+
+function adminCreateBooking() {
+  const msg = document.getElementById('book-msg');
+  const btn = document.getElementById('book-submit-btn');
+  const professionalId = document.getElementById('book-pro').value;
+  const clientEmail = document.getElementById('book-client-email').value.trim();
+  const time = document.getElementById('book-time').value;
+  const note = document.getElementById('book-note').value.trim();
+
+  msg.className = 'book-msg';
+  msg.textContent = '';
+
+  if (!professionalId || !clientEmail || !time) {
+    msg.className = 'book-msg error';
+    msg.textContent = 'Please choose a professional, a client, and a time.';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Booking…';
+
+  fetch('/portal/wp-admin/admin-ajax.php', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      action: 'kounselia_admin_create_booking',
+      nonce: KOUNSELIA_ADMIN_NONCE,
+      professional_id: professionalId,
+      client_email: clientEmail,
+      scheduled_start: time.replace('T', ' ') + ':00',
+      note: note
+    })
+  })
+  .then(r => r.json())
+  .then(res => {
+    btn.disabled = false;
+    btn.textContent = 'Book session';
+    if (res.success) {
+      msg.className = 'book-msg success';
+      msg.textContent = res.data.message;
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      msg.className = 'book-msg error';
+      msg.textContent = (res.data && res.data.message) || 'Something went wrong.';
+    }
+  })
+  .catch(() => {
+    btn.disabled = false;
+    btn.textContent = 'Book session';
+    msg.className = 'book-msg error';
+    msg.textContent = 'Something went wrong, please check your connection.';
   });
 }
 </script>
