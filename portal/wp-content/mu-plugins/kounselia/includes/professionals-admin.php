@@ -42,6 +42,9 @@ function kounselia_admin_professional_update( $professional_id, $data ) {
         if ( '' === $title ) {
             return new WP_Error( 'missing_title', 'A professional title is needed, e.g. "Clinical Psychologist".' );
         }
+        if ( function_exists( 'kounselia_title_is_bare_honorific' ) && kounselia_title_is_bare_honorific( $title ) ) {
+            return new WP_Error( 'bare_title', 'That title is just an honorific ("' . $title . '"). Use their role or qualification instead, e.g. "Licensed Clinical Psychologist".' );
+        }
         $row['title'] = mb_substr( $title, 0, 191 );
     }
     if ( isset( $data['specialty'] ) ) {

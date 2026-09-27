@@ -3,7 +3,7 @@
 // Underneath: love it, open the conversation, and follow or book the
 // professional who wrote it.
 import { fetchBlogPost, type BlogPost } from '@kounselia/core';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, Share, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -18,9 +18,6 @@ import { SITE_URL } from '@/config';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors, useTheme } from '@/theme';
 import { ArticleSkeleton } from '@/components/Skeleton';
-
-const ARTICLE_LINK = new RegExp(`^${SITE_URL.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}/blog/([a-z0-9-]+)/?(?:[?#].*)?$`, 'i');
-const NOT_ARTICLES = ['tag', 'tags', 'feed', 'rss', 'search', 'page', 'author'];
 
 export default function Article() {
   const styles = useStyles();
@@ -57,9 +54,10 @@ export default function Article() {
   function shouldLoad(url: string, isTopFrame: boolean) {
     // The article itself, jumps within it, and videos embedded in it.
     if (!isTopFrame || url === baseUrl || url.startsWith(`${baseUrl}#`) || /^(about|data):/.test(url)) return true;
-    const m = ARTICLE_LINK.exec(url);
-    if (m && !NOT_ARTICLES.includes(m[1])) router.push({ pathname: '/articles/[slug]', params: { slug: m[1] } });
-    else openInApp(url);
+    // Another article, or a professional's profile, opens its own native
+    // screen instead of the browser — openInApp knows how to tell (see
+    // nativeRoute in BrowserProvider).
+    openInApp(url);
     return false;
   }
 

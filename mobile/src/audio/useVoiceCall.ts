@@ -138,6 +138,10 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
   }, []);
 
   const startMicrophone = useCallback(() => {
+    // iOS gets echo cancellation from the "voiceChat" audio session mode
+    // set in setSoundMode('call') above. react-native-audio-api 0.13.6
+    // doesn't yet expose an equivalent for Android (no option here turns
+    // it on) — see the "Android echo" note in session.ts.
     const rec = new AudioRecorder();
     rec.onAudioReady({ sampleRate: MIC_RATE, bufferLength: MIC_RATE / 10, channelCount: 1 }, ({ buffer }) => {
       const socket = ws.current;
@@ -203,12 +207,16 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
               flushBot();
             }
             if (typeof sc.inputTranscription?.text === 'string') {
-              userSaid.current = sc.inputTranscription.text;
+              // Each message carries the next chunk of speech, not the
+              // whole thing said so far, so the chunks must be joined —
+              // otherwise only the last chunk of what was said is kept,
+              // and it shows up as several short turns instead of one.
+              userSaid.current += sc.inputTranscription.text;
               userFlushed.current = false;
             }
             if (typeof sc.outputTranscription?.text === 'string') {
               if (!userFlushed.current) flushUser();
-              botSaid.current = sc.outputTranscription.text;
+              botSaid.current += sc.outputTranscription.text;
               setStatus('speaking');
               setStatusText('Speaking…');
               setCaption(botSaid.current);
