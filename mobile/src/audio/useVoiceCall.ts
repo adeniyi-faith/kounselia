@@ -138,7 +138,12 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
   }, []);
 
   const startMicrophone = useCallback(() => {
-    const rec = new AudioRecorder();
+    // Without this, the microphone has no echo cancellation: it picks up
+    // the counselor's own voice coming out of the speaker and sends it
+    // back as if the member were talking, which the server reads as being
+    // interrupted — so the counselor's reply cuts off and restarts on a
+    // loop. This turns on each platform's built-in echo cancellation.
+    const rec = new AudioRecorder({ androidInputPreset: 'voiceCommunication', iosVoiceProcessing: true });
     rec.onAudioReady({ sampleRate: MIC_RATE, bufferLength: MIC_RATE / 10, channelCount: 1 }, ({ buffer }) => {
       const socket = ws.current;
       if (mutedRef.current || !socket || socket.readyState !== WebSocket.OPEN) return;
@@ -203,12 +208,16 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
               flushBot();
             }
             if (typeof sc.inputTranscription?.text === 'string') {
-              userSaid.current = sc.inputTranscription.text;
+              // Each message carries the next chunk of speech, not the
+              // whole thing said so far, so the chunks must be joined —
+              // otherwise only the last chunk of what was said is kept,
+              // and it shows up as several short turns instead of one.
+              userSaid.current += sc.inputTranscription.text;
               userFlushed.current = false;
             }
             if (typeof sc.outputTranscription?.text === 'string') {
               if (!userFlushed.current) flushUser();
-              botSaid.current = sc.outputTranscription.text;
+              botSaid.current += sc.outputTranscription.text;
               setStatus('speaking');
               setStatusText('Speaking…');
               setCaption(botSaid.current);

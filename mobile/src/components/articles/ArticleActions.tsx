@@ -107,7 +107,9 @@ export function ArticleActions({ post, onNotify }: { post: BlogPost; onNotify: (
           style={({ pressed }) => [styles.pill, c.following ? null : styles.follow, pressed && styles.pressed]}
         >
           <TablerIcon name={c.following ? 'check' : 'user-plus'} size={17} color={c.following ? colors.accentText : '#fff'} />
-          <Text style={[styles.label, !c.following && { color: '#fff' }]}>{c.following ? 'Following' : 'Follow'}</Text>
+          <Text style={[styles.label, !c.following && { color: '#fff' }]} numberOfLines={1}>
+            {c.following ? 'Following' : 'Follow'}
+          </Text>
         </Pressable>
       )}
       {c.book_pro_id ? (
@@ -118,7 +120,9 @@ export function ArticleActions({ post, onNotify }: { post: BlogPost; onNotify: (
           style={({ pressed }) => [styles.pill, styles.book, pressed && styles.pressed]}
         >
           <TablerIcon name="video" size={17} color={colors.gold} />
-          <Text style={[styles.label, { color: colors.gold }]}>Book</Text>
+          <Text style={[styles.label, { color: colors.gold }]} numberOfLines={1}>
+            Book
+          </Text>
         </Pressable>
       ) : null}
     </View>
@@ -129,17 +133,20 @@ const useStyles = makeStyles((colors) => ({
   bar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    flexWrap: 'wrap',
+    rowGap: 8,
+    columnGap: 8,
     paddingHorizontal: 14,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
-  spacer: { flex: 1 },
+  spacer: { flexGrow: 1, flexBasis: 0, minWidth: 8 },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexShrink: 1,
     gap: 6,
     minHeight: 42,
     paddingHorizontal: 14,
