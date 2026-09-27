@@ -125,7 +125,7 @@ $history_labels = array(
         <h2>Profile <span class="muted" style="font-family:Outfit,sans-serif;font-size:12px">What members see</span></h2>
         <div class="field-row">
           <div class="field"><label for="p-name">Name</label><input type="text" id="p-name" value="<?php echo esc_attr( $pro->display_name ); ?>"></div>
-          <div class="field"><label for="p-title">Professional title</label><input type="text" id="p-title" value="<?php echo esc_attr( $pro->title ); ?>"></div>
+          <div class="field"><label for="p-title">Professional title</label><input type="text" id="p-title" value="<?php echo esc_attr( $pro->title ); ?>" placeholder="e.g. Licensed Clinical Psychologist"></div>
         </div>
         <div class="field-row">
           <div class="field"><label for="p-spec">Specialties</label><input type="text" id="p-spec" value="<?php echo esc_attr( (string) $pro->specialty ); ?>" placeholder="e.g. Anxiety, Grief"></div>
