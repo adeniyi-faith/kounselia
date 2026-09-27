@@ -5,7 +5,7 @@ import { setFollowing, setPostLove, type BlogPost, type PostCommunity } from '@k
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { showDialog } from '@/components/Dialog';
 import { TablerIcon } from '@/components/TablerIcon';
@@ -74,79 +74,80 @@ export function ArticleActions({ post, onNotify }: { post: BlogPost; onNotify: (
 
   return (
     <View style={[styles.bar, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-      {c.loves_on && (
-        <Pressable
-          onPress={love}
-          accessibilityRole="button"
-          accessibilityState={{ selected: c.loved }}
-          accessibilityLabel={`${c.loved ? 'Loved' : 'Love this article'}, ${c.love_count} ${c.love_count === 1 ? 'love' : 'loves'}`}
-          style={({ pressed }) => [styles.pill, c.loved && styles.loved, pressed && styles.pressed]}
-        >
-          <TablerIcon name={c.loved ? 'heart-filled' : 'heart'} size={19} color={c.loved ? colors.rose : colors.text2} />
-          <Text style={[styles.count, c.loved && { color: colors.rose }]}>{c.love_count}</Text>
-        </Pressable>
-      )}
-      {c.comments_on && (
-        <Pressable
-          onPress={() => router.push({ pathname: '/comments/[postId]', params: { postId: String(post.id), title: post.title, count: String(c.comment_count) } })}
-          accessibilityRole="button"
-          accessibilityLabel={`Conversation, ${c.comment_count} ${c.comment_count === 1 ? 'comment' : 'comments'}`}
-          style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
-        >
-          <TablerIcon name="message-circle" size={19} color={colors.text2} />
-          <Text style={styles.count}>{c.comment_count}</Text>
-        </Pressable>
-      )}
-      <View style={styles.spacer} />
-      {c.follows_on && (
-        <Pressable
-          onPress={follow}
-          accessibilityRole="button"
-          accessibilityState={{ selected: c.following }}
-          accessibilityLabel={c.following ? `Following ${post.author.name}` : `Follow ${post.author.name}`}
-          style={({ pressed }) => [styles.pill, c.following ? null : styles.follow, pressed && styles.pressed]}
-        >
-          <TablerIcon name={c.following ? 'check' : 'user-plus'} size={17} color={c.following ? colors.accentText : '#fff'} />
-          <Text style={[styles.label, !c.following && { color: '#fff' }]} numberOfLines={1}>
-            {c.following ? 'Following' : 'Follow'}
-          </Text>
-        </Pressable>
-      )}
-      {c.book_pro_id ? (
-        <Pressable
-          onPress={() => router.push({ pathname: '/book/[proId]', params: { proId: String(c.book_pro_id) } })}
-          accessibilityRole="button"
-          accessibilityLabel={`Book a session with ${post.author.name}`}
-          style={({ pressed }) => [styles.pill, styles.book, pressed && styles.pressed]}
-        >
-          <TablerIcon name="video" size={17} color={colors.gold} />
-          <Text style={[styles.label, { color: colors.gold }]} numberOfLines={1}>
-            Book
-          </Text>
-        </Pressable>
-      ) : null}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+        {c.loves_on && (
+          <Pressable
+            onPress={love}
+            accessibilityRole="button"
+            accessibilityState={{ selected: c.loved }}
+            accessibilityLabel={`${c.loved ? 'Loved' : 'Love this article'}, ${c.love_count} ${c.love_count === 1 ? 'love' : 'loves'}`}
+            style={({ pressed }) => [styles.pill, c.loved && styles.loved, pressed && styles.pressed]}
+          >
+            <TablerIcon name={c.loved ? 'heart-filled' : 'heart'} size={19} color={c.loved ? colors.rose : colors.text2} />
+            <Text style={[styles.count, c.loved && { color: colors.rose }]}>{c.love_count}</Text>
+          </Pressable>
+        )}
+        {c.comments_on && (
+          <Pressable
+            onPress={() => router.push({ pathname: '/comments/[postId]', params: { postId: String(post.id), title: post.title, count: String(c.comment_count) } })}
+            accessibilityRole="button"
+            accessibilityLabel={`Conversation, ${c.comment_count} ${c.comment_count === 1 ? 'comment' : 'comments'}`}
+            style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
+          >
+            <TablerIcon name="message-circle" size={19} color={colors.text2} />
+            <Text style={styles.count}>{c.comment_count}</Text>
+          </Pressable>
+        )}
+        <View style={styles.spacer} />
+        {c.follows_on && (
+          <Pressable
+            onPress={follow}
+            accessibilityRole="button"
+            accessibilityState={{ selected: c.following }}
+            accessibilityLabel={c.following ? `Following ${post.author.name}` : `Follow ${post.author.name}`}
+            style={({ pressed }) => [styles.pill, c.following ? null : styles.follow, pressed && styles.pressed]}
+          >
+            <TablerIcon name={c.following ? 'check' : 'user-plus'} size={17} color={c.following ? colors.accentText : '#fff'} />
+            <Text style={[styles.label, !c.following && { color: '#fff' }]} numberOfLines={1}>
+              {c.following ? 'Following' : 'Follow'}
+            </Text>
+          </Pressable>
+        )}
+        {c.book_pro_id ? (
+          <Pressable
+            onPress={() => router.push({ pathname: '/book/[proId]', params: { proId: String(c.book_pro_id) } })}
+            accessibilityRole="button"
+            accessibilityLabel={`Book a session with ${post.author.name}`}
+            style={({ pressed }) => [styles.pill, styles.book, pressed && styles.pressed]}
+          >
+            <TablerIcon name="video" size={17} color={colors.gold} />
+            <Text style={[styles.label, { color: colors.gold }]} numberOfLines={1}>
+              Book
+            </Text>
+          </Pressable>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
 
 const useStyles = makeStyles((colors) => ({
   bar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    rowGap: 8,
-    columnGap: 8,
     paddingHorizontal: 14,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     backgroundColor: colors.surface,
   },
-  spacer: { flexGrow: 1, flexBasis: 0, minWidth: 8 },
+  // flexGrow makes this at least as wide as the bar when everything fits,
+  // so the spacer below still pushes Follow/Book to the right edge as
+  // before. On a narrow phone, where it doesn't all fit, this scrolls
+  // sideways instead of wrapping Book onto its own line or clipping it.
+  row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexGrow: 1 },
+  spacer: { flex: 1, minWidth: 8 },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    flexShrink: 1,
     gap: 6,
     minHeight: 42,
     paddingHorizontal: 14,
