@@ -740,9 +740,39 @@ function kounselia_ajax_get_professional_slots() {
         // member's own time zone (it sends back the `slots` form).
         'slots_utc'       => array_map( 'kounselia_app_utc', $slots ),
         'session_minutes' => kounselia_session_length_minutes(),
+        'today_note'      => kounselia_today_unavailable_note( $professional_id, $slots ),
     ) );
 }
 add_action( 'wp_ajax_kounselia_get_professional_slots', 'kounselia_ajax_get_professional_slots' );
+
+/**
+ * When today is one of the professional's working days but every slot in
+ * it has already been ruled out by kounselia_booking_lead_seconds() (e.g.
+ * she's free until 8pm, but it's already past 5pm so the last hour-long
+ * slot no longer gives 2 hours' notice), $slots has nothing dated today
+ * at all — otherwise indistinguishable from today simply not being one
+ * of her working days. Told apart here so the app can still show a
+ * "today" day with an explanation, instead of it silently disappearing
+ * until the next day she works.
+ */
+function kounselia_today_unavailable_note( $professional_id, $slots ) {
+    $today = date( 'Y-m-d', current_time( 'timestamp' ) );
+    foreach ( $slots as $slot ) {
+        if ( 0 === strpos( $slot, $today ) ) {
+            return null; // Today already has open slots.
+        }
+    }
+
+    $dow   = (int) date( 'w', current_time( 'timestamp' ) );
+    $rules = kounselia_get_availability_rules( $professional_id );
+    foreach ( $rules as $rule ) {
+        if ( (int) $rule->day_of_week === $dow ) {
+            $lead_hours = kounselia_booking_lead_seconds() / HOUR_IN_SECONDS;
+            return sprintf( 'No more times available today — booking needs at least %s hours\' notice.', rtrim( rtrim( number_format( $lead_hours, 1 ), '0' ), '.' ) );
+        }
+    }
+    return null; // Not a working day today at all.
+}
 
 function kounselia_ajax_create_booking() {
     kounselia_verify_nonce();
