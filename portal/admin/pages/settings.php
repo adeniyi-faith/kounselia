@@ -149,7 +149,20 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
         } else {
             $kounselia_error = 'Core table installation function not found. Ensure kounselia-core.php is loaded.';
         }
-        
+
+    // 9B. Compress every picture already on the site (profile photos + post images)
+    } elseif ( 'compress_existing_images' === $kounselia_action
+        && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_maintenance' ) ) {
+
+        if ( function_exists( 'kounselia_backfill_compress_existing_images' ) ) {
+            $kounselia_compress_result = kounselia_backfill_compress_existing_images();
+            kounselia_admin_log( 'compress_existing_images', 'settings' );
+            $kounselia_notice = 'Compressed ' . (int) $kounselia_compress_result['avatars'] . ' profile picture(s) and '
+                . (int) $kounselia_compress_result['images'] . ' post image(s) already on the site.';
+        } else {
+            $kounselia_error = 'Image compression helper not found. Ensure kounselia-core.php is loaded.';
+        }
+
     // 10. Save Safety Alert Recipients
     } elseif ( 'save_safety_alert_emails' === $kounselia_action
         && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_safety_alerts' ) ) {
@@ -762,6 +775,19 @@ $opt_booking_commission_percent = (float) get_option( 'kounselia_booking_commiss
         <?php wp_nonce_field( 'kounselia_settings_maintenance' ); ?>
         <input type="hidden" name="kounselia_action" value="force_db_upgrade">
         <button type="submit" class="login-submit" style="width:auto;padding:9px 18px;background:#334155;font-size:12.5px;">Sync Schema (v<?php echo esc_html( $current_db_version ); ?>)</button>
+      </form>
+    </div>
+
+    <!-- Maintenance Action: Compress existing images -->
+    <div class="maint-row">
+      <div class="maint-info">
+        <h4>Compress Existing Images</h4>
+        <p>New profile photos and post images are compressed automatically as they're uploaded. This catches up everything uploaded before that started — every member's profile picture, and every post's cover image and in-body pictures — resizing and re-compressing each one in place with no visible loss in quality. Can take a while on a site with a lot of images; safe to re-run.</p>
+      </div>
+      <form method="post" onsubmit="return confirm('Compress every profile picture and post image already on the site? This can take a little while.');">
+        <?php wp_nonce_field( 'kounselia_settings_maintenance' ); ?>
+        <input type="hidden" name="kounselia_action" value="compress_existing_images">
+        <button type="submit" class="login-submit" style="width:auto;padding:9px 18px;background:#0F766E;font-size:12.5px;">Compress Existing Images</button>
       </form>
     </div>
   </div>
