@@ -101,7 +101,20 @@ $kounselia_booking_flagged = $wpdb->get_results(
      WHERE bm.flagged_safety = 1"
 );
 
-$kounselia_all_flagged = array_merge( $kounselia_ai_flagged, $kounselia_booking_flagged );
+// Comments on Journal articles, held back from the public by the same check.
+$kounselia_quiet             = $wpdb->suppress_errors();
+$kounselia_comment_flagged   = $wpdb->get_results(
+    "SELECT 'article_comment' AS source, c.id AS message_id, NULL AS session_id, NULL AS booking_id, c.content, c.flag_reason, c.created_at,
+            c.user_id, NULL AS guest_token, NULL AS counselor_slug, p.title AS post_title,
+            e.id AS escalation_id, e.severity, e.status, e.acknowledged_by, e.acknowledged_at
+     FROM {$wpdb->prefix}kounselia_post_comments c
+     INNER JOIN {$wpdb->prefix}kounselia_posts p ON p.id = c.post_id
+     LEFT JOIN {$kounselia_escalations_table} e ON e.comment_id = c.id AND e.source = 'article_comment'
+     WHERE c.flag_reason IS NOT NULL"
+);
+$wpdb->suppress_errors( $kounselia_quiet );
+
+$kounselia_all_flagged = array_merge( $kounselia_ai_flagged, $kounselia_booking_flagged, (array) $kounselia_comment_flagged );
 usort( $kounselia_all_flagged, function( $a, $b ) {
     return strtotime( $b->created_at ) <=> strtotime( $a->created_at );
 } );
@@ -212,6 +225,7 @@ $kounselia_nonce = wp_create_nonce( 'kounselia_safety_keywords' );
         <tbody>
         <?php foreach ( $kounselia_flagged as $row ) :
           $is_booking_row = ( 'booking_message' === $row->source );
+          $is_comment_row = ( 'article_comment' === $row->source );
         ?>
           <tr>
             <td data-label="Who">
@@ -219,9 +233,13 @@ $kounselia_nonce = wp_create_nonce( 'kounselia_safety_keywords' );
               <span class="badge <?php echo $row->user_id ? 'member' : 'guest'; ?>"><?php echo $row->user_id ? 'Member' : 'Guest'; ?></span></span>
             </td>
             <td data-label="Where"><?php
-              echo $is_booking_row
-                ? 'Messaging ' . esc_html( $row->pro_name ?: 'a professional' )
-                : esc_html( kounselia_admin_counselor_name( $row->counselor_slug ) );
+              if ( $is_comment_row ) {
+                echo 'Comment on “' . esc_html( wp_trim_words( $row->post_title, 8 ) ) . '”';
+              } else {
+                echo $is_booking_row
+                  ? 'Messaging ' . esc_html( $row->pro_name ?: 'a professional' )
+                  : esc_html( kounselia_admin_counselor_name( $row->counselor_slug ) );
+              }
             ?></td>
             <td data-label="Severity">
               <?php if ( $row->severity ) : ?>
@@ -255,7 +273,9 @@ $kounselia_nonce = wp_create_nonce( 'kounselia_safety_keywords' );
               <?php endif; ?>
             </td>
             <td data-label="When"><?php echo esc_html( kounselia_admin_time_label( $row->created_at ) ); ?></td>
-            <td data-label=""><?php if ( $is_booking_row ) : ?>
+            <td data-label=""><?php if ( $is_comment_row ) : ?>
+              <a href="/portal/admin/pages/articles.php?tab=community&amp;status=safety">Open in Community →</a>
+            <?php elseif ( $is_booking_row ) : ?>
               <a href="/portal/admin/pages/booking-messages.php?booking_id=<?php echo (int) $row->booking_id; ?>">View conversation →</a>
             <?php else : ?>
               <a href="/portal/admin/pages/session.php?id=<?php echo (int) $row->session_id; ?>">View transcript →</a>

@@ -85,4 +85,6 @@ require_once KOUNSELIA_CORE_DIR . '/includes/admin-access.php';      // 19. Admi
 require_once KOUNSELIA_CORE_DIR . '/includes/admin-2fa.php';         // 19B. Admin two-factor authentication (TOTP)
 require_once KOUNSELIA_CORE_DIR . '/includes/content.php';           // 20. CMS: editable pages, blog, footer
 require_once KOUNSELIA_CORE_DIR . '/includes/professionals-public.php'; // 20B. Public professional directory & profiles
+require_once KOUNSELIA_CORE_DIR . '/includes/articles.php';          // 20C. Articles by professionals: access, review, publishing
+require_once KOUNSELIA_CORE_DIR . '/includes/community.php';         // 20D. Follows, loves, comments and reports around the Journal
 require_once KOUNSELIA_CORE_DIR . '/includes/newsletter.php';        // 21. Newsletter & email CRM: contacts, segments, campaigns
