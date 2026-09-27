@@ -133,7 +133,7 @@ export function ArticleActions({ post, onNotify }: { post: BlogPost; onNotify: (
 
 const useStyles = makeStyles((colors) => ({
   bar: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingTop: 10,
     borderTopWidth: 1,
     borderTopColor: colors.border,
@@ -141,16 +141,17 @@ const useStyles = makeStyles((colors) => ({
   },
   // flexGrow makes this at least as wide as the bar when everything fits,
   // so the spacer below still pushes Follow/Book to the right edge as
-  // before. On a narrow phone, where it doesn't all fit, this scrolls
-  // sideways instead of wrapping Book onto its own line or clipping it.
-  row: { flexDirection: 'row', alignItems: 'center', gap: 8, flexGrow: 1 },
-  spacer: { flex: 1, minWidth: 8 },
+  // before. Spacing is kept tight so love, comments, Following and Book
+  // all fit on an ordinary phone; only a very narrow one scrolls sideways
+  // (rather than wrapping Book onto its own line or clipping it).
+  row: { flexDirection: 'row', alignItems: 'center', gap: 6, flexGrow: 1 },
+  spacer: { flex: 1 },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     minHeight: 42,
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     borderRadius: radius.pill,
     borderWidth: 1,
     borderColor: colors.border,

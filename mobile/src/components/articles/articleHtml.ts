@@ -72,7 +72,7 @@ export function articleHtml(post: BlogPost, colors: Palette, dark: boolean) {
   ${topic ? `<div class="topic">${esc(topic)}</div>` : ''}
   <h1>${esc(post.title)}</h1>
   ${post.subtitle ? `<p class="sub">${esc(post.subtitle)}</p>` : ''}
-  <div class="by"><span class="av">${avatar}</span><span><b>${esc(post.author.name)}${post.author.is_professional ? '<i class="ti ti-discount-check-filled tick" aria-label="Verified professional"></i>' : ''}</b>${post.author.title ? `${esc(post.author.title)} · ` : ''}${esc(articleDate(post.published_utc))} · ${post.reading_minutes} min read</span></div>
+  <div class="by"><span class="av">${avatar}</span><span><b>${esc(post.author.name)}${post.author.is_professional ? '<i class="ti ti-discount-check-filled tick" aria-label="Verified professional"></i>' : ''}</b>${esc(articleDate(post.published_utc))} · ${post.reading_minutes} min read</span></div>
   ${post.cover ? `<figure><img src="${esc(post.cover)}" alt="">${post.cover_caption ? `<figcaption>${esc(post.cover_caption)}</figcaption>` : ''}</figure>` : ''}
   <div class="body">${post.html}</div>
   ${post.community?.disclaimer ? `<div class="care">${esc(post.community.disclaimer)}</div>` : ''}
