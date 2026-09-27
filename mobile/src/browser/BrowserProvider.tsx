@@ -5,8 +5,9 @@
 //
 // Anywhere in the app:  const { openInApp } = useBrowser();  openInApp(url)
 //
-// The one exception is a video session: its video room (Jitsi) only works
-// properly in the phone's own browser, so joinSession() keeps using that.
+// The one exception is a video session: it gets its own full-screen,
+// chrome-less modal (see VideoCallProvider) instead of this one, since it
+// has no toolbar, back/forward, or address bar to show at all.
 import { fetchWebSsoCode, type KounseliaConfig } from '@kounselia/core';
 import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';

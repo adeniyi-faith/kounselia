@@ -19,6 +19,7 @@ import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { BrowserProvider } from '@/browser/BrowserProvider';
+import { VideoCallProvider } from '@/browser/VideoCallProvider';
 import { AppLockProvider } from '@/components/AppLock';
 import { Button } from '@/components/Button';
 import { DialogHost } from '@/components/Dialog';
@@ -47,12 +48,14 @@ function RootLayout() {
     <ThemeProvider>
       <SessionProvider>
         <BrowserProvider>
-          <AppLockProvider>
-            <SystemColors />
-            {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
-            {fontsLoaded || fontError ? <RootNavigator /> : null}
-            <DialogHost />
-          </AppLockProvider>
+          <VideoCallProvider>
+            <AppLockProvider>
+              <SystemColors />
+              {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
+              {fontsLoaded || fontError ? <RootNavigator /> : null}
+              <DialogHost />
+            </AppLockProvider>
+          </VideoCallProvider>
         </BrowserProvider>
       </SessionProvider>
     </ThemeProvider>
