@@ -285,7 +285,9 @@ function kounselia_blog_slug_redirect( $slug ) {
 
 /**
  * Public post listing. $args: tag (slug), search, page (1-based),
- * per_page, exclude (array of ids), featured_only, orderby ('date'|'views').
+ * per_page, exclude (array of ids), featured_only, orderby ('date'|'views'),
+ * author_type ('staff'|'professional'), professional_id, professional_ids
+ * (array; an empty array matches nothing, for "people I follow").
  * Returns array( 'items' => [...], 'total' => int ).
  */
 function kounselia_blog_query( $args = array() ) {
@@ -299,6 +301,9 @@ function kounselia_blog_query( $args = array() ) {
         'exclude'       => array(),
         'featured_only' => false,
         'orderby'       => 'date',
+        'author_type'   => '',
+        'professional_id'  => 0,
+        'professional_ids' => null,
     ) );
 
     $where  = array( "status = 'published'", 'published_at <= %s' );
@@ -315,6 +320,18 @@ function kounselia_blog_query( $args = array() ) {
     }
     if ( $args['featured_only'] ) {
         $where[] = 'featured = 1';
+    }
+    if ( in_array( $args['author_type'], array( 'staff', 'professional' ), true ) ) {
+        $where[]  = 'author_type = %s';
+        $params[] = $args['author_type'];
+    }
+    if ( $args['professional_id'] ) {
+        $where[]  = 'professional_id = %d';
+        $params[] = (int) $args['professional_id'];
+    }
+    if ( is_array( $args['professional_ids'] ) ) {
+        $ids     = array_filter( array_map( 'intval', $args['professional_ids'] ) );
+        $where[] = $ids ? 'professional_id IN (' . implode( ',', $ids ) . ')' : '1=0';
     }
     $exclude = array_filter( array_map( 'intval', (array) $args['exclude'] ) );
     if ( $exclude ) {
@@ -410,7 +427,9 @@ function kounselia_blog_count_view( $post_id ) {
 }
 
 /**
- * Author name + avatar for a post byline.
+ * Author name + avatar for a post byline. For a professional's article
+ * this also says who they are (title, public profile, id to follow),
+ * and uses the bio from their professional profile.
  */
 function kounselia_blog_author( $post ) {
     $user = $post->author_id ? get_userdata( $post->author_id ) : null;
@@ -419,13 +438,32 @@ function kounselia_blog_author( $post ) {
     if ( $user && function_exists( 'kounselia_get_avatar_url' ) ) {
         $avatar = kounselia_get_avatar_url( $user->ID, 'thumbnail' );
     }
-    $bio = $user ? (string) get_user_meta( $user->ID, 'description', true ) : '';
-    return array(
-        'name'    => $name,
-        'avatar'  => $avatar,
-        'initial' => mb_strtoupper( mb_substr( $name, 0, 1 ) ),
-        'bio'     => $bio,
+    $bio    = $user ? (string) get_user_meta( $user->ID, 'description', true ) : '';
+    $author = array(
+        'name'            => $name,
+        'avatar'          => $avatar,
+        'initial'         => mb_strtoupper( mb_substr( $name, 0, 1 ) ),
+        'bio'             => $bio,
+        'is_professional' => false,
+        'professional_id' => 0,
+        'title'           => '',
+        'profile_url'     => '',
     );
+
+    if ( isset( $post->author_type ) && 'professional' === $post->author_type && $post->professional_id && function_exists( 'kounselia_get_professional_by_id' ) ) {
+        $pro = kounselia_get_professional_by_id( (int) $post->professional_id );
+        if ( $pro ) {
+            $author['is_professional'] = true;
+            $author['professional_id'] = (int) $pro->id;
+            $author['title']           = (string) $pro->title;
+            $author['bio']             = $pro->bio ? wp_trim_words( wp_strip_all_tags( $pro->bio ), 60 ) : $bio;
+            // Only link to a profile the public can actually open.
+            if ( 'verified' === $pro->status && function_exists( 'kounselia_professional_is_public' ) && kounselia_professional_is_public( $pro->user_id ) ) {
+                $author['profile_url'] = kounselia_professional_url( $pro );
+            }
+        }
+    }
+    return $author;
 }
 
 /**
@@ -484,6 +522,10 @@ function kounselia_save_blog_post( $data, $id = 0 ) {
     $tag_names = kounselia_content_parse_tags( isset( $data['tags'] ) ? $data['tags'] : '' );
     $tag_slugs = array_map( 'sanitize_title', $tag_names );
     $author_id = ! empty( $data['author_id'] ) ? (int) $data['author_id'] : ( $existing ? (int) $existing->author_id : get_current_user_id() );
+    if ( $existing && 'professional' === $existing->author_type ) {
+        // A professional's article stays theirs when an editor touches it.
+        $author_id = (int) $existing->author_id;
+    }
 
     $wanted_slug = ! empty( $data['slug'] ) ? $data['slug'] : $title;
     $slug        = kounselia_content_unique_slug( 'posts', $wanted_slug, $id );
@@ -507,9 +549,22 @@ function kounselia_save_blog_post( $data, $id = 0 ) {
         'updated_at'       => $now,
     );
 
+    if ( $existing && 'professional' === $existing->author_type && 'published' === $status ) {
+        // An editor publishing a professional's article in Admin → Blog
+        // is approving it: any edit waiting for review is replaced by
+        // what the editor just saved.
+        $row['review_status']   = 'approved';
+        $row['pending_changes'] = null;
+        $row['reviewed_at']     = $now;
+        $row['reviewed_by']     = get_current_user_id() ?: null;
+    }
+
     if ( $existing ) {
         $row['previous_slugs'] = kounselia_content_remember_old_slug( $existing->previous_slugs, $existing->slug, $slug );
         $wpdb->update( $table, $row, array( 'id' => $id ) );
+        if ( 'published' === $status && function_exists( 'kounselia_article_went_live' ) ) {
+            kounselia_article_went_live( (int) $id );
+        }
         return (int) $id;
     }
 
@@ -520,7 +575,11 @@ function kounselia_save_blog_post( $data, $id = 0 ) {
 
 function kounselia_delete_blog_post( $id ) {
     global $wpdb;
-    return (bool) $wpdb->delete( $wpdb->prefix . 'kounselia_posts', array( 'id' => (int) $id ) );
+    $deleted = (bool) $wpdb->delete( $wpdb->prefix . 'kounselia_posts', array( 'id' => (int) $id ) );
+    if ( $deleted ) {
+        do_action( 'kounselia_blog_post_deleted', (int) $id );
+    }
+    return $deleted;
 }
 
 /* -------------------------------------------------------------------------
@@ -941,11 +1000,28 @@ function kounselia_ajax_admin_upload_media() {
     if ( ! kounselia_admin_can( 'pages' ) && ! kounselia_admin_can( 'blog' ) && ! kounselia_admin_can( 'broadcasts' ) ) {
         kounselia_send_pure_json_error( array( 'message' => 'You do not have access to upload.' ), 403 );
     }
-    if ( empty( $_FILES['file'] ) || ! empty( $_FILES['file']['error'] ) ) {
-        kounselia_send_pure_json_error( array( 'message' => 'No file received.' ), 400 );
+    $url = kounselia_content_store_image( $_FILES['file'], 8 );
+    if ( is_wp_error( $url ) ) {
+        kounselia_send_pure_json_error( array( 'message' => $url->get_error_message() ), 400 );
     }
-    if ( $_FILES['file']['size'] > 8 * MB_IN_BYTES ) {
-        kounselia_send_pure_json_error( array( 'message' => 'Images must be under 8MB.' ), 400 );
+
+    kounselia_admin_log( 'uploaded_media', 'media', 0 );
+    // "location" is the key the rich editor expects.
+    kounselia_send_pure_json_success( array( 'url' => $url, 'location' => $url ) );
+}
+add_action( 'wp_ajax_kounselia_admin_upload_media', 'kounselia_ajax_admin_upload_media' );
+
+/**
+ * Saves one uploaded image ($_FILES entry) into the public uploads
+ * folder, shrinking anything wider than 2000px. Returns its URL or a
+ * WP_Error. Shared by the admin editor and professionals' articles.
+ */
+function kounselia_content_store_image( $file, $max_mb = 8 ) {
+    if ( empty( $file ) || ! empty( $file['error'] ) ) {
+        return new WP_Error( 'no_file', 'No file received.' );
+    }
+    if ( $file['size'] > $max_mb * MB_IN_BYTES ) {
+        return new WP_Error( 'too_big', 'Images must be under ' . (int) $max_mb . 'MB.' );
     }
 
     require_once ABSPATH . 'wp-admin/includes/file.php';
@@ -955,9 +1031,9 @@ function kounselia_ajax_admin_upload_media() {
         'gif'          => 'image/gif',
         'webp'         => 'image/webp',
     );
-    $upload = wp_handle_upload( $_FILES['file'], array( 'test_form' => false, 'mimes' => $mimes ) );
+    $upload = wp_handle_upload( $file, array( 'test_form' => false, 'mimes' => $mimes ) );
     if ( isset( $upload['error'] ) ) {
-        kounselia_send_pure_json_error( array( 'message' => $upload['error'] ), 400 );
+        return new WP_Error( 'upload_failed', $upload['error'] );
     }
 
     if ( 'image/gif' !== $upload['type'] ) {
@@ -971,12 +1047,8 @@ function kounselia_ajax_admin_upload_media() {
             }
         }
     }
-
-    kounselia_admin_log( 'uploaded_media', 'media', 0 );
-    // "location" is the key the rich editor expects.
-    kounselia_send_pure_json_success( array( 'url' => $upload['url'], 'location' => $upload['url'] ) );
+    return $upload['url'];
 }
-add_action( 'wp_ajax_kounselia_admin_upload_media', 'kounselia_ajax_admin_upload_media' );
 
 /* -------------------------------------------------------------------------
  * DEFAULT CONTENT
