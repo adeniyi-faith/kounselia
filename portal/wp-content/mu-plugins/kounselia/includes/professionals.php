@@ -489,12 +489,17 @@ function kounselia_ajax_update_professional_profile() {
     $years     = isset( $_POST['years_experience'] ) ? absint( $_POST['years_experience'] ) : 0;
     $bio       = isset( $_POST['bio'] ) ? sanitize_textarea_field( wp_unslash( $_POST['bio'] ) ) : '';
     $rate      = isset( $_POST['rate_amount'] ) ? (float) $_POST['rate_amount'] : 0;
+    $free      = isset( $_POST['free_sessions_per_client'] ) && '' !== $_POST['free_sessions_per_client'] && function_exists( 'kounselia_free_sessions_clean' )
+        ? kounselia_free_sessions_clean( $_POST['free_sessions_per_client'] )
+        : (int) $application->free_sessions_per_client;
+    $all_free  = defined( 'KOUNSELIA_FREE_ALWAYS' ) && $free >= KOUNSELIA_FREE_ALWAYS;
 
     if ( '' === $title ) {
         wp_send_json_error( array( 'message' => 'Please enter your professional title.' ), 400 );
     }
-    if ( $rate <= 0 ) {
-        wp_send_json_error( array( 'message' => 'Please enter a rate greater than zero.' ), 400 );
+    // A rate is needed unless every session is free.
+    if ( $rate <= 0 && ! $all_free ) {
+        wp_send_json_error( array( 'message' => 'Please enter a rate greater than zero, or make every session free.' ), 400 );
     }
 
     global $wpdb;
@@ -503,7 +508,8 @@ function kounselia_ajax_update_professional_profile() {
         'specialty'        => $specialty,
         'years_experience' => $years ?: null,
         'bio'              => $bio,
-        'rate_amount'      => $rate,
+        'rate_amount'      => $rate > 0 ? $rate : null,
+        'free_sessions_per_client' => $free,
         'updated_at'       => current_time( 'mysql' ),
     ), array( 'id' => $application->id ) );
 

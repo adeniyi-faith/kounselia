@@ -1,6 +1,7 @@
 // The blog, "The Kounselia Journal": newest articles first, with search
-// and topics to narrow them down. More load as you scroll.
-import { fetchBlog, type BlogCard, type BlogTag } from '@kounselia/core';
+// and topics to narrow them down, plus articles by professionals and by the
+// people you follow. More load as you scroll.
+import { fetchBlog, type BlogCard, type BlogFrom, type BlogTag } from '@kounselia/core';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
@@ -22,6 +23,8 @@ export default function Articles() {
   const [tagline, setTagline] = useState('');
   const [tags, setTags] = useState<BlogTag[]>([]);
   const [tag, setTag] = useState('');
+  const [from, setFrom] = useState<BlogFrom>('');
+  const [filters, setFilters] = useState<{ professionals: string | null; following: boolean }>({ professionals: null, following: false });
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
@@ -33,7 +36,7 @@ export default function Articles() {
 
   const load = useCallback(async () => {
     const ticket = ++latestRequest.current;
-    const res = await fetchBlog(config, { page: 1, tag, q: search });
+    const res = await fetchBlog(config, { page: 1, tag, q: search, from });
     if (ticket !== latestRequest.current) return; // A newer search is on its way.
     if (!res.ok) {
       setFailed(true);
@@ -46,8 +49,9 @@ export default function Articles() {
     if (res.data.title) setTitle(res.data.title);
     if (res.data.tagline) setTagline(res.data.tagline);
     // Keep the full list of topics while one of them is picked.
-    if (res.data.tags && !tag && !search) setTags(res.data.tags);
-  }, [config, tag, search]);
+    if (res.data.tags && !tag && !search && !from) setTags(res.data.tags);
+    if (res.data.filters && !from) setFilters(res.data.filters);
+  }, [config, tag, search, from]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -63,7 +67,7 @@ export default function Articles() {
   async function more() {
     if (!hasMore || loadingMore || !posts) return;
     setLoadingMore(true);
-    const res = await fetchBlog(config, { page: page + 1, tag, q: search });
+    const res = await fetchBlog(config, { page: page + 1, tag, q: search, from });
     setLoadingMore(false);
     if (!res.ok) return;
     setPosts([...posts, ...res.data.posts]);
@@ -100,15 +104,21 @@ export default function Articles() {
           </Pressable>
         ) : null}
       </View>
-      {tags.length > 0 && (
+      {(tags.length > 0 || filters.professionals) && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.chipRow}>
-          <Chip label="All" active={!tag} onPress={() => setTag('')} />
+          <Chip label="All" active={!tag && !from} onPress={() => { setTag(''); setFrom(''); }} />
+          {filters.professionals ? (
+            <Chip label={filters.professionals} icon="discount-check" active={from === 'professionals'} onPress={() => { setTag(''); setFrom(from === 'professionals' ? '' : 'professionals'); }} />
+          ) : null}
+          {filters.following ? (
+            <Chip label="Following" icon="users" active={from === 'following'} onPress={() => { setTag(''); setFrom(from === 'following' ? '' : 'following'); }} />
+          ) : null}
           {tags.map((t) => (
-            <Chip key={t.slug} label={t.name} active={tag === t.slug} onPress={() => setTag(tag === t.slug ? '' : t.slug)} />
+            <Chip key={t.slug} label={t.name} active={tag === t.slug} onPress={() => { setFrom(''); setTag(tag === t.slug ? '' : t.slug); }} />
           ))}
         </ScrollView>
       )}
-      {tags.length === 0 && <View style={{ height: 18 }} />}
+      {tags.length === 0 && !filters.professionals && <View style={{ height: 18 }} />}
     </View>
   );
 
@@ -141,7 +151,13 @@ export default function Articles() {
           ListEmptyComponent={
             <View style={styles.empty}>
               <TablerIcon name="news" size={28} color={colors.text3} />
-              <Text style={styles.notice}>{search || tag ? 'No articles match that. Try another word or topic.' : 'No articles yet. Check back soon.'}</Text>
+              <Text style={styles.notice}>
+                {from === 'following'
+                  ? 'Nothing here yet. Tap Follow under an article by a professional, and their new writing will show up here.'
+                  : search || tag || from
+                    ? 'No articles match that. Try another word or topic.'
+                    : 'No articles yet. Check back soon.'}
+              </Text>
             </View>
           }
           ListFooterComponent={loadingMore ? <View style={{ marginTop: 16 }}><ArticlesSkeleton cards={1} /></View> : null}
@@ -154,15 +170,18 @@ export default function Articles() {
   );
 }
 
-function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+function Chip({ label, active, onPress, icon }: { label: string; active: boolean; onPress: () => void; icon?: string }) {
   const styles = useStyles();
+  const colors = useColors();
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ selected: active }}
       style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && { opacity: 0.85 }]}
     >
+      {icon ? <TablerIcon name={icon} size={14} color={active ? '#fff' : colors.text2} /> : null}
       <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
     </Pressable>
   );
@@ -192,6 +211,9 @@ const useStyles = makeStyles((colors) => ({
   chipRow: { marginHorizontal: -16, marginTop: 14, marginBottom: 18 },
   chips: { gap: 8, paddingHorizontal: 16 },
   chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: radius.pill,

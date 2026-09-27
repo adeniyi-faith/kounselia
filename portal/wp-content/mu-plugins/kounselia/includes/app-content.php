@@ -6,7 +6,10 @@
  * never included directly.
  *
  *   kounselia_app_blog            the blog ("The Kounselia Journal"), a page at a time
- *   kounselia_app_blog_post       one blog post, with its body and related posts
+ *                                 (from=professionals|following narrows it)
+ *   kounselia_app_blog_post       one blog post, with its body, related posts,
+ *                                 and loves / comments / follow state (community.php
+ *                                 has the actions themselves)
  *   kounselia_get_journal_entries a member's past private journal entries
  *   kounselia_app_account         everything the app's Settings screen shows
  *   kounselia_app_upload_avatar   a new profile photo, sent as base64
@@ -45,7 +48,15 @@ function kounselia_app_blog_card( $post ) {
         'title'           => $post->title,
         'summary'         => kounselia_blog_summary( $post, 30 ),
         'cover'           => $post->cover_image ? $post->cover_image : null,
-        'author'          => array( 'name' => $author['name'], 'avatar' => $author['avatar'] ? $author['avatar'] : null ),
+        'author'          => array(
+            'name'            => $author['name'],
+            'avatar'          => $author['avatar'] ? $author['avatar'] : null,
+            'is_professional' => ! empty( $author['is_professional'] ),
+            'professional_id' => ! empty( $author['professional_id'] ) ? (int) $author['professional_id'] : null,
+            'title'           => ! empty( $author['title'] ) ? $author['title'] : null,
+        ),
+        'love_count'      => isset( $post->love_count ) ? (int) $post->love_count : 0,
+        'comment_count'   => isset( $post->comment_count ) ? (int) $post->comment_count : 0,
         'published_utc'   => kounselia_app_utc( $post->published_at ),
         'reading_minutes' => (int) $post->reading_minutes,
         'tags'            => kounselia_blog_post_tags( $post ),
@@ -59,9 +70,16 @@ function kounselia_ajax_app_blog() {
     $page     = isset( $_POST['page'] ) ? max( 1, (int) $_POST['page'] ) : 1;
     $tag      = isset( $_POST['tag'] ) ? sanitize_title( wp_unslash( $_POST['tag'] ) ) : '';
     $search   = isset( $_POST['q'] ) ? mb_substr( sanitize_text_field( wp_unslash( $_POST['q'] ) ), 0, 100 ) : '';
+    $from     = isset( $_POST['from'] ) ? sanitize_key( $_POST['from'] ) : '';
     $per_page = 10;
 
-    $found = kounselia_blog_query( array( 'page' => $page, 'per_page' => $per_page, 'tag' => $tag, 'search' => $search ) );
+    $args = array( 'page' => $page, 'per_page' => $per_page, 'tag' => $tag, 'search' => $search );
+    if ( 'professionals' === $from ) {
+        $args['author_type'] = 'professional';
+    } elseif ( 'following' === $from ) {
+        $args['professional_ids'] = is_user_logged_in() && function_exists( 'kounselia_followed_professional_ids' ) ? kounselia_followed_professional_ids( get_current_user_id() ) : array();
+    }
+    $found = kounselia_blog_query( $args );
 
     $data = array(
         'posts'    => array_map( 'kounselia_app_blog_card', $found['items'] ),
@@ -75,6 +93,13 @@ function kounselia_ajax_app_blog() {
         $data['tags']  = array_values( array_map( function ( $t ) {
             return array( 'name' => $t['name'], 'slug' => $t['slug'] );
         }, array_slice( kounselia_blog_all_tags(), 0, 12 ) ) );
+        // Which extra filters to offer: only once professionals have written.
+        $settings = function_exists( 'kounselia_article_settings' ) ? kounselia_article_settings() : array();
+        $has_pro  = kounselia_blog_query( array( 'author_type' => 'professional', 'per_page' => 1 ) )['total'] > 0;
+        $data['filters'] = array(
+            'professionals' => $has_pro ? ( isset( $settings['filter_label'] ) ? $settings['filter_label'] : 'From our professionals' ) : null,
+            'following'     => $has_pro && ! empty( $settings['follows_enabled'] ),
+        );
     }
     wp_send_json_success( $data );
 }
@@ -104,10 +129,37 @@ function kounselia_ajax_app_blog_post() {
     $data['author']['bio'] = $author['bio'];
     $data['html']          = $html;
     $data['related']       = array_map( 'kounselia_app_blog_card', kounselia_blog_related( $post, 3 ) );
+    $data['community']     = kounselia_app_post_community( $post, $author );
     wp_send_json_success( $data );
 }
 add_action( 'wp_ajax_kounselia_app_blog_post', 'kounselia_ajax_app_blog_post' );
 add_action( 'wp_ajax_nopriv_kounselia_app_blog_post', 'kounselia_ajax_app_blog_post' );
+
+/**
+ * What the reader can do around an article: love it, read and join the
+ * conversation, follow and book its author. Everything here matches the
+ * website's article page.
+ */
+function kounselia_app_post_community( $post, $author ) {
+    $user_id  = get_current_user_id();
+    $settings = function_exists( 'kounselia_article_settings' ) ? kounselia_article_settings() : array();
+    $is_pro   = ! empty( $author['is_professional'] );
+    $pro      = $is_pro ? kounselia_get_professional_by_id( $author['professional_id'] ) : null;
+    $can_book = $pro && 'verified' === $pro->status && ! empty( $settings['show_book_button'] ) && (int) $pro->user_id !== $user_id;
+    $follows  = $pro && function_exists( 'kounselia_follows_on' ) && kounselia_follows_on() && (int) $pro->user_id !== $user_id && 'verified' === $pro->status;
+    return array(
+        'loves_on'      => function_exists( 'kounselia_community_on' ) && kounselia_community_on( $post, 'loves' ),
+        'loved'         => function_exists( 'kounselia_post_loved_by' ) && kounselia_post_loved_by( $post->id, $user_id ),
+        'love_count'    => (int) $post->love_count,
+        'comments_on'   => function_exists( 'kounselia_community_on' ) && ( kounselia_community_on( $post, 'comments' ) || (int) $post->comment_count > 0 ),
+        'comment_count' => (int) $post->comment_count,
+        'follows_on'    => (bool) $follows,
+        'following'     => $follows && kounselia_is_following( $user_id, $pro->id ),
+        'followers'     => $follows ? kounselia_follower_count( $pro->id ) : 0,
+        'book_pro_id'   => $can_book ? (int) $pro->id : null,
+        'disclaimer'    => $is_pro && ! empty( $settings['disclaimer_enabled'] ) ? $settings['disclaimer_text'] : null,
+    );
+}
 
 /* -------------------------------------------------------------------------
  * PRIVATE JOURNAL: past entries

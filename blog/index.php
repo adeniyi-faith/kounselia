@@ -11,6 +11,7 @@
  * only visible to staff, who see a banner saying so.
  */
 require dirname( __DIR__ ) . '/inc/kounselia-boot.php';
+require dirname( __DIR__ ) . '/inc/kounselia-community.php';
 
 $kounselia_segments = kounselia_request_segments( 'blog' );
 $kounselia_settings = kounselia_blog_settings();
@@ -30,6 +31,11 @@ function kounselia_blog_av( $author ) {
     return '<span class="k-av">' . ( $author['avatar'] ? '<img src="' . esc_url( $author['avatar'] ) . '" alt="">' : esc_html( $author['initial'] ) ) . '</span>';
 }
 
+/** A small "verified professional" tick after a professional's name. */
+function kounselia_blog_pro_tick( $author ) {
+    return ! empty( $author['is_professional'] ) ? ' <i class="ti ti-discount-check-filled k-pro-tick" title="Verified professional" aria-label="Verified professional"></i>' : '';
+}
+
 function kounselia_blog_date( $post ) {
     $ts = strtotime( $post->published_at ? $post->published_at : $post->created_at );
     return date_i18n( date( 'Y', $ts ) === date( 'Y' ) ? 'M j' : 'M j, Y', $ts );
@@ -41,13 +47,15 @@ function kounselia_blog_feed_item( $post ) {
     ?>
     <a class="k-feed-item<?php echo $post->cover_image ? '' : ' no-thumb'; ?>" href="<?php echo esc_url( kounselia_blog_url( $post->slug ) ); ?>">
       <div>
-        <div class="k-meta"><?php echo kounselia_blog_av( $author ); ?><b><?php echo esc_html( $author['name'] ); ?></b></div>
+        <div class="k-meta"><?php echo kounselia_blog_av( $author ); ?><b><?php echo esc_html( $author['name'] ); ?><?php echo kounselia_blog_pro_tick( $author ); ?></b></div>
         <h3><?php echo esc_html( $post->title ); ?></h3>
         <p><?php echo esc_html( kounselia_blog_summary( $post, 30 ) ); ?></p>
         <div class="k-feed-foot">
           <span><?php echo esc_html( kounselia_blog_date( $post ) ); ?></span>
           <span class="dot"></span>
           <span><?php echo (int) $post->reading_minutes; ?> min read</span>
+          <?php if ( $post->love_count ) : ?><span class="dot"></span><span><i class="ti ti-heart"></i> <?php echo esc_html( number_format_i18n( $post->love_count ) ); ?></span><?php endif; ?>
+          <?php if ( $post->comment_count ) : ?><span><i class="ti ti-message-circle"></i> <?php echo esc_html( number_format_i18n( $post->comment_count ) ); ?></span><?php endif; ?>
           <?php if ( $tags ) : ?><span class="k-tag-chip"><?php echo esc_html( $tags[0]['name'] ); ?></span><?php endif; ?>
         </div>
       </div>
@@ -110,7 +118,12 @@ $kounselia_is_listing = empty( $kounselia_segments ) || 'tag' === $kounselia_seg
 
 if ( ! $kounselia_is_listing ) {
     $slug = $kounselia_segments[0];
-    $post = kounselia_get_blog_post_by_slug( $slug, ! $kounselia_is_staff );
+    $post = kounselia_get_blog_post_by_slug( $slug, false );
+    // Drafts are for staff, and for the professional who wrote them.
+    $kounselia_is_writer = $post && function_exists( 'kounselia_is_pro_article' ) && kounselia_is_pro_article( $post ) && get_current_user_id() && (int) $post->author_id === get_current_user_id();
+    if ( $post && ! kounselia_blog_post_is_live( $post ) && ! $kounselia_is_staff && ! $kounselia_is_writer ) {
+        $post = null;
+    }
     if ( ! $post ) {
         $moved = kounselia_blog_slug_redirect( $slug );
         if ( $moved ) {
@@ -121,7 +134,7 @@ if ( ! $kounselia_is_listing ) {
     }
 
     $live = kounselia_blog_post_is_live( $post );
-    if ( $live && ! $kounselia_is_staff && ! preg_match( '/bot|crawl|spider|slurp|preview|facebookexternalhit/i', isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '' ) ) {
+    if ( $live && ! $kounselia_is_staff && ! $kounselia_is_writer && ! preg_match( '/bot|crawl|spider|slurp|preview|facebookexternalhit/i', isset( $_SERVER['HTTP_USER_AGENT'] ) ? $_SERVER['HTTP_USER_AGENT'] : '' ) ) {
         kounselia_blog_count_view( $post->id );
     }
 
@@ -140,7 +153,7 @@ if ( ! $kounselia_is_listing ) {
         'description'      => $summary,
         'datePublished'    => $iso,
         'dateModified'     => mysql2date( 'c', $post->updated_at, false ),
-        'author'           => array( '@type' => 'Person', 'name' => $author['name'] ),
+        'author'           => array_filter( array( '@type' => 'Person', 'name' => $author['name'], 'jobTitle' => $author['title'] ? $author['title'] : null, 'url' => $author['profile_url'] ? kounselia_site_url( $author['profile_url'] ) : null ) ),
         'publisher'        => array( '@type' => 'Organization', 'name' => 'Kounselia', 'logo' => array( '@type' => 'ImageObject', 'url' => 'https://kounselia.com/img/Kounselia_Logo_IconMark_MidnightNavy.png' ) ),
         'mainEntityOfPage' => $url,
     );
@@ -158,11 +171,17 @@ if ( ! $kounselia_is_listing ) {
         'extra'       => '<meta property="article:published_time" content="' . esc_attr( $iso ) . '">'
             . '<script type="application/ld+json">' . wp_json_encode( $jsonld, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG ) . '</script>',
     ) );
+    $is_pro_post = ! empty( $author['is_professional'] );
+    $a_settings  = function_exists( 'kounselia_article_settings' ) ? kounselia_article_settings() : array();
+    $book_pro    = ( $is_pro_post && ! empty( $a_settings['show_book_button'] ) && $author['profile_url'] ) ? kounselia_get_professional_by_id( $author['professional_id'] ) : null;
     $share_text = rawurlencode( $post->title );
     $share_url  = rawurlencode( $url );
     ?>
 <body class="k-site">
 <div class="k-progress" id="k-progress"></div>
+<?php if ( $kounselia_is_writer && ! $kounselia_is_staff && ! $live ) : ?>
+  <div class="k-draft-bar">Preview: only you and our editors can see this until it is live. <a href="/pro-write.php?id=<?php echo (int) $post->id; ?>">Keep editing</a></div>
+<?php endif; ?>
 <?php if ( $kounselia_is_staff ) : ?>
   <div class="k-draft-bar"<?php echo $live ? ' style="background:var(--accent)"' : ''; ?>>
     <?php
@@ -191,11 +210,12 @@ if ( ! $kounselia_is_listing ) {
       <?php endif; ?>
       <div class="k-byline">
         <div class="k-byline-who">
-          <?php echo kounselia_blog_av( $author ); ?>
+          <?php echo $author['profile_url'] ? '<a href="' . esc_url( $author['profile_url'] ) . '" class="k-byline-av-link">' . kounselia_blog_av( $author ) . '</a>' : kounselia_blog_av( $author ); ?>
           <div>
-            <div class="k-byline-name"><?php echo esc_html( $author['name'] ); ?></div>
-            <div class="k-byline-meta"><?php echo (int) $post->reading_minutes; ?> min read · <?php echo esc_html( date_i18n( 'M j, Y', strtotime( $post->published_at ? $post->published_at : $post->created_at ) ) ); ?></div>
+            <div class="k-byline-name"><?php echo $author['profile_url'] ? '<a href="' . esc_url( $author['profile_url'] ) . '">' . esc_html( $author['name'] ) . '</a>' : esc_html( $author['name'] ); ?><?php echo kounselia_blog_pro_tick( $author ); ?></div>
+            <div class="k-byline-meta"><?php echo $is_pro_post && $author['title'] ? esc_html( $author['title'] ) . ' · ' : ''; ?><?php echo (int) $post->reading_minutes; ?> min read · <?php echo esc_html( date_i18n( 'M j, Y', strtotime( $post->published_at ? $post->published_at : $post->created_at ) ) ); ?></div>
           </div>
+          <?php if ( $is_pro_post && $live ) : ?><span class="k-byline-follow"><?php echo kounselia_follow_button_html( $author['professional_id'] ); ?></span><?php endif; ?>
         </div>
         <div class="k-share">
           <a href="https://twitter.com/intent/tweet?text=<?php echo $share_text; ?>&url=<?php echo $share_url; ?>" target="_blank" rel="noopener" aria-label="Share on X"><i class="ti ti-brand-x"></i></a>
@@ -218,6 +238,13 @@ if ( ! $kounselia_is_listing ) {
       <?php echo kounselia_render_content( $post->content ); // Cleaned with kounselia_content_kses() on save. ?>
     </div>
 
+    <?php if ( $is_pro_post && ! empty( $a_settings['disclaimer_enabled'] ) ) : ?>
+      <aside class="k-care-note">
+        <i class="ti ti-heart-handshake"></i>
+        <p><?php echo esc_html( $a_settings['disclaimer_text'] ); ?> <a href="<?php echo esc_url( kounselia_page_url( 'safety-resources' ) ); ?>">Safety resources</a></p>
+      </aside>
+    <?php endif; ?>
+
     <footer class="k-article-foot">
       <?php if ( $tags ) : ?>
         <div class="k-tags">
@@ -225,6 +252,15 @@ if ( ! $kounselia_is_listing ) {
             <a href="<?php echo esc_url( kounselia_blog_tag_url( $t['slug'] ) ); ?>"><?php echo esc_html( $t['name'] ); ?></a>
           <?php endforeach; ?>
         </div>
+      <?php endif; ?>
+
+      <?php if ( $live ) : $love_html = kounselia_love_button_html( $post ); $talk_on = function_exists( 'kounselia_community_on' ) && ( kounselia_community_on( $post, 'comments' ) || $post->comment_count ); ?>
+        <?php if ( $love_html || $talk_on ) : ?>
+          <div class="k-react">
+            <?php echo $love_html; ?>
+            <?php if ( $talk_on ) : ?><a class="k-react-link" href="#comments"><i class="ti ti-message-circle"></i> <span data-comment-count><?php echo esc_html( number_format_i18n( $post->comment_count ) ); ?></span></a><?php endif; ?>
+          </div>
+        <?php endif; ?>
       <?php endif; ?>
 
       <div class="k-foot-share">
@@ -236,14 +272,24 @@ if ( ! $kounselia_is_listing ) {
         </div>
       </div>
 
-      <div class="k-author-card">
+      <div class="k-author-card<?php echo $is_pro_post ? ' pro' : ''; ?>">
         <?php echo kounselia_blog_av( $author ); ?>
         <div>
-          <div class="lbl">Written by</div>
-          <h4><?php echo esc_html( $author['name'] ); ?></h4>
+          <div class="lbl"><?php echo $is_pro_post ? 'Written by a verified professional' : 'Written by'; ?></div>
+          <h4><?php echo esc_html( $author['name'] ); ?><?php echo kounselia_blog_pro_tick( $author ); ?></h4>
+          <?php if ( $is_pro_post && $author['title'] ) : ?><div class="k-author-title"><?php echo esc_html( $author['title'] ); ?></div><?php endif; ?>
           <p><?php echo esc_html( $author['bio'] ? $author['bio'] : 'Part of the team at Kounselia, a global mental wellness initiative making support accessible to anyone, anywhere.' ); ?></p>
+          <?php if ( $is_pro_post && $author['profile_url'] ) : ?>
+            <div class="k-author-actions">
+              <?php echo kounselia_follow_button_html( $author['professional_id'], array( 'count' => true ) ); ?>
+              <a class="k-author-link" href="<?php echo esc_url( $author['profile_url'] ); ?>">View profile</a>
+              <?php if ( $book_pro ) : ?><a class="k-author-link book" href="<?php echo esc_url( kounselia_professional_book_url( $book_pro ) ); ?>"><i class="ti ti-video"></i> Book a session</a><?php endif; ?>
+            </div>
+          <?php endif; ?>
         </div>
       </div>
+
+      <?php if ( $live ) { kounselia_comments_section( $post ); } ?>
 
       <div class="k-post-nl">
         <h3>Never miss a story</h3>
@@ -308,6 +354,7 @@ if ( ! $kounselia_is_listing ) {
   });
 })();
 </script>
+<?php kounselia_community_assets(); ?>
 </body>
 </html>
     <?php
@@ -324,6 +371,19 @@ if ( isset( $kounselia_segments[0] ) && 'tag' === $kounselia_segments[0] && '' =
     exit;
 }
 $search   = isset( $_GET['q'] ) ? trim( sanitize_text_field( wp_unslash( $_GET['q'] ) ) ) : '';
+// ?from=professionals (articles by professionals) or ?from=following
+// (people the signed-in member follows).
+$from       = isset( $_GET['from'] ) && in_array( $_GET['from'], array( 'professionals', 'following' ), true ) ? $_GET['from'] : '';
+$a_settings = function_exists( 'kounselia_article_settings' ) ? kounselia_article_settings() : array( 'filter_label' => 'From our professionals', 'follows_enabled' => 0 );
+if ( 'following' === $from && empty( $a_settings['follows_enabled'] ) ) {
+    $from = '';
+}
+$from_args = array();
+if ( 'professionals' === $from ) {
+    $from_args['author_type'] = 'professional';
+} elseif ( 'following' === $from ) {
+    $from_args['professional_ids'] = is_user_logged_in() ? kounselia_followed_professional_ids( get_current_user_id() ) : array();
+}
 $page_num = isset( $_GET['page'] ) ? max( 1, (int) $_GET['page'] ) : 1;
 $all_tags = kounselia_blog_all_tags();
 $tag_name = $tag_slug && isset( $all_tags[ $tag_slug ] ) ? $all_tags[ $tag_slug ]['name'] : ucwords( str_replace( '-', ' ', $tag_slug ) );
@@ -332,7 +392,7 @@ $tag_name = $tag_slug && isset( $all_tags[ $tag_slug ] ) ? $all_tags[ $tag_slug 
 // It's worked out on every page so it can be left out of the list
 // consistently (otherwise paging would repeat a story).
 $feature = null;
-if ( ! $tag_slug && '' === $search ) {
+if ( ! $tag_slug && '' === $search && ! $from ) {
     $f       = kounselia_blog_query( array( 'featured_only' => true, 'per_page' => 1 ) );
     $feature = $f['items'] ? $f['items'][0] : null;
     if ( ! $feature ) {
@@ -341,13 +401,13 @@ if ( ! $tag_slug && '' === $search ) {
     }
 }
 
-$found = kounselia_blog_query( array(
+$found = kounselia_blog_query( array_merge( array(
     'tag'      => $tag_slug,
     'search'   => $search,
     'page'     => $page_num,
     'per_page' => (int) $kounselia_settings['per_page'],
     'exclude'  => $feature ? array( $feature->id ) : array(),
-) );
+), $from_args ) );
 if ( 1 !== $page_num ) {
     $feature = null; // Only shown above page one.
 }
@@ -358,10 +418,13 @@ if ( $tag_slug && ! $found['total'] ) {
 }
 
 $base_url = $tag_slug ? kounselia_blog_tag_url( $tag_slug ) : '/blog/';
-$page_url = function ( $n ) use ( $base_url, $search ) {
+$page_url = function ( $n ) use ( $base_url, $search, $from ) {
     $args = array();
     if ( '' !== $search ) {
         $args['q'] = $search;
+    }
+    if ( $from ) {
+        $args['from'] = $from;
     }
     if ( $n > 1 ) {
         $args['page'] = $n;
@@ -374,8 +437,9 @@ kounselia_public_head( array(
     'title'       => $title,
     'description' => $tag_slug ? 'Stories about ' . $tag_name . ' from ' . $kounselia_settings['title'] . '.' : $kounselia_settings['tagline'],
     'url'         => kounselia_site_url( $page_url( $page_num ) ),
-    'noindex'     => '' !== $search,
+    'noindex'     => '' !== $search || 'following' === $from,
 ) );
+$has_pro_posts = function_exists( 'kounselia_blog_query' ) && kounselia_blog_query( array( 'author_type' => 'professional', 'per_page' => 1 ) )['total'] > 0;
 ?>
 <body class="k-site">
 <?php require dirname( __DIR__ ) . '/inc/kounselia-site-nav.php'; ?>
@@ -393,7 +457,9 @@ kounselia_public_head( array(
 
   <?php if ( $all_tags ) : ?>
     <nav class="k-topics" aria-label="Topics">
-      <a class="k-pill<?php echo ! $tag_slug ? ' active' : ''; ?>" href="/blog/">All stories</a>
+      <a class="k-pill<?php echo ! $tag_slug && ! $from ? ' active' : ''; ?>" href="/blog/">All stories</a>
+      <?php if ( $has_pro_posts ) : ?><a class="k-pill<?php echo 'professionals' === $from && ! $tag_slug ? ' active' : ''; ?>" href="/blog/?from=professionals"><i class="ti ti-discount-check"></i> <?php echo esc_html( $a_settings['filter_label'] ); ?></a><?php endif; ?>
+      <?php if ( $has_pro_posts && ! empty( $a_settings['follows_enabled'] ) ) : ?><a class="k-pill<?php echo 'following' === $from ? ' active' : ''; ?>" href="/blog/?from=following"><i class="ti ti-users"></i> Following</a><?php endif; ?>
       <?php foreach ( array_slice( $all_tags, 0, 12 ) as $t ) : ?>
         <a class="k-pill<?php echo $tag_slug === $t['slug'] ? ' active' : ''; ?>" href="<?php echo esc_url( kounselia_blog_tag_url( $t['slug'] ) ); ?>"><?php echo esc_html( $t['name'] ); ?></a>
       <?php endforeach; ?>
@@ -418,10 +484,23 @@ kounselia_public_head( array(
         <?php if ( '' !== $search ) : ?>
           <p class="k-results-note"><?php echo esc_html( number_format_i18n( $found['total'] ) . ' result' . ( 1 === $found['total'] ? '' : 's' ) . ' for “' . $search . '”' ); ?> · <a href="/blog/">Clear search</a></p>
         <?php endif; ?>
-        <div class="k-feed-head"><span><?php echo $tag_slug ? 'Latest on ' . esc_html( strtolower( $tag_name ) ) : ( '' !== $search ? 'Results' : 'Latest stories' ); ?></span></div>
+        <div class="k-feed-head"><span><?php echo $tag_slug ? 'Latest on ' . esc_html( strtolower( $tag_name ) ) : ( '' !== $search ? 'Results' : ( 'professionals' === $from ? esc_html( $a_settings['filter_label'] ) : ( 'following' === $from ? 'From people you follow' : 'Latest stories' ) ) ); ?></span></div>
 
         <?php if ( $found['items'] ) : ?>
           <?php foreach ( $found['items'] as $p ) { kounselia_blog_feed_item( $p ); } ?>
+        <?php elseif ( 'following' === $from ) : ?>
+          <div class="k-empty">
+            <i class="ti ti-users"></i>
+            <?php if ( ! is_user_logged_in() ) : ?>
+              <h3>Follow professionals you trust</h3>
+              <p>Sign in, then tap Follow on any professional's article or profile. Their new writing will show up here.</p>
+              <p><a class="k-btn" href="/?auth=login&amp;return=<?php echo rawurlencode( '/blog/?from=following' ); ?>">Sign in</a></p>
+            <?php else : ?>
+              <h3>Nothing here yet</h3>
+              <p>Tap Follow on a professional's article or profile, and their new writing will show up here.</p>
+              <p><a class="k-btn outline" href="/blog/?from=professionals"><?php echo esc_html( $a_settings['filter_label'] ); ?></a></p>
+            <?php endif; ?>
+          </div>
         <?php elseif ( ! $feature ) : ?>
           <div class="k-empty">
             <i class="ti ti-feather"></i>
@@ -444,5 +523,6 @@ kounselia_public_head( array(
 </main>
 
 <?php require dirname( __DIR__ ) . '/inc/kounselia-footer.php'; ?>
+<?php kounselia_community_assets(); ?>
 </body>
 </html>

@@ -957,7 +957,16 @@ function unlockChat(){
     if(!typing)document.getElementById('dynamic-fab').disabled=false;}
 }
 
+// Content pages send people here with ?return=/blog/... so that after
+// signing in they land back on what they were reading.
+function kounseliaReturnPath(){
+  const r=new URLSearchParams(location.search).get('return')||'';
+  return /^\/[^\/\\]/.test(r)?r:'';
+}
+
 function authSuccess(msg,pro){
+  const back=kounseliaReturnPath();
+  if(back){ window.location.href=back; return; }
   const isChatActive = (curSlug !== null && curSlug !== '');
   const btnAction = isChatActive ? "closeModal()" : "window.location.href='/dashboard.php'";
   const btnText = isChatActive ? "Continue my session" : "Go to your dashboard";

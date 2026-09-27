@@ -124,6 +124,12 @@ export interface Professional {
   review_count: number;
   price: string | null;
   full_price: string | null;
+  // The professional's free-session offer for this member, e.g. "Your next
+  // session is free". null when they have nothing free left.
+  free_label: string | null;
+  // "Zoom", "Google Meet", "Microsoft Teams" or "Whereby" when their sessions
+  // happen there instead of Kounselia's own video room (joined from Kounselia).
+  video_provider: string | null;
 }
 
 export interface BookingsData {
@@ -149,8 +155,14 @@ export const fetchSlots = (config: KounseliaConfig, professionalId: number, resc
 
 // Reserves the slot and returns the Paystack page to pay on. The booking
 // is only confirmed once Paystack tells the server the payment went through.
+// A free session (the professional's offer) is confirmed at once instead:
+// `free` is true and there is no payment page.
+export type CreatedBooking =
+  | { free?: false; authorization_url: string; booking_id: number }
+  | { free: true; booking_id: number; message: string };
+
 export const createBooking = (config: KounseliaConfig, professionalId: number, slot: string, note: string, weekly: boolean) =>
-  call<{ authorization_url: string; booking_id: number }>(config, 'kounselia_create_booking', {
+  call<CreatedBooking>(config, 'kounselia_create_booking', {
     professional_id: professionalId,
     scheduled_start: slot,
     note,
@@ -171,8 +183,11 @@ export const cancelBooking = (config: KounseliaConfig, bookingId: number, reason
 export const cancelSeries = (config: KounseliaConfig, seriesId: number, reason = '') =>
   call<{ message: string }>(config, 'kounselia_cancel_series', { series_id: seriesId, reason });
 
+// The way into a booked session, only for the two people on it and only
+// at session time. `external` is true when the professional holds their
+// sessions on their own Zoom / Meet / Teams / Whereby link.
 export const fetchBookingRoom = (config: KounseliaConfig, bookingId: number) =>
-  call<{ url: string }>(config, 'kounselia_get_booking_room', { booking_id: bookingId });
+  call<{ url: string; external: boolean; provider: string }>(config, 'kounselia_get_booking_room', { booking_id: bookingId });
 
 export const submitReview = (config: KounseliaConfig, bookingId: number, rating: number, comment: string) =>
   call<{ message: string }>(config, 'kounselia_submit_review', { booking_id: bookingId, rating, comment });
