@@ -147,6 +147,10 @@ export interface Slots {
   slots: string[]; // site time — send one of these back when booking
   slots_utc: (string | null)[];
   session_minutes: number;
+  // Set when today is one of the professional's working days but every
+  // slot in it has already been ruled out by the booking lead time —
+  // otherwise today would just silently disappear from the day picker.
+  today_note: string | null;
 }
 
 export const fetchSlots = (config: KounseliaConfig, professionalId: number, rescheduleBookingId?: number) =>
