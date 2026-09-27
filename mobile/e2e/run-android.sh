@@ -23,6 +23,11 @@ run_flows() {
     status=$?
     if [ "$status" -eq 0 ]; then result=passed; else result=FAILED; fi
     running=$(adb shell pidof "$APP" > /dev/null && echo "app running" || echo "APP NOT RUNNING")
+    # What the phone shows at the end of this flow, whatever happened.
+    adb exec-out screencap -p > "$OUT/shots/$prefix-$name-end.png" 2>/dev/null
+    if [ "$status" -ne 0 ]; then
+      adb shell uiautomator dump /sdcard/ui.xml > /dev/null 2>&1 && adb pull /sdcard/ui.xml "$OUT/$prefix-$name-screen.xml" > /dev/null 2>&1
+    fi
     echo "$prefix $name: $result ($running)" | tee -a "$OUT/summary.txt"
     # Keep any crash, then start the next flow with a clean log.
     adb logcat -d -b crash > "$OUT/$prefix-$name-crash.txt" 2>/dev/null
@@ -40,10 +45,21 @@ run_flows() {
   done
 }
 
+# Before any tapping: does the app start and show its first screen?
+adb shell monkey -p "$APP" -c android.intent.category.LAUNCHER 1 > /dev/null 2>&1
+sleep 25
+adb exec-out screencap -p > "$OUT/shots/00-first-launch.png" 2>/dev/null
+adb logcat -d > "$OUT/00-first-launch-logcat.txt" 2>/dev/null
+adb shell am force-stop "$APP"
+adb logcat -b all -c
+
 adb shell cmd uimode night no
 run_flows light
 adb shell cmd uimode night yes
 run_flows dark
+
+# Maestro's own debug output (its screenshots of failed steps, and logs).
+[ -d "$HOME/.maestro/tests" ] && cp -r "$HOME/.maestro/tests" "$OUT/maestro-debug"
 
 echo "$(ls "$OUT/shots" | wc -l) screenshots" | tee -a "$OUT/summary.txt"
 
