@@ -219,6 +219,31 @@ export interface Account {
 
 export const fetchAccount = (config: KounseliaConfig) => callAction<Account>(config, 'kounselia_app_account');
 
+// ---- Plan (upgrade / manage subscription) ----------------------------------
+
+export interface Plan {
+  id: string;
+  name: string;
+  price: string; // already formatted in the viewer's currency, e.g. "$4.99"
+  interval: 'month' | 'year';
+  features: string[];
+  is_popular: boolean;
+}
+
+export const fetchPlans = (config: KounseliaConfig) => callAction<{ plans: Plan[] }>(config, 'kounselia_app_plans');
+
+// Starts Paystack checkout for a plan and returns the page to pay on. Always
+// asks for the redirect page (never the pop-up), since a pop-up needs
+// Paystack's own script running on a page we don't control here.
+export const startSubscriptionPayment = (config: KounseliaConfig, planId: string) =>
+  callAction<{ authorization_url: string }>(config, 'kounselia_init_subscription_payment', { plan_id: planId, redirect: 1 });
+
+// Stops auto-renew; access continues until the period already paid for ends.
+export const cancelSubscription = (config: KounseliaConfig) => callAction<{ message: string }>(config, 'kounselia_cancel_subscription');
+
+// Turns auto-renew back on, using the card already saved.
+export const resumeSubscription = (config: KounseliaConfig) => callAction<{ message: string }>(config, 'kounselia_resume_subscription');
+
 export const updateName = (config: KounseliaConfig, name: string) => callAction<{ name: string }>(config, 'kounselia_update_profile', { name });
 
 export const changePassword = (config: KounseliaConfig, currentPassword: string, newPassword: string) =>
