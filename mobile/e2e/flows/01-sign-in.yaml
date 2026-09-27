@@ -1,0 +1,24 @@
+# Signed out: the welcome and sign-in screens, then sign in (the mock
+# server accepts any email and password).
+appId: com.kounselia.app
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "I already have an account"
+    timeout: 90000
+- takeScreenshot: ${P}01-welcome
+- tapOn: "I already have an account"
+- extendedWaitUntil:
+    visible: "Welcome back"
+    timeout: 10000
+- takeScreenshot: ${P}02-sign-in
+- tapOn: "you@example.com"
+- inputText: "samson@example.com"
+- tapOn: "••••••••"
+- inputText: "test-password"
+- hideKeyboard
+- tapOn: "Sign in"
+- extendedWaitUntil:
+    visible: "Talk to someone now"
+    timeout: 20000

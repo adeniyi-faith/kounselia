@@ -1,7 +1,7 @@
 import { fetchSessions, type SessionSummary } from '@kounselia/core';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { CounselorAvatar } from '@/components/CounselorAvatar';
@@ -10,6 +10,7 @@ import { TablerIcon } from '@/components/TablerIcon';
 import { useCounselors } from '@/counselors';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors } from '@/theme';
+import { ListSkeleton } from '@/components/Skeleton';
 
 // "3 hours ago", "2 days ago" — like the website's session list.
 function ago(iso: string | null): string {
@@ -72,7 +73,9 @@ export default function Sessions() {
               <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
-            <ActivityIndicator color={colors.accentText} style={{ marginTop: 40 }} />
+            <View style={{ marginTop: 8 }}>
+              <ListSkeleton />
+            </View>
           )}
         </View>
       ) : (

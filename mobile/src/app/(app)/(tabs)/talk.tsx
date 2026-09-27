@@ -1,12 +1,13 @@
 import type { CounselorSummary } from '@kounselia/core';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { CounselorAvatar } from '@/components/CounselorAvatar';
 import { useCounselors } from '@/counselors';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
+import { GridSkeleton } from '@/components/Skeleton';
 
 // The dashboard's "Talk to someone" grid (.counselor-grid): two tiles per
 // row, each opening a conversation with that counselor.
@@ -35,7 +36,9 @@ export default function Talk() {
     return (
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         {header}
-        <ActivityIndicator color={colors.accentText} style={styles.center} />
+        <View style={styles.skeleton}>
+          <GridSkeleton />
+        </View>
       </SafeAreaView>
     );
   }
@@ -109,5 +112,6 @@ const useStyles = makeStyles((colors) => ({
   tileName: { fontFamily: fonts.serifMedium, fontSize: 18, color: colors.text, marginTop: 10, marginBottom: 2 },
   tileSpec: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, color: colors.text3, textAlign: 'center' },
   center: { flex: 1, justifyContent: 'center', gap: 16, paddingHorizontal: 20 },
+  skeleton: { paddingHorizontal: 20, paddingTop: 4 },
   errorText: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
 }));

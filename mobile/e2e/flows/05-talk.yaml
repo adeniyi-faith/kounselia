@@ -1,0 +1,14 @@
+appId: com.kounselia.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Talk to someone now"
+    timeout: 60000
+- tapOn: "Talk to someone"
+- extendedWaitUntil:
+    visible: "Eli"
+    timeout: 10000
+- takeScreenshot: ${P}10-talk
+- tapOn: "Eli"
+- waitForAnimationToEnd
+- takeScreenshot: ${P}11-chat

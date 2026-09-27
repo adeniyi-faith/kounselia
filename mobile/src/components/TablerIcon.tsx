@@ -23,5 +23,7 @@ export function TablerIcon({ name, size = 20, color, style }: Props) {
   // An icon name typed by an admin that doesn't exist falls back to a
   // plain speech bubble rather than showing nothing.
   const known = name in glyphMap ? name : 'message-circle';
-  return <Tabler name={known} size={size} color={color} style={style} />;
+  // Exactly `size` tall, with none of the extra space Android adds above
+  // and below text by default, so icons line up with what's beside them.
+  return <Tabler name={known} size={size} color={color} style={[{ lineHeight: size, includeFontPadding: false, textAlignVertical: 'center' }, style]} />;
 }

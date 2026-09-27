@@ -1,0 +1,14 @@
+appId: com.kounselia.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Talk to someone now"
+    timeout: 60000
+- waitForAnimationToEnd
+- takeScreenshot: ${P}03-home-top
+- scroll
+- takeScreenshot: ${P}04-home-2
+- scroll
+- takeScreenshot: ${P}05-home-3
+- scroll
+- takeScreenshot: ${P}06-home-4

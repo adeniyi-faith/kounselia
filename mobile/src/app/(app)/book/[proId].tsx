@@ -2,7 +2,7 @@ import { createBooking, fetchBookings, fetchBookingStatus, fetchSlots, reschedul
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, AppState, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBrowser } from '@/browser/BrowserProvider';
 import { Button } from '@/components/Button';
@@ -11,6 +11,8 @@ import { FormMessage } from '@/components/FormMessage';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, useColors } from '@/theme';
+import { showDialog } from '@/components/Dialog';
+import { DetailSkeleton } from '@/components/Skeleton';
 
 interface Slot {
   value: string; // site time, sent back to the server
@@ -100,7 +102,12 @@ export default function BookProfessional() {
         return;
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-      Alert.alert('Session moved', `Your session is now on ${picked.at.toLocaleString([], { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })}.`);
+      showDialog({
+        title: 'Session moved',
+        message: `Your session is now on ${picked.at.toLocaleString([], { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })}.`,
+        icon: 'calendar-check',
+        tone: 'success',
+      });
       router.back();
       return;
     }
@@ -134,7 +141,12 @@ export default function BookProfessional() {
       if (res.ok && res.data.status === 'confirmed') {
         done.current = true;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-        Alert.alert("You're booked", `Your session with ${pro?.name ?? 'your professional'} is confirmed. You'll find it under Book, with a Join button 10 minutes before it starts.`);
+        showDialog({
+          title: "You're booked",
+          message: `Your session with ${pro?.name ?? 'your professional'} is confirmed. You'll find it under Book, with a Join button 10 minutes before it starts.`,
+          icon: 'circle-check',
+          tone: 'success',
+        });
         router.back();
       } else if (!res.ok && !res.offline) {
         // The hold ran out before payment arrived; the time was released.
@@ -180,8 +192,10 @@ export default function BookProfessional() {
 
   if (!slots) {
     return (
-      <SafeAreaView style={[styles.safe, styles.center]}>
-        <ActivityIndicator color={colors.accentText} />
+      <SafeAreaView style={styles.safe}>
+        <View style={{ padding: 16 }}>
+          <DetailSkeleton />
+        </View>
       </SafeAreaView>
     );
   }
