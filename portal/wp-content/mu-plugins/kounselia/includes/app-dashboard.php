@@ -276,6 +276,44 @@ function kounselia_ajax_app_bookings() {
 add_action( 'wp_ajax_kounselia_app_bookings', 'kounselia_ajax_app_bookings' );
 add_action( 'wp_ajax_nopriv_kounselia_app_bookings', 'kounselia_ajax_app_bookings' );
 
+/**
+ * What clients said about a professional, for the app's "Book a session"
+ * screen: the star average, how many ratings, and the most recent written
+ * reviews. Anonymous, like the website's profile page: no names, only the
+ * stars, the words and when (kounselia_public_professional_reviews()).
+ */
+function kounselia_ajax_app_professional_reviews() {
+    kounselia_verify_nonce();
+
+    $pro_id = isset( $_POST['professional_id'] ) ? (int) $_POST['professional_id'] : 0;
+    $pro    = $pro_id ? kounselia_get_professional_by_id( $pro_id ) : null;
+    if ( ! $pro || 'verified' !== $pro->status || ! empty( $pro->admin_hidden ) ) {
+        wp_send_json_error( array( 'message' => 'This professional isn’t available.' ), 404 );
+    }
+
+    $summary = function_exists( 'kounselia_get_professional_rating_summary' )
+        ? kounselia_get_professional_rating_summary( $pro_id )
+        : array( 'average' => 0, 'count' => 0 );
+    $reviews = array();
+    if ( function_exists( 'kounselia_public_professional_reviews' ) ) {
+        foreach ( kounselia_public_professional_reviews( $pro_id, 10 ) as $r ) {
+            $reviews[] = array(
+                'rating'   => (int) $r['rating'],
+                'comment'  => wp_strip_all_tags( (string) $r['comment'] ),
+                'date_utc' => kounselia_app_utc( $r['date'] ),
+            );
+        }
+    }
+
+    wp_send_json_success( array(
+        'average' => (float) $summary['average'],
+        'count'   => (int) $summary['count'],
+        'reviews' => $reviews,
+    ) );
+}
+add_action( 'wp_ajax_kounselia_app_professional_reviews', 'kounselia_ajax_app_professional_reviews' );
+add_action( 'wp_ajax_nopriv_kounselia_app_professional_reviews', 'kounselia_ajax_app_professional_reviews' );
+
 /* -------------------------------------------------------------------------
  * JOIN: the private video room for a booked session
  * ---------------------------------------------------------------------- */
