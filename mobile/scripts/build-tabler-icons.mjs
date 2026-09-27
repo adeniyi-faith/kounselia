@@ -73,6 +73,14 @@ for (const file of tsFilesUnder(join(mobileDir, 'src'))) {
   for (const m of src.matchAll(/<TablerIcon\b[^>]*?\bname=\{?["'`]([a-z0-9-]+)["'`]\}?/gs)) usedInApp.add(m[1]);
   for (const m of src.matchAll(/\bicon=\{?["'`]([a-z0-9-]+)["'`]\}?/gs)) usedInApp.add(m[1]);
   for (const m of src.matchAll(/\bicon:\s*["'`]([a-z0-9-]+)["'`]/gs)) usedInApp.add(m[1]);
+  // Any other quoted word that happens to be an icon name, so names kept in
+  // lookup tables or picked in code (the tab bar's { settings: 'settings' },
+  // isOpen ? 'chevron-up' : 'chevron-down') are never missed. This also
+  // keeps a few ordinary words that are icon names too ("link", "ghost");
+  // a handful of unused glyphs is a fair price for never losing a real one.
+  for (const m of src.matchAll(/["'`]([a-z0-9]+(?:-[a-z0-9]+)*)["'`]/g)) {
+    if (m[1] in allGlyphs) usedInApp.add(m[1]);
+  }
 }
 
 // The website's own defaults (built-in counselors, mood options): scanned
