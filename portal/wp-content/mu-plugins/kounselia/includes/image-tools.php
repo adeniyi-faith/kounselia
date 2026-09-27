@@ -76,3 +76,75 @@ function kounselia_compress_attachment( $attachment_id, $max_width = 2000, $qual
 
     return $ok;
 }
+
+/**
+ * Compresses a picture already sitting in the uploads folder, given the
+ * public URL it's stored under (what kounselia_content_store_image()
+ * returns and what a post's cover_image / inline <img> tags hold — those
+ * aren't media library attachments, just files, so there's no attachment
+ * id to hand kounselia_compress_attachment()). Returns false, without
+ * touching anything, for a URL that isn't one of ours (an image someone
+ * linked to from elsewhere, which we have no file to compress).
+ */
+function kounselia_compress_uploaded_image_url( $url, $max_width = 2000, $quality = 82 ) {
+    if ( empty( $url ) ) {
+        return false;
+    }
+
+    $upload_dir = wp_upload_dir();
+    if ( 0 !== strpos( $url, $upload_dir['baseurl'] ) ) {
+        return false;
+    }
+
+    $relative_path = ltrim( substr( $url, strlen( $upload_dir['baseurl'] ) ), '/' );
+    $path          = trailingslashit( $upload_dir['basedir'] ) . $relative_path;
+
+    return kounselia_compress_image_file( $path, $max_width, $quality );
+}
+
+/**
+ * One-off maintenance pass over every picture already on the site —
+ * everyone's profile photo, plus every post's cover image and any
+ * pictures pasted into a post's body — for images uploaded before this
+ * compression step existed, or from before it was deployed. New uploads
+ * are compressed automatically as they come in; this is only for
+ * catching up on the backlog. Triggered from Admin → Settings →
+ * System Maintenance.
+ */
+function kounselia_backfill_compress_existing_images( $max_width = 2000, $quality = 82 ) {
+    $counts = array( 'avatars' => 0, 'images' => 0 );
+
+    $users = get_users( array( 'meta_key' => 'kounselia_avatar_id', 'fields' => array( 'ID' ) ) );
+    foreach ( $users as $user ) {
+        $attachment_id = (int) get_user_meta( $user->ID, 'kounselia_avatar_id', true );
+        if ( $attachment_id && kounselia_compress_attachment( $attachment_id, 1024, 82 ) ) {
+            $counts['avatars']++;
+        }
+    }
+
+    global $wpdb;
+    $posts = $wpdb->get_results( "SELECT cover_image, content FROM {$wpdb->prefix}kounselia_posts" );
+
+    $urls = array();
+    foreach ( $posts as $post ) {
+        if ( $post->cover_image ) {
+            $urls[] = $post->cover_image;
+        }
+        if ( $post->content && preg_match_all( '/<img[^>]+src=["\']([^"\']+)["\']/i', $post->content, $matches ) ) {
+            $urls = array_merge( $urls, $matches[1] );
+        }
+    }
+
+    $touched = array();
+    foreach ( array_unique( $urls ) as $url ) {
+        if ( isset( $touched[ $url ] ) ) {
+            continue;
+        }
+        $touched[ $url ] = true;
+        if ( kounselia_compress_uploaded_image_url( $url, $max_width, $quality ) ) {
+            $counts['images']++;
+        }
+    }
+
+    return $counts;
+}
