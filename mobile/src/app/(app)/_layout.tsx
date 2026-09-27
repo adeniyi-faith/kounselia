@@ -1,5 +1,7 @@
 import { Stack } from 'expo-router';
 import { CounselorsProvider } from '@/counselors';
+import { usePushNotifications } from '@/notifications';
+import { useSession } from '@/session';
 import { useColors } from '@/theme';
 
 // Signed-in screens: the tabs, with conversations opening on top of them
@@ -8,6 +10,10 @@ import { useColors } from '@/theme';
 // back from anywhere on the screen, not just the edge.
 export default function AppLayout() {
   const colors = useColors();
+  const { config } = useSession();
+  // Keeps this phone's notifications working, and opens the right screen
+  // when one is tapped.
+  usePushNotifications(config);
   return (
     <CounselorsProvider>
       <Stack

@@ -3,7 +3,7 @@
     "name": "Kounselia",
     "slug": "kounselia",
     "scheme": "kounselia",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -52,6 +52,20 @@
           ]
         }
       ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#26446F",
+          "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Kounselia uses Face ID so only you can open your conversations and journal, if you turn on App lock."
+        }
+      ],
       "expo-web-browser",
       "expo-image",
       [
@@ -70,7 +84,8 @@
             "enableShrinkResourcesInReleaseBuilds": true
           }
         }
-      ]
+      ],
+      "@sentry/react-native"
     ],
     "experiments": {
       "typedRoutes": true

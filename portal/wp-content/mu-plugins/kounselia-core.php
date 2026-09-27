@@ -56,6 +56,7 @@ require_once KOUNSELIA_CORE_DIR . '/includes/auth.php';              // 3-5. Log
 require_once KOUNSELIA_CORE_DIR . '/includes/app-auth.php';          // 5B. Mobile app sign-in (token instead of cookie + nonce)
 require_once KOUNSELIA_CORE_DIR . '/includes/dashboard.php';         // 6.  Dashboard helpers
 require_once KOUNSELIA_CORE_DIR . '/includes/account.php';           // 7-9. Avatar, profile, password
+require_once KOUNSELIA_CORE_DIR . '/includes/account-deletion.php';  // 9B. A member deleting their own account (and what that erases)
 require_once KOUNSELIA_CORE_DIR . '/includes/chat-helpers.php';      // 10. Session/guest-limit/safety/Gemini-client helpers
 require_once KOUNSELIA_CORE_DIR . '/includes/safety-escalation.php'; // 10B. Safety escalation: severity, staff alerts, acknowledgment
 require_once KOUNSELIA_CORE_DIR . '/includes/safety-ai-screening.php'; // 10C. Background AI risk check for messages keywords missed
