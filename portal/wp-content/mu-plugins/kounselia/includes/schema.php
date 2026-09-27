@@ -1049,4 +1049,4 @@ function kounselia_cleanup_message_slashes() {
             $wpdb->update( $table, array( 'content' => $clean ), array( 'id' => $row->id ) );
         }
     }
-}
+}

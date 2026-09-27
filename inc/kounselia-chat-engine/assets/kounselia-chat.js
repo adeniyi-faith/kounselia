@@ -1294,4 +1294,4 @@ function endVoiceCall(){
 
   document.getElementById('call-overlay').classList.remove('active');
   document.getElementById('call-ring').classList.remove('speaking');
-}
+}
