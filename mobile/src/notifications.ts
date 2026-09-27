@@ -12,8 +12,9 @@
 // switch notifications on in Settings.
 //
 // Needs the app linked to an Expo project (`eas init` puts its id in
-// app.json). Until then pushState() says 'unavailable' and Settings hides
-// the switch.
+// app.json) and, on Android, Firebase's google-services.json file (named
+// in app.json as android.googleServicesFile). Until then pushState() says
+// 'unavailable': Settings hides the switch and booking doesn't offer it.
 import { registerPushToken, unregisterPushToken, type KounseliaConfig } from '@kounselia/core';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
@@ -76,8 +77,14 @@ async function send(config: KounseliaConfig, token: string) {
   if (await registerPushToken(config, platform, token)) await writeSecure(TOKEN_KEY, token);
 }
 
+// Android phones get their push address through Google's Firebase, which
+// the app can only reach once it's built with Firebase's settings file.
+function firebaseReady(): boolean {
+  return Platform.OS !== 'android' || !!Constants.expoConfig?.android?.googleServicesFile;
+}
+
 export async function pushState(): Promise<PushState> {
-  if (Platform.OS === 'web' || !Device.isDevice || !projectId()) return 'unavailable';
+  if (Platform.OS === 'web' || !Device.isDevice || !projectId() || !firebaseReady()) return 'unavailable';
   const [perm, choice] = await Promise.all([Notifications.getPermissionsAsync().catch(() => null), readSecure(CHOICE_KEY)]);
   if (!perm) return 'unavailable';
   if (perm.status === 'granted') return choice === 'off' ? 'off' : 'on';
@@ -94,9 +101,12 @@ export async function turnOnPush(config: KounseliaConfig): Promise<PushState> {
     await writeSecure(CHOICE_KEY, 'off');
     return perm.canAskAgain ? 'off' : 'blocked';
   }
-  await writeSecure(CHOICE_KEY, 'on');
   const token = await currentToken();
-  if (token) await send(config, token);
+  // No address from Apple or Google (e.g. the build is missing its push
+  // settings): say so, rather than show a switch that's on but does nothing.
+  if (!token) return 'unavailable';
+  await writeSecure(CHOICE_KEY, 'on');
+  await send(config, token);
   return 'on';
 }
 

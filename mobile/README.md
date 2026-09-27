@@ -77,10 +77,14 @@ works normally, with notifications hidden in Settings and no crash reports.
 1. **Link the app to Expo** (needed for notifications). In this folder:
    `npx eas-cli@latest login`, then `npx eas-cli@latest init`. It adds an
    `owner` and a project id to `app.json`: commit that change.
-2. **Android notifications**: create a free Firebase project, add an Android
-   app with the package name `com.kounselia.app`, and upload its FCM V1
-   service account key to Expo:
-   https://docs.expo.dev/push-notifications/fcm-credentials/
+2. **Android notifications**: create a free Firebase project and add an
+   Android app with the package name `com.kounselia.app`. Then:
+   - download its `google-services.json`, put it in this folder, and add
+     `"googleServicesFile": "./google-services.json"` inside `"android"` in
+     `app.json` (commit both; the file isn't secret). Until this is in a
+     build, Android hides the Notifications switch;
+   - upload its FCM V1 service account key to Expo (this one *is* secret,
+     don't commit it): https://docs.expo.dev/push-notifications/fcm-credentials/
 3. **iPhone notifications**: the first `npm run build:test:ios` or
    `npm run build:store` asks whether to set up push notifications; answer
    yes and let EAS create the key (needs the Apple Developer account).
@@ -94,6 +98,13 @@ works normally, with notifications hidden in Settings and no crash reports.
    Set them for the `preview` and `production` environments.
 5. **Build a new version.** These features include new native code, so an
    over-the-air update isn't enough: run a new build (see below).
+
+Any of these can be done later, in any order. A build made before them
+works normally, just without that feature: nothing crashes. Most need a
+new build afterwards to take effect, because they're built into the app
+(the Sentry settings and `google-services.json`). The two keys kept on
+Expo's servers (Android's FCM key and Apple's push key) work for builds
+already out there as soon as they're added.
 
 ## Version numbers
 
