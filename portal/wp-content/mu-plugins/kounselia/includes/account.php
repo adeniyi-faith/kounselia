@@ -49,6 +49,8 @@ function kounselia_ajax_upload_avatar() {
         wp_send_json_error( array( 'message' => 'Could not upload that image, please try again.' ), 500 );
     }
 
+    kounselia_compress_attachment( $attachment_id, 1024, 82 );
+
     $old_attachment_id = get_user_meta( $user_id, 'kounselia_avatar_id', true );
     if ( $old_attachment_id && $old_attachment_id != $attachment_id ) {
         wp_delete_attachment( $old_attachment_id, true );
