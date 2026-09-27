@@ -9,6 +9,7 @@
 // properly in the phone's own browser, so joinSession() keeps using that.
 import { fetchWebSsoCode, type KounseliaConfig } from '@kounselia/core';
 import * as Clipboard from 'expo-clipboard';
+import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Linking, Modal, Platform, Pressable, Share, Text, View } from 'react-native';
@@ -57,6 +58,29 @@ function pathOf(url: string): string {
   return m && m[1] ? m[1] : '/';
 }
 
+function escapeRegExp(text: string) {
+  return text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
+}
+
+const BLOG_LINK = new RegExp(`^${escapeRegExp(SITE_URL)}/blog/([a-z0-9-]+)/?(?:[?#].*)?$`, 'i');
+const NOT_ARTICLES = ['tag', 'tags', 'feed', 'rss', 'search', 'page', 'author'];
+// "/professionals/ada-obi-12" — see kounselia_professional_url() on the
+// server; the number at the end is what actually gets looked up.
+const PRO_PROFILE_LINK = new RegExp(`^${escapeRegExp(SITE_URL)}/professionals/[a-z0-9-]*?(\\d+)/?(?:[?#].*)?$`, 'i');
+
+// A link to something the app already has its own screen for — a blog
+// article, or a professional's profile (where booking them lives). Sent
+// straight there instead of into the in-app browser, so a link inside an
+// article, or anywhere else openInApp is used, doesn't send someone off
+// into the full website for a page the app already shows natively.
+function nativeRoute(url: string): { pathname: '/articles/[slug]' | '/book/[proId]'; params: Record<string, string> } | null {
+  const blog = BLOG_LINK.exec(url);
+  if (blog && !NOT_ARTICLES.includes(blog[1])) return { pathname: '/articles/[slug]', params: { slug: blog[1] } };
+  const pro = PRO_PROFILE_LINK.exec(url);
+  if (pro) return { pathname: '/book/[proId]', params: { proId: pro[1] } };
+  return null;
+}
+
 // The app is signed in with its own token (see appAuth.ts); the WebView
 // this opens has never signed in on the website itself and has no way to
 // carry that token, so a page that needs a member signed in would always
@@ -87,6 +111,11 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
     (url: string, options: OpenOptions = {}) => {
       if (isExternal(url)) {
         Linking.openURL(url).catch(() => undefined);
+        return Promise.resolve();
+      }
+      const native = nativeRoute(url);
+      if (native) {
+        router.push(native);
         return Promise.resolve();
       }
       resolver.current?.(); // Only one at a time.
