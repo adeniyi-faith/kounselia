@@ -13,6 +13,9 @@
       "supportsTablet": true,
       "config": {
         "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSCameraUsageDescription": "Kounselia uses your camera so you can be seen in your video session with your counselor."
       }
     },
     "android": {
@@ -22,7 +25,8 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": true
+      "predictiveBackGestureEnabled": true,
+      "permissions": ["android.permission.CAMERA"]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -43,7 +47,7 @@
       [
         "react-native-audio-api",
         {
-          "iosMicrophonePermission": "Kounselia uses your microphone so you can talk to your counselor and speak your messages instead of typing them.",
+          "iosMicrophonePermission": "Kounselia uses your microphone so you can talk to your counselor, speak your messages instead of typing them, and be heard in your video sessions.",
           "iosBackgroundMode": false,
           "androidForegroundService": false,
           "androidPermissions": [
@@ -66,7 +70,6 @@
           "faceIDPermission": "Kounselia uses Face ID so only you can open your conversations and journal, if you turn on App lock."
         }
       ],
-      "expo-web-browser",
       "expo-image",
       [
         "expo-image-picker",
