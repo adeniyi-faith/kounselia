@@ -183,7 +183,7 @@ $kounselia_nonce = wp_create_nonce( 'kounselia_safety_keywords' );
   <?php endif; ?>
 
   <div class="note">
-    This covers every place someone could say something concerning — the AI counselor chat, and a private message thread with a human professional. Keyword matching catches obvious phrasing quickly, but it can miss things worded differently and can occasionally flag something harmless. A <span class="sev-badge sev-critical">Critical</span> match pages every admin/staff member by email the moment it happens; an <span class="sev-badge sev-elevated">Elevated</span> match is queued here for review without an alert. Treat both as "worth a look," and keep an eye on new conversations directly from time to time too.
+    This covers every place someone could say something concerning — the AI counselor chat, a private message thread with a human professional, and comments on Journal articles. Keyword matching catches obvious phrasing quickly, but it can miss things worded differently and can occasionally flag something harmless. A <span class="sev-badge sev-critical">Critical</span> match pages every admin/staff member by email the moment it happens; an <span class="sev-badge sev-elevated">Elevated</span> match is queued here for review without an alert. Treat both as "worth a look," and keep an eye on new conversations directly from time to time too.
   </div>
 
   <div class="panel">

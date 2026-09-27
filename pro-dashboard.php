@@ -646,7 +646,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     <?php if ( ! $article_access['allowed'] ) : ?>
       <div class="art-mode"><i class="ti ti-info-circle"></i><div><?php echo esc_html( $article_access['message'] ); ?></div></div>
     <?php elseif ( 'trusted' === $article_access['mode'] ) : ?>
-      <div class="art-mode"><i class="ti ti-rosette-discount-check"></i><div><b>You're a trusted writer.</b> Your articles go live on the Journal as soon as you publish them.</div></div>
+      <div class="art-mode"><i class="ti ti-discount-check"></i><div><b>You're a trusted writer.</b> Your articles go live on the Journal as soon as you publish them.</div></div>
     <?php else : ?>
       <div class="art-mode"><i class="ti ti-eye-check"></i><div>An editor reads every article before it goes live, usually within two working days. You'll get a notification and an email either way.</div></div>
     <?php endif; ?>
