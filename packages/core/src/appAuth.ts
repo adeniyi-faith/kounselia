@@ -68,8 +68,10 @@ export async function fetchAppUser(config: KounseliaConfig): Promise<AppMeResult
 
 // Signs out this phone only. Resolves either way: the app forgets the
 // token regardless, so a dropped connection can't keep someone signed in.
-export function appLogout(config: KounseliaConfig): Promise<void> {
-  return postAction(config, 'kounselia_app_logout').then(
+// `pushToken` is this phone's notification address, if it has one, so the
+// member's notifications stop coming to a phone they've signed out of.
+export function appLogout(config: KounseliaConfig, pushToken?: string | null): Promise<void> {
+  return postAction(config, 'kounselia_app_logout', pushToken ? { push_token: pushToken } : {}).then(
     () => undefined,
     () => undefined,
   );
@@ -92,5 +94,26 @@ export async function fetchWebSsoCode(config: KounseliaConfig): Promise<string |
     return json?.success && json.data?.code ? json.data.code : null;
   } catch {
     return null;
+  }
+}
+
+// Push notifications (includes/notifications.php): tells the server this
+// phone's Expo push token, so the member's reminders and replies reach it,
+// or that it should stop. True if the server took it.
+export async function registerPushToken(config: KounseliaConfig, platform: 'ios' | 'android', token: string): Promise<boolean> {
+  try {
+    const json = await postAction(config, 'kounselia_register_push_token', { platform, token }, 15000);
+    return !!json?.success;
+  } catch {
+    return false;
+  }
+}
+
+export async function unregisterPushToken(config: KounseliaConfig, token: string): Promise<boolean> {
+  try {
+    const json = await postAction(config, 'kounselia_unregister_push_token', { token }, 15000);
+    return !!json?.success;
+  } catch {
+    return false;
   }
 }

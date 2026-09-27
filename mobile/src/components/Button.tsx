@@ -1,5 +1,5 @@
 // The site's pill buttons: .modal-btn (navy gradient) and .btn-ghost
-// (outlined). Pressing gives a light tap of haptic feedback and a small
+// (outlined), plus a solid rose one for something that can't be undone. Pressing gives a light tap of haptic feedback and a small
 // press-down, where the website has a hover lift.
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,7 +9,7 @@ import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 interface Props {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'ghost';
+  variant?: 'primary' | 'ghost' | 'danger';
   busy?: boolean;
   disabled?: boolean;
   style?: ViewStyle;
@@ -20,6 +20,7 @@ export function Button({ title, onPress, variant = 'primary', busy = false, disa
   const colors = useColors();
   const inactive = busy || disabled;
   const primary = variant === 'primary';
+  const filled = variant !== 'ghost';
 
   return (
     <Pressable
@@ -32,7 +33,8 @@ export function Button({ title, onPress, variant = 'primary', busy = false, disa
       }}
       style={({ pressed }) => [
         styles.base,
-        primary ? shadows.button : styles.ghost,
+        filled ? shadows.button : styles.ghost,
+        variant === 'danger' && { backgroundColor: colors.roseFill },
         { opacity: inactive ? 0.6 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] },
         style,
       ]}
@@ -46,9 +48,9 @@ export function Button({ title, onPress, variant = 'primary', busy = false, disa
         />
       )}
       {busy ? (
-        <ActivityIndicator color={primary ? '#fff' : colors.accent} />
+        <ActivityIndicator color={filled ? '#fff' : colors.accent} />
       ) : (
-        <Text style={[styles.label, { color: primary ? '#fff' : colors.text }]}>{title}</Text>
+        <Text style={[styles.label, { color: filled ? '#fff' : colors.text }]}>{title}</Text>
       )}
     </Pressable>
   );

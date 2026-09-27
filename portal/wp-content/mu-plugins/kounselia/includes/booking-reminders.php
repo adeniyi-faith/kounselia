@@ -7,8 +7,8 @@
  * the actual time approached. This runs a WP-Cron job every 15 minutes
  * that finds bookings starting in about an hour and hasn't reminded
  * about yet, and notifies both the client and the professional through
- * kounselia_notify_user() (email today; in-app and, once a mobile app
- * exists, push).
+ * kounselia_notify_user() (email, in-app, and a push notification on
+ * the mobile app).
  *
  * WordPress's own cron only fires on a page load (there's no daemon
  * running in the background), so on a very quiet site a reminder could

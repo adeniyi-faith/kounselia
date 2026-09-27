@@ -1,3 +1,5 @@
+// Crash reporting starts first, so it also catches errors while the rest loads.
+import { identify, report, wrapRoot } from '@/monitoring';
 // Each weight is imported from its own subpath (as the @expo-google-fonts
 // packages' own docs recommend), not the package root: importing from the
 // root pulls in every weight's font file as a side effect, even ones never
@@ -11,21 +13,26 @@ import { Outfit_400Regular } from '@expo-google-fonts/outfit/400Regular';
 import { Outfit_500Medium } from '@expo-google-fonts/outfit/500Medium';
 import { Outfit_600SemiBold } from '@expo-google-fonts/outfit/600SemiBold';
 import { useFonts } from 'expo-font';
-import { SplashScreen, Stack } from 'expo-router';
+import { SplashScreen, Stack, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
 import { useEffect } from 'react';
+import { Text, View } from 'react-native';
 import { BrowserProvider } from '@/browser/BrowserProvider';
+import { AppLockProvider } from '@/components/AppLock';
+import { Button } from '@/components/Button';
 import { DialogHost } from '@/components/Dialog';
 import { tablerFont } from '@/components/TablerIcon';
 import { SessionProvider, useSession } from '@/session';
-import { ThemeProvider, useColors, useTheme } from '@/theme';
+import { fonts, ThemeProvider, useColors, useTheme } from '@/theme';
 
 // Keep the Kounselia splash up until the fonts are in and we know whether
 // someone is signed in, so nobody sees a flash of the wrong screen.
 SplashScreen.preventAutoHideAsync();
 
-export default function RootLayout() {
+export default wrapRoot(RootLayout);
+
+function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
     Outfit_300Light,
     Outfit_400Regular,
@@ -40,10 +47,12 @@ export default function RootLayout() {
     <ThemeProvider>
       <SessionProvider>
         <BrowserProvider>
-          <SystemColors />
-          {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
-          {fontsLoaded || fontError ? <RootNavigator /> : null}
-          <DialogHost />
+          <AppLockProvider>
+            <SystemColors />
+            {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
+            {fontsLoaded || fontError ? <RootNavigator /> : null}
+            <DialogHost />
+          </AppLockProvider>
         </BrowserProvider>
       </SessionProvider>
     </ThemeProvider>
@@ -62,7 +71,11 @@ function SystemColors() {
 
 function RootNavigator() {
   const colors = useColors();
-  const { status } = useSession();
+  const { status, user } = useSession();
+  const userId = user?.id ?? null;
+  useEffect(() => {
+    identify(userId);
+  }, [userId]);
   if (status === 'loading') return null;
   SplashScreen.hide();
 
@@ -81,5 +94,24 @@ function RootNavigator() {
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
     </Stack>
+  );
+}
+
+// If a screen crashes while drawing, show this instead of closing the app,
+// and send the details to crash reporting (src/monitoring.ts).
+export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
+  const colors = useColors();
+  useEffect(() => {
+    report(error);
+    SplashScreen.hide();
+  }, [error]);
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
+      <Text style={{ fontFamily: fonts.serifMedium, fontSize: 26, color: colors.text, textAlign: 'center' }}>Something went wrong</Text>
+      <Text style={{ fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center', marginTop: 10 }}>
+        Sorry about that. Please try again.
+      </Text>
+      <Button title="Try again" onPress={retry} style={{ alignSelf: 'stretch', marginTop: 24 }} />
+    </View>
   );
 }
