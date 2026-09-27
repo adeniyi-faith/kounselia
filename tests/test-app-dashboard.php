@@ -209,4 +209,29 @@ class Test_App_Dashboard extends WP_Ajax_UnitTestCase {
         $this->assertSame( get_gmt_from_date( '2030-01-02 09:00:00', 'Y-m-d\TH:i:s\Z' ), kounselia_app_utc( '2030-01-02 09:00:00' ) );
         $this->assertNull( kounselia_app_utc( null ) );
     }
+
+    function test_reviews_for_booking_show_stars_and_words_but_no_names() {
+        global $wpdb;
+        $client  = self::factory()->user->create( array( 'display_name' => 'Secret Client' ) );
+        $booking = $this->booking( $client, -2 * DAY_IN_SECONDS );
+        $pro_id  = (int) $wpdb->get_var( $wpdb->prepare( "SELECT professional_id FROM {$wpdb->prefix}kounselia_bookings WHERE id = %d", $booking ) );
+        $now     = current_time( 'mysql' );
+        $wpdb->insert( $wpdb->prefix . 'kounselia_professional_reviews', array( 'booking_id' => $booking, 'professional_id' => $pro_id, 'client_user_id' => $client, 'rating' => 5, 'comment' => 'She really listened.', 'created_at' => $now, 'updated_at' => $now ) );
+        $wpdb->insert( $wpdb->prefix . 'kounselia_professional_reviews', array( 'booking_id' => $booking + 1000, 'professional_id' => $pro_id, 'client_user_id' => $client, 'rating' => 3, 'comment' => '', 'created_at' => $now, 'updated_at' => $now ) );
+
+        $res = $this->ajax( 'kounselia_app_professional_reviews', array( 'professional_id' => $pro_id ) );
+
+        $this->assertTrue( $res['success'] );
+        $this->assertSame( 2, $res['data']['count'] );
+        $this->assertEquals( 4.0, $res['data']['average'] );
+        // Star-only ratings count in the average but have no card.
+        $this->assertCount( 1, $res['data']['reviews'] );
+        $this->assertSame( 'She really listened.', $res['data']['reviews'][0]['comment'] );
+        $this->assertStringNotContainsString( 'Secret Client', wp_json_encode( $res ) );
+    }
+
+    function test_reviews_for_an_unknown_professional_are_refused() {
+        $res = $this->ajax( 'kounselia_app_professional_reviews', array( 'professional_id' => 999999 ) );
+        $this->assertFalse( $res['success'] );
+    }
 }
