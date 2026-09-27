@@ -184,6 +184,15 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .capability-row.locked .tag{color:var(--text3)}
 .capability-row.unlocked .tag{color:var(--sage)}
 
+.avatar-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:28px 22px;text-align:center;box-shadow:var(--shadow-sm);margin-bottom:24px}
+.avatar-wrap{position:relative;width:104px;height:104px;margin:0 auto 16px}
+.avatar-img{width:104px;height:104px;border-radius:50%;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:600;overflow:hidden;border:3px solid var(--surface);box-shadow:var(--shadow-md)}
+.avatar-img img{width:100%;height:100%;object-fit:cover}
+.avatar-edit{position:absolute;bottom:0;right:0;width:32px;height:32px;border-radius:50%;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;border:3px solid var(--surface);cursor:pointer;font-size:14px}
+.avatar-edit input{display:none}
+.avatar-card h4{font-size:15px;font-weight:600;margin-bottom:2px}
+.avatar-card p{font-size:12.5px;color:var(--text3)}
+
 .pro-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:32px}
 .form-field textarea{width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;font-family:inherit;font-size:14.5px;color:var(--text);background:var(--bg);outline:none;resize:vertical;min-height:90px}
 .form-field textarea:focus{border-color:var(--accent);background:var(--surface);box-shadow:0 0 0 4px var(--accent-light)}
@@ -428,6 +437,20 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <h2>Profile &amp; rate</h2>
       <span class="section-sub">This is what clients see once you're verified</span>
     </div>
+
+    <div class="avatar-card">
+      <div class="avatar-wrap">
+        <div class="avatar-img" id="pro-avatar-img"><?php echo $avatar_url ? '<img src="' . esc_url( $avatar_url ) . '" alt="">' : esc_html( $initial ); ?></div>
+        <label class="avatar-edit">
+          <i class="ti ti-camera"></i>
+          <input type="file" id="pro-avatar-input" accept="image/png,image/jpeg,image/webp">
+        </label>
+      </div>
+      <h4><?php echo esc_html( $display_name ); ?></h4>
+      <p>Clients see this photo on your public profile and everywhere else you appear on Kounselia.</p>
+      <div class="inline-msg" id="pro-avatar-msg"></div>
+    </div>
+
     <div class="pro-card">
       <?php if ( $application->license_number ) : ?>
         <div class="readonly-note">Verified against license/registration <strong><?php echo esc_html( $application->license_number ); ?></strong>. To change your credentials, contact support — that requires re-verification.</div>
@@ -963,6 +986,44 @@ function signOut(){
     body:new URLSearchParams({action:'kounselia_logout',nonce:KOUNSELIA.nonce})
   }).finally(()=>{ window.location.href='/index.php'; });
 }
+
+function showInline(id,msg,ok){
+  const el=document.getElementById(id);
+  if(!el) return;
+  el.textContent=msg;
+  el.className='inline-msg '+(ok?'ok':'err');
+  el.style.display='block';
+}
+
+function setupAvatarUpload(inputId, imgId, sideAvId, mobileAvId, msgId){
+  const inp=document.getElementById(inputId);
+  if(!inp) return;
+  inp.addEventListener('change',function(e){
+    const file=e.target.files[0];
+    if(!file) return;
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const html=`<img src="${ev.target.result}" alt="">`;
+      [imgId,sideAvId,mobileAvId].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
+    };
+    reader.readAsDataURL(file);
+    const fd=new FormData();
+    fd.append('action','kounselia_upload_avatar');
+    fd.append('nonce',KOUNSELIA.nonce);
+    fd.append('avatar',file);
+    fetch(KOUNSELIA.ajaxUrl,{method:'POST',body:fd})
+      .then(r=>r.json())
+      .then(res=>{
+        if(res.success){
+          showInline(msgId,'Profile picture updated.',true);
+          const html=`<img src="${res.data.avatar_url}" alt="">`;
+          [imgId,sideAvId,mobileAvId].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
+        } else { showInline(msgId,res.data&&res.data.message?res.data.message:'Could not upload that image.',false); }
+      })
+      .catch(()=>showInline(msgId,'Something went wrong, please try again.',false));
+  });
+}
+setupAvatarUpload('pro-avatar-input','pro-avatar-img','side-av','mobile-av','pro-avatar-msg');
 
 document.getElementById('pro-form').addEventListener('submit', function(e){
   e.preventDefault();
