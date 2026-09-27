@@ -1,6 +1,7 @@
 // One blog article in a list: cover picture, topic, title, a line or two of
-// summary, and who wrote it. `compact` is the narrower card used in the
-// sideways row on Home.
+// summary, who wrote it (with a tick for a verified professional), and how
+// many loves and comments it has. `compact` is the narrower card used in
+// the sideways row on Home.
 import type { BlogCard } from '@kounselia/core';
 import { Image } from 'expo-image';
 import { Pressable, Text, View } from 'react-native';
@@ -44,10 +45,23 @@ export function ArticleCard({ post, onPress, compact }: { post: BlogCard; onPres
         ) : null}
         <View style={styles.meta}>
           {!compact && <Text style={styles.metaText}>{post.author.name}</Text>}
+          {!compact && post.author.is_professional ? <TablerIcon name="discount-check-filled" size={14} color={colors.sage} /> : null}
           {!compact && <View style={styles.dot} />}
           <Text style={styles.metaText}>{articleDate(post.published_utc)}</Text>
           <View style={styles.dot} />
           <Text style={styles.metaText}>{post.reading_minutes} min read</Text>
+          {!compact && post.love_count > 0 ? (
+            <View style={styles.count} accessibilityLabel={`${post.love_count} loves`}>
+              <TablerIcon name="heart" size={13} color={colors.text3} />
+              <Text style={styles.metaText}>{post.love_count}</Text>
+            </View>
+          ) : null}
+          {!compact && post.comment_count > 0 ? (
+            <View style={styles.count} accessibilityLabel={`${post.comment_count} comments`}>
+              <TablerIcon name="message-circle" size={13} color={colors.text3} />
+              <Text style={styles.metaText}>{post.comment_count}</Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </Pressable>
@@ -75,4 +89,5 @@ const useStyles = makeStyles((colors) => ({
   meta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6, marginTop: 4 },
   metaText: { fontFamily: fonts.regular, fontSize: 12, color: colors.text3 },
   dot: { width: 3, height: 3, borderRadius: 2, backgroundColor: colors.text3 },
+  count: { flexDirection: 'row', alignItems: 'center', gap: 3, marginLeft: 4 },
 }));

@@ -2,7 +2,7 @@ import { fetchCheckinQuestion, type CounselorSummary } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Share, Text, View } from 'react-native';
+import { FlatList, KeyboardAvoidingView, Share, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReplyPlayer } from '@/audio/useReplyPlayer';
 import { useVoiceCall } from '@/audio/useVoiceCall';
@@ -15,6 +15,7 @@ import { formatTime } from '@/components/chat/formatTime';
 import { MessageBubble } from '@/components/chat/MessageBubble';
 import { Toast, useToast } from '@/components/chat/Toast';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
+import { useKeyboardOpen } from '@/components/useKeyboardOpen';
 import { useCounselors } from '@/counselors';
 import { useSession } from '@/session';
 import { fonts, makeStyles } from '@/theme';
@@ -51,21 +52,6 @@ export default function ChatRoute() {
       )}
     </View>
   );
-}
-
-// The home-bar gap under the message box is only needed while the
-// keyboard is closed; with it open, the box sits right on the keyboard.
-function useKeyboardOpen() {
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setOpen(true));
-    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setOpen(false));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
-  }, []);
-  return open;
 }
 
 function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; checkinId?: number }) {
