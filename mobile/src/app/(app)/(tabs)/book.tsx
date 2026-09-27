@@ -126,10 +126,7 @@ export default function Book() {
                       <TablerIcon name="calendar-event" size={18} color={colors.gold} />
                     </View>
                     <View style={styles.meta}>
-                      <Text style={styles.name}>
-                        {b.pro_name}
-                        {b.pro_title ? ` · ${b.pro_title}` : ''}
-                      </Text>
+                      <Text style={styles.name}>{b.pro_name}</Text>
                       <Text style={styles.sub}>{sessionWhen(b.start_utc)}</Text>
                     </View>
                     {b.series_id ? <Text style={styles.weekly}>Weekly</Text> : null}
@@ -167,10 +164,7 @@ export default function Book() {
                       <TablerIcon name="check" size={18} color={colors.accentText} />
                     </View>
                     <View style={styles.meta}>
-                      <Text style={styles.name}>
-                        {b.pro_name}
-                        {b.pro_title ? ` · ${b.pro_title}` : ''}
-                      </Text>
+                      <Text style={styles.name}>{b.pro_name}</Text>
                       <Text style={styles.sub}>{sessionWhen(b.start_utc, true)}</Text>
                     </View>
                     {b.review_rating ? (
