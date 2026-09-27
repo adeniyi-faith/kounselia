@@ -138,12 +138,11 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
   }, []);
 
   const startMicrophone = useCallback(() => {
-    // Without this, the microphone has no echo cancellation: it picks up
-    // the counselor's own voice coming out of the speaker and sends it
-    // back as if the member were talking, which the server reads as being
-    // interrupted — so the counselor's reply cuts off and restarts on a
-    // loop. This turns on each platform's built-in echo cancellation.
-    const rec = new AudioRecorder({ androidInputPreset: 'voiceCommunication', iosVoiceProcessing: true });
+    // iOS gets echo cancellation from the "voiceChat" audio session mode
+    // set in setSoundMode('call') above. react-native-audio-api 0.13.6
+    // doesn't yet expose an equivalent for Android (no option here turns
+    // it on) — see the "Android echo" note in session.ts.
+    const rec = new AudioRecorder();
     rec.onAudioReady({ sampleRate: MIC_RATE, bufferLength: MIC_RATE / 10, channelCount: 1 }, ({ buffer }) => {
       const socket = ws.current;
       if (mutedRef.current || !socket || socket.readyState !== WebSocket.OPEN) return;
