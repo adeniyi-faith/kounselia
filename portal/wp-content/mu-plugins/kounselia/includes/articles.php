@@ -282,6 +282,12 @@ function kounselia_article_clean_html( $html, $settings = null ) {
     if ( empty( $settings['allow_images'] ) ) {
         $html = preg_replace( '#<figure\b[^>]*>\s*<img\b[^>]*>.*?</figure>#is', '', $html );
         $html = preg_replace( '#<img\b[^>]*>#i', '', $html );
+    } else {
+        // Only images uploaded here: a picture hosted elsewhere could let
+        // another site see who reads the article.
+        $html = preg_replace_callback( '#<img\b[^>]*>#i', function ( $m ) {
+            return preg_match( '#\ssrc=["\']([^"\']+)["\']#i', $m[0], $src ) && kounselia_article_is_our_upload( html_entity_decode( $src[1] ) ) ? $m[0] : '';
+        }, $html );
     }
     if ( empty( $settings['allow_embeds'] ) ) {
         $html = preg_replace( '#<iframe\b[^>]*>.*?</iframe>#is', '', $html );

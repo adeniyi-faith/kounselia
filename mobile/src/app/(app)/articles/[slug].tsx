@@ -1,5 +1,7 @@
 // Reading one article. Links inside it open in the in-app browser, except
 // links to other Kounselia articles, which open right here in the reader.
+// Underneath: love it, open the conversation, and follow or book the
+// professional who wrote it.
 import { fetchBlogPost, type BlogPost } from '@kounselia/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -7,7 +9,9 @@ import { Platform, Share, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBrowser } from '@/browser/BrowserProvider';
 import { WebFrame } from '@/browser/WebFrame';
+import { ArticleActions } from '@/components/articles/ArticleActions';
 import { articleHtml } from '@/components/articles/articleHtml';
+import { Toast, useToast } from '@/components/chat/Toast';
 import { Button } from '@/components/Button';
 import { HeaderButton, ScreenHeader } from '@/components/ScreenHeader';
 import { SITE_URL } from '@/config';
@@ -28,6 +32,7 @@ export default function Article() {
   const [post, setPost] = useState<BlogPost | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const toast = useToast();
 
   const load = useCallback(async () => {
     setBusy(true);
@@ -67,7 +72,10 @@ export default function Article() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScreenHeader title={post?.tags[0]?.name ?? 'Article'} right={post ? <HeaderButton icon="share" label="Share article" onPress={share} /> : null} />
       {post ? (
-        <WebFrame source={{ html, baseUrl }} style={styles.web} shouldLoad={shouldLoad} />
+        <>
+          <WebFrame source={{ html, baseUrl }} style={styles.web} shouldLoad={shouldLoad} />
+          <ArticleActions key={post.id} post={post} onNotify={toast.show} />
+        </>
       ) : failed ? (
         <View style={styles.center}>
           <Text style={styles.notice}>{failed}</Text>
@@ -76,6 +84,7 @@ export default function Article() {
       ) : (
         <ArticleSkeleton />
       )}
+      <Toast note={toast.note} />
     </SafeAreaView>
   );
 }

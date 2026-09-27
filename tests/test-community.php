@@ -197,6 +197,32 @@ class Test_Community extends WP_Ajax_UnitTestCase {
         $this->assertSame( 0, (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_post_loves" ) );
     }
 
+    function test_the_app_gets_counts_and_what_the_reader_can_do() {
+        $fan = $this->member();
+        wp_set_current_user( $fan );
+        kounselia_set_post_love( $fan, $this->post->id, true );
+        kounselia_set_following( $fan, $this->pro->id, true );
+        $post = kounselia_get_blog_post( $this->post->id );
+
+        $card = kounselia_app_blog_card( $post );
+        $this->assertTrue( $card['author']['is_professional'] );
+        $this->assertSame( (int) $this->pro->id, $card['author']['professional_id'] );
+        $this->assertSame( 1, $card['love_count'] );
+
+        $c = kounselia_app_post_community( $post, kounselia_blog_author( $post ) );
+        $this->assertTrue( $c['loved'] );
+        $this->assertTrue( $c['following'] );
+        $this->assertSame( 1, $c['followers'] );
+        $this->assertSame( (int) $this->pro->id, $c['book_pro_id'] );
+        $this->assertNotEmpty( $c['disclaimer'] );
+
+        // The author reading their own article can't follow or book themselves.
+        wp_set_current_user( (int) $this->pro->user_id );
+        $own = kounselia_app_post_community( $post, kounselia_blog_author( $post ) );
+        $this->assertFalse( $own['follows_on'] );
+        $this->assertNull( $own['book_pro_id'] );
+    }
+
     function test_comments_can_be_switched_off() {
         update_option( 'kounselia_article_settings', array_merge( kounselia_article_settings(), array( 'comments_enabled' => 0 ) ) );
         $this->assertSame( 'closed', kounselia_comment_add( $this->member(), $this->post->id, 'Hi' )->get_error_code() );

@@ -899,10 +899,21 @@ function kounselia_ajax_comment_add() {
 }
 add_action( 'wp_ajax_kounselia_comment_add', 'kounselia_ajax_comment_add' );
 
+/** The article's visible comment count, sent back after a change so screens stay in step. */
+function kounselia_comment_count_for( $comment_id ) {
+    $c = kounselia_get_comment( $comment_id );
+    return $c ? (int) kounselia_get_blog_post( $c->post_id )->comment_count : null;
+}
+
 function kounselia_ajax_comment_delete() {
-    $user_id = kounselia_community_require_member();
-    $result  = kounselia_comment_delete_own( $user_id, isset( $_POST['comment_id'] ) ? absint( $_POST['comment_id'] ) : 0 );
-    kounselia_community_send( is_wp_error( $result ) ? $result : array( 'message' => 'Comment deleted.' ) );
+    $user_id    = kounselia_community_require_member();
+    $comment_id = isset( $_POST['comment_id'] ) ? absint( $_POST['comment_id'] ) : 0;
+    $c          = kounselia_get_comment( $comment_id );
+    $result     = kounselia_comment_delete_own( $user_id, $comment_id );
+    kounselia_community_send( is_wp_error( $result ) ? $result : array(
+        'message' => 'Comment deleted.',
+        'count'   => $c ? (int) kounselia_get_blog_post( $c->post_id )->comment_count : null,
+    ) );
 }
 add_action( 'wp_ajax_kounselia_comment_delete', 'kounselia_ajax_comment_delete' );
 
@@ -911,7 +922,10 @@ function kounselia_ajax_comment_moderate() {
     $act     = isset( $_POST['act'] ) ? sanitize_key( $_POST['act'] ) : '';
     $result  = kounselia_comment_moderate( $user_id, isset( $_POST['comment_id'] ) ? absint( $_POST['comment_id'] ) : 0, $act );
     $labels  = array( 'approve' => 'Comment is visible.', 'hide' => 'Comment hidden.', 'pin' => 'Pinned to the top.', 'unpin' => 'Unpinned.', 'delete' => 'Comment deleted.', 'dismiss' => 'Reports cleared.' );
-    kounselia_community_send( is_wp_error( $result ) ? $result : array( 'message' => isset( $labels[ $act ] ) ? $labels[ $act ] : 'Done.' ) );
+    kounselia_community_send( is_wp_error( $result ) ? $result : array(
+        'message' => isset( $labels[ $act ] ) ? $labels[ $act ] : 'Done.',
+        'count'   => kounselia_comment_count_for( isset( $_POST['comment_id'] ) ? absint( $_POST['comment_id'] ) : 0 ),
+    ) );
 }
 add_action( 'wp_ajax_kounselia_comment_moderate', 'kounselia_ajax_comment_moderate' );
 

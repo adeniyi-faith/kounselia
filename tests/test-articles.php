@@ -166,6 +166,13 @@ class Test_Articles extends WP_Ajax_UnitTestCase {
         $this->assertStringNotContainsString( 'script', $html );
     }
 
+    function test_images_inside_articles_must_be_uploaded_here() {
+        $ours = wp_get_upload_dir()['baseurl'] . '/2026/09/calm.jpg';
+        $html = kounselia_article_clean_html( '<p><img src="' . $ours . '" alt=""></p><p><img src="https://tracker.example/pixel.gif"></p>' );
+        $this->assertStringContainsString( 'calm.jpg', $html );
+        $this->assertStringNotContainsString( 'tracker.example', $html );
+    }
+
     function test_cover_must_be_uploaded_here() {
         $pro   = $this->professional();
         $data  = array_merge( $this->article(), array( 'cover_image' => 'https://elsewhere.example/tracker.jpg' ) );

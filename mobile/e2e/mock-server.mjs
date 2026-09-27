@@ -31,9 +31,22 @@ const moodOptions = [
 ].map(([key, label, icon, color]) => ({ key, label, icon, color }));
 
 const posts = [
-  { id: 1, slug: 'sleep-mind-races', title: 'How to sleep when your mind races', summary: 'Small changes that make nights easier.', cover: null, author: { name: 'Kounselia Team', avatar: null }, published_utc: iso(-3 * 864e5), reading_minutes: 6, tags: [{ name: 'Sleep', slug: 'sleep' }], url: 'https://kounselia.com/blog/sleep-mind-races' },
-  { id: 2, slug: 'grief-waves', title: 'Grief comes in waves', summary: 'What to expect in the first year.', cover: null, author: { name: 'Dr. Amaka Eze', avatar: null }, published_utc: iso(-9 * 864e5), reading_minutes: 8, tags: [{ name: 'Grief', slug: 'grief' }], url: 'https://kounselia.com/blog/grief-waves' },
+  { id: 1, slug: 'sleep-mind-races', title: 'How to sleep when your mind races', summary: 'Small changes that make nights easier.', cover: null, author: { name: 'Kounselia Team', avatar: null, is_professional: false, professional_id: null, title: null }, published_utc: iso(-3 * 864e5), reading_minutes: 6, tags: [{ name: 'Sleep', slug: 'sleep' }], url: 'https://kounselia.com/blog/sleep-mind-races', love_count: 12, comment_count: 2 },
+  { id: 2, slug: 'grief-waves', title: 'Grief comes in waves', summary: 'What to expect in the first year.', cover: null, author: { name: 'Dr. Amaka Eze', avatar: null, is_professional: true, professional_id: 3, title: 'Clinical Psychologist' }, published_utc: iso(-9 * 864e5), reading_minutes: 8, tags: [{ name: 'Grief', slug: 'grief' }], url: 'https://kounselia.com/blog/grief-waves', love_count: 4, comment_count: 0 },
 ];
+
+// The conversation under an article (includes/community.php).
+let nextCommentId = 100;
+let identity = { mode: '', nickname: '', first_name: 'Samson', name: 'Samson' };
+const commentsByPost = {
+  1: [
+    { id: 21, parent_id: null, author: { name: 'Quiet River', initial: 'Q', avatar: null, is_author: false, profile_url: null }, content: 'The tip about morning light really helped me.', status: 'visible', held: false, pinned: true, love_count: 3, loved: false, is_mine: false, created_utc: iso(-7200e3), time_label: '2 hours ago',
+      replies: [{ id: 22, parent_id: 21, author: { name: 'Kounselia Team', initial: 'K', avatar: null, is_author: true, profile_url: null }, content: 'So glad to hear it.', status: 'visible', held: false, pinned: false, love_count: 1, loved: false, is_mine: false, created_utc: iso(-3600e3), time_label: '1 hour ago', replies: [] }] },
+  ],
+  2: [],
+};
+const viewer = () => ({ signed_in: true, can_comment: !!identity.mode, reason: identity.mode ? null : 'need_identity', message: identity.mode ? null : 'Choose how your name is shown first.', identity, can_moderate: false, max_length: 1500, held_first: false });
+const community = (post) => ({ loves_on: true, loved: false, love_count: post.love_count, comments_on: true, comment_count: post.comment_count, follows_on: post.author.is_professional, following: false, followers: 18, book_pro_id: post.author.professional_id, disclaimer: post.author.is_professional ? 'This article shares general information. It is not a substitute for care from someone who knows your situation.' : null });
 
 let todayMood = 'anxious';
 let journal = '';
@@ -111,7 +124,11 @@ function answer(p) {
     case 'kounselia_get_booking_messages':
       return ok({ messages: [] });
     case 'kounselia_app_blog':
-      return ok({ posts, has_more: false, ...(p.page === '1' ? { title: 'The Kounselia Journal', tagline: 'Honest writing on feelings, relationships, work and healing.', tags: [{ name: 'Sleep', slug: 'sleep' }, { name: 'Grief', slug: 'grief' }] } : {}) });
+      return ok({
+        posts: p.from === 'professionals' ? posts.filter((x) => x.author.is_professional) : p.from === 'following' ? [] : posts,
+        has_more: false,
+        ...(p.page === '1' ? { title: 'The Kounselia Journal', tagline: 'Honest writing on feelings, relationships, work and healing.', tags: [{ name: 'Sleep', slug: 'sleep' }, { name: 'Grief', slug: 'grief' }], filters: { professionals: 'From our professionals', following: true } } : {}),
+      });
     case 'kounselia_app_blog_post': {
       const post = posts.find((x) => x.slug === p.slug);
       if (!post) return err("That article isn't available any more.");
@@ -122,8 +139,29 @@ function answer(p) {
         author: { ...post.author, bio: 'Writes about rest and recovery.' },
         html: '<p>Most of us know the feeling of lying awake while the day replays itself.</p><h2>Start with light</h2><p>Morning light sets your body clock. <a href="https://example.org/study">Read the study</a>.</p><blockquote>Rest is not a reward.</blockquote><ul><li>Same wake time</li><li>No phone in bed</li></ul>',
         related: posts.filter((x) => x.slug !== post.slug),
+        community: community(post),
       });
     }
+    case 'kounselia_comments':
+      return ok({ comments: commentsByPost[p.post_id] ?? [], has_more: false, total: (commentsByPost[p.post_id] ?? []).length, enabled: true, viewer: viewer() });
+    case 'kounselia_community_identity':
+      identity = p.mode === 'nickname' ? { ...identity, mode: 'nickname', nickname: p.nickname, name: p.nickname } : { ...identity, mode: 'first_name', name: identity.first_name };
+      return ok(identity);
+    case 'kounselia_comment_add': {
+      const c = { id: nextCommentId++, parent_id: p.parent_id ? Number(p.parent_id) : null, author: { name: identity.name, initial: identity.name.charAt(0), avatar: null, is_author: false, profile_url: null }, content: p.content, status: 'visible', held: false, pinned: false, love_count: 0, loved: false, is_mine: true, created_utc: iso(0), time_label: '0 min ago', replies: [] };
+      const list = (commentsByPost[p.post_id] ??= []);
+      if (c.parent_id) list.find((x) => x.id === c.parent_id)?.replies.push(c);
+      else list.unshift(c);
+      return ok({ comment: c, held: false, safety: false, support_url: null, message: 'Posted.', count: list.length });
+    }
+    case 'kounselia_post_love':
+      return ok({ loved: p.love === '1', count: p.love === '1' ? 13 : 12 });
+    case 'kounselia_comment_love':
+      return ok({ loved: p.love === '1', count: p.love === '1' ? 4 : 3 });
+    case 'kounselia_follow':
+      return ok({ following: p.follow === '1', followers: p.follow === '1' ? 19 : 18 });
+    case 'kounselia_comment_report':
+      return ok({ message: 'Thank you. Our team will take a look.' });
     case 'kounselia_get_journal_entries':
       return ok({ entries: [{ date: day(0), content: journal || 'Today so far.', is_today: true }, { date: day(1), content: 'Talked to Serena about work. Felt lighter afterwards.', is_today: false }], has_more: false });
     case 'kounselia_app_account':
