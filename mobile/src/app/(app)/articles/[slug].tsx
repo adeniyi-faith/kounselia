@@ -3,7 +3,7 @@
 import { fetchBlogPost, type BlogPost } from '@kounselia/core';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Share, Text, View } from 'react-native';
+import { Platform, Share, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBrowser } from '@/browser/BrowserProvider';
 import { WebFrame } from '@/browser/WebFrame';
@@ -13,6 +13,7 @@ import { HeaderButton, ScreenHeader } from '@/components/ScreenHeader';
 import { SITE_URL } from '@/config';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors, useTheme } from '@/theme';
+import { ArticleSkeleton } from '@/components/Skeleton';
 
 const ARTICLE_LINK = new RegExp(`^${SITE_URL.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')}/blog/([a-z0-9-]+)/?(?:[?#].*)?$`, 'i');
 const NOT_ARTICLES = ['tag', 'tags', 'feed', 'rss', 'search', 'page', 'author'];
@@ -73,9 +74,7 @@ export default function Article() {
           <Button title="Try again" variant="ghost" onPress={load} busy={busy} />
         </View>
       ) : (
-        <View style={styles.center}>
-          <ActivityIndicator color={colors.accentText} />
-        </View>
+        <ArticleSkeleton />
       )}
     </SafeAreaView>
   );

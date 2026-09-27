@@ -152,13 +152,88 @@ const subsetBuffer = await subsetFont(fullFontBuffer, text, {
   noLayoutClosure: true,
 });
 
+// ---- Fix the font's height numbers --------------------------------------
+//
+// One icon in the upstream font ("frustum-off") is drawn nearly four times
+// taller than the rest, and the font's overall height numbers (the "head"
+// bounding box and the OS/2 "win" ascent) were set from it. Android sizes
+// every piece of text in a font from those numbers, so each icon got a box
+// ~3.7x too tall with the icon at the bottom: icons fell out of small
+// boxes (and vanished), sat under button labels instead of beside them,
+// and pushed the tab bar labels down. The subsetter keeps those numbers
+// as they were, so they're reset here to the font's own normal line: 900
+// above the baseline and 100 below (1000 in all, the font's em size),
+// which every kept icon fits inside (checked below).
+
+/** Reads a TrueType table directory: tag -> { offset, length, record }. */
+function tableDirectory(buf) {
+  const tables = {};
+  const count = buf.readUInt16BE(4);
+  for (let i = 0; i < count; i++) {
+    const record = 12 + i * 16;
+    tables[buf.toString('latin1', record, record + 4)] = { record, offset: buf.readUInt32BE(record + 8), length: buf.readUInt32BE(record + 12) };
+  }
+  return tables;
+}
+
+function checksum(buf, offset, length) {
+  let sum = 0;
+  for (let i = 0; i < length; i += 4) {
+    const word = Buffer.alloc(4);
+    buf.copy(word, 0, offset + i, Math.min(offset + i + 4, offset + length));
+    sum = (sum + word.readUInt32BE(0)) >>> 0;
+  }
+  return sum;
+}
+
+function fixMetrics(buf, ascent, descent) {
+  const out = Buffer.from(buf);
+  const t = tableDirectory(out);
+  const head = t.head.offset;
+  const os2 = t['OS/2'].offset;
+
+  // Every glyph must fit inside the new line, or it would be clipped.
+  const loca = t.loca.offset;
+  const longLoca = out.readInt16BE(head + 50) === 1;
+  const glyphCount = out.readUInt16BE(t.maxp.offset + 4);
+  let yMin = 0;
+  let yMax = 0;
+  for (let g = 0; g < glyphCount; g++) {
+    const start = longLoca ? out.readUInt32BE(loca + g * 4) : out.readUInt16BE(loca + g * 2) * 2;
+    const end = longLoca ? out.readUInt32BE(loca + (g + 1) * 4) : out.readUInt16BE(loca + (g + 1) * 2) * 2;
+    if (end === start) continue; // empty glyph
+    const glyph = t.glyf.offset + start;
+    yMin = Math.min(yMin, out.readInt16BE(glyph + 4));
+    yMax = Math.max(yMax, out.readInt16BE(glyph + 8));
+  }
+  if (yMax > ascent || -yMin > descent) {
+    throw new Error(`A kept icon (${yMin}..${yMax}) doesn't fit the ${-descent}..${ascent} line; widen it in this script.`);
+  }
+
+  out.writeInt16BE(-descent, head + 38); // head.yMin
+  out.writeInt16BE(ascent, head + 42); // head.yMax
+  out.writeUInt16BE(ascent, os2 + 74); // OS/2.usWinAscent
+  out.writeUInt16BE(descent, os2 + 76); // OS/2.usWinDescent
+
+  // Recompute the checksums the changed tables carry.
+  out.writeUInt32BE(0, head + 8); // head.checkSumAdjustment, zero while summing
+  for (const tag of ['head', 'OS/2']) {
+    out.writeUInt32BE(checksum(out, t[tag].offset, t[tag].length), t[tag].record + 4);
+  }
+  out.writeUInt32BE((0xb1b0afba - checksum(out, 0, out.length)) >>> 0, head + 8);
+  return { font: out, yMin, yMax };
+}
+
+const fixed = fixMetrics(subsetBuffer, 900, 100);
+
 writeFileSync(join(here, '../src/icons/tabler-glyphs.json'), JSON.stringify(keptGlyphs));
-writeFileSync(join(here, '../assets/fonts/tabler-icons.ttf'), subsetBuffer);
+writeFileSync(join(here, '../assets/fonts/tabler-icons.ttf'), fixed.font);
 writeFileSync(join(here, '../assets/fonts/tabler-icons-LICENSE.txt'), readFileSync(join(pkgDir, 'LICENSE')));
 
 const total = Object.keys(allGlyphs).length;
 const kept = Object.keys(keptGlyphs).length;
 console.log(
   `${kept} of ${total} icons kept (${((100 * kept) / total).toFixed(0)}%). ` +
-    `Font: ${(fullFontBuffer.length / 1024).toFixed(0)}KB -> ${(subsetBuffer.length / 1024).toFixed(0)}KB.`,
+    `Font: ${(fullFontBuffer.length / 1024).toFixed(0)}KB -> ${(fixed.font.length / 1024).toFixed(0)}KB. ` +
+    `Icons span ${fixed.yMin}..${fixed.yMax} on a -100..900 line.`,
 );

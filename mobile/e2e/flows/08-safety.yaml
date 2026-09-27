@@ -1,0 +1,19 @@
+# Safety resources open in the in-app browser (reported crashing).
+appId: com.kounselia.app
+---
+- launchApp
+- extendedWaitUntil:
+    visible: "Talk to someone now"
+    timeout: 60000
+- tapOn: "Settings"
+- waitForAnimationToEnd
+- scrollUntilVisible:
+    element: "Safety resources"
+    direction: DOWN
+- tapOn: "Safety resources"
+- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "Close"
+    timeout: 10000
+    optional: true
+- takeScreenshot: ${P}20-safety

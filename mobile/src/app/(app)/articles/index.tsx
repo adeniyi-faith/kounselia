@@ -3,7 +3,7 @@
 import { fetchBlog, type BlogCard, type BlogTag } from '@kounselia/core';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArticleCard } from '@/components/articles/ArticleCard';
 import { Button } from '@/components/Button';
@@ -11,6 +11,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, useColors } from '@/theme';
+import { ArticlesSkeleton } from '@/components/Skeleton';
 
 export default function Articles() {
   const styles = useStyles();
@@ -115,16 +116,16 @@ export default function Articles() {
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScreenHeader title="Articles" />
       {!posts ? (
-        <View style={styles.center}>
-          {failed ? (
-            <>
-              <Text style={styles.notice}>We couldn’t load the articles. Please check your internet connection.</Text>
-              <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
-            </>
-          ) : (
-            <ActivityIndicator color={colors.accentText} />
-          )}
-        </View>
+        failed ? (
+          <View style={styles.center}>
+            <Text style={styles.notice}>We couldn’t load the articles. Please check your internet connection.</Text>
+            <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+          </View>
+        ) : (
+          <View style={styles.skeleton}>
+            <ArticlesSkeleton />
+          </View>
+        )
       ) : (
         <FlatList
           data={posts}
@@ -143,7 +144,7 @@ export default function Articles() {
               <Text style={styles.notice}>{search || tag ? 'No articles match that. Try another word or topic.' : 'No articles yet. Check back soon.'}</Text>
             </View>
           }
-          ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.accentText} style={{ marginTop: 20 }} /> : null}
+          ListFooterComponent={loadingMore ? <View style={{ marginTop: 16 }}><ArticlesSkeleton cards={1} /></View> : null}
           renderItem={({ item }) => (
             <ArticleCard post={item} onPress={() => router.push({ pathname: '/articles/[slug]', params: { slug: item.slug } })} />
           )}
@@ -170,6 +171,7 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
+  skeleton: { padding: 16 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
   content: { paddingHorizontal: 16, paddingBottom: 40 },
   title: { fontFamily: fonts.serifMedium, fontSize: 32, lineHeight: 36, color: colors.text, marginTop: 6 },

@@ -1,0 +1,132 @@
+# Android check: builds the real Android app (the same release settings
+# as the test builds on Expo), runs it on an Android emulator (a virtual
+# phone), taps through every main screen in light and dark mode, and saves
+# a screenshot of each screen plus any crash from the phone's log.
+#
+# The app talks to a stand-in server with made-up data (mobile/e2e/
+# mock-server.mjs), so no real account or live data is touched.
+#
+# Results: the run's summary lists each screen as passed/failed, and the
+# "android-check" download holds the screenshots and logs.
+name: Android check
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/**']
+    paths:
+      - 'mobile/**'
+      - 'packages/core/**'
+      - '.github/workflows/android-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Build and tour on an emulator
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      # The emulator reaches the computer it runs on at 10.0.2.2.
+      EXPO_PUBLIC_KOUNSELIA_AJAX_URL: http://10.0.2.2:8787/portal/wp-admin/admin-ajax.php
+      NODE_ENV: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install
+        run: |
+          (cd ../packages/core && npm ci)
+          npm ci
+
+      - name: Allow the stand-in server's plain http (this check only)
+        run: |
+          node -e '
+            const fs = require("fs");
+            const app = JSON.parse(fs.readFileSync("app.json", "utf8"));
+            const bp = app.expo.plugins.find((p) => Array.isArray(p) && p[0] === "expo-build-properties");
+            bp[1].android.usesCleartextTraffic = true;
+            fs.writeFileSync("app.json", JSON.stringify(app, null, 2));
+          '
+
+      - name: Generate the Android project
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build the app
+        working-directory: mobile/android
+        run: ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
+
+      - name: Start the stand-in server
+        run: |
+          mkdir -p e2e-output
+          nohup node e2e/mock-server.mjs > e2e-output/mock-server.log 2>&1 &
+
+      - name: Install Maestro
+        run: curl -fsSL "https://get.maestro.mobile.dev" | bash
+
+      - name: Let the emulator use hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Run on the emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          working-directory: mobile
+          script: bash e2e/run-android.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo '## Android check'
+            echo
+            echo '```'
+            cat e2e-output/summary.txt 2>/dev/null || echo 'No results (see the steps above).'
+            echo '```'
+            for f in e2e-output/*-crash.txt; do
+              [ -e "$f" ] || continue
+              echo "### Crash: $(basename "$f")"
+              echo '```'
+              head -60 "$f"
+              echo '```'
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-check
+          path: mobile/e2e-output
+          retention-days: 14

@@ -2,7 +2,7 @@ import { fetchCheckinQuestion, type CounselorSummary } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Keyboard, KeyboardAvoidingView, Platform, Share, Text, View } from 'react-native';
+import { FlatList, Keyboard, KeyboardAvoidingView, Platform, Share, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReplyPlayer } from '@/audio/useReplyPlayer';
 import { useVoiceCall } from '@/audio/useVoiceCall';
@@ -17,7 +17,9 @@ import { Toast, useToast } from '@/components/chat/Toast';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { useCounselors } from '@/counselors';
 import { useSession } from '@/session';
-import { fonts, makeStyles, useColors } from '@/theme';
+import { fonts, makeStyles } from '@/theme';
+import { showDialog } from '@/components/Dialog';
+import { ChatSkeleton } from '@/components/Skeleton';
 
 function goBack() {
   if (router.canGoBack()) router.back();
@@ -27,7 +29,6 @@ function goBack() {
 // Waits for the counselor list, then opens the conversation.
 export default function ChatRoute() {
   const styles = useStyles();
-  const colors = useColors();
   const { slug, checkin } = useLocalSearchParams<{ slug: string; checkin?: string }>();
   const { status, bySlug } = useCounselors();
   const counselor = bySlug(slug);
@@ -37,7 +38,7 @@ export default function ChatRoute() {
   return (
     <View style={styles.centerScreen}>
       {status === 'loading' ? (
-        <ActivityIndicator color={colors.accentText} />
+        <ChatSkeleton />
       ) : (
         <>
           <Text style={styles.notice}>
@@ -69,7 +70,6 @@ function useKeyboardOpen() {
 
 function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; checkinId?: number }) {
   const styles = useStyles();
-  const colors = useColors();
   const { config } = useSession();
   const chat = useChat(config, counselor);
   const toast = useToast();
@@ -151,10 +151,11 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
   }
 
   function confirmClear() {
-    Alert.alert(
-      'Clear this conversation?',
-      'It will be removed from your chat history and cannot be brought back.',
-      [
+    showDialog({
+      title: 'Clear this conversation?',
+      message: 'It will be removed from your chat history and cannot be brought back.',
+      icon: 'trash',
+      buttons: [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Clear',
@@ -165,7 +166,7 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
           },
         },
       ],
-    );
+    });
   }
 
   return (
@@ -179,8 +180,8 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
       />
       <KeyboardAvoidingView style={styles.flex} behavior="padding">
         {chat.phase === 'loading' ? (
-          <View style={styles.centerFill}>
-            <ActivityIndicator color={colors.accentText} />
+          <View style={styles.flex}>
+            <ChatSkeleton />
             <Text style={styles.loadingText}>Connecting you with {counselor.name}…</Text>
           </View>
         ) : (
@@ -237,8 +238,7 @@ const useStyles = makeStyles((colors) => ({
   typingGap: { marginTop: 18 },
   // .chat-footer (the website's warm sand dock)
   footer: { backgroundColor: colors.chatFooter, borderTopWidth: 1, borderTopColor: colors.border },
-  centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText: { fontFamily: fonts.regular, fontSize: 14, color: colors.text2 },
+  loadingText: { fontFamily: fonts.regular, fontSize: 14, color: colors.text2, textAlign: 'center', paddingBottom: 20 },
   centerScreen: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
 }));

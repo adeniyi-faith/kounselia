@@ -9,6 +9,7 @@ import { Toast, useToast } from '@/components/chat/Toast';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors } from '@/theme';
+import { ChatSkeleton } from '@/components/Skeleton';
 
 // Messages with the professional for one booked session (the website's
 // "Message" button on a booking). New messages are checked every 15
@@ -71,7 +72,7 @@ export default function BookingMessages() {
       </View>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
         {messages === null ? (
-          <ActivityIndicator color={colors.accentText} style={{ flex: 1 }} />
+          <ChatSkeleton />
         ) : (
           <FlatList
             inverted

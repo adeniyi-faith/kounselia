@@ -3,7 +3,7 @@
 // all of it. Only today's entry can be changed, as on the website.
 import { fetchJournalEntries, type JournalEntry } from '@kounselia/core';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { SectionHead } from '@/components/dashboard/Card';
@@ -12,6 +12,7 @@ import { ScreenHeader } from '@/components/ScreenHeader';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
+import { JournalSkeleton } from '@/components/Skeleton';
 
 // "2026-09-26" is a calendar day, not a moment, so it's read as local noon
 // to never slip into the day before or after.
@@ -73,16 +74,16 @@ export default function Journal() {
     return (
       <SafeAreaView style={styles.safe}>
         <ScreenHeader title="My journal" />
-        <View style={styles.center}>
-          {failed ? (
-            <>
-              <Text style={styles.notice}>We couldn’t load your journal. Please check your internet connection.</Text>
-              <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
-            </>
-          ) : (
-            <ActivityIndicator color={colors.accentText} />
-          )}
-        </View>
+        {failed ? (
+          <View style={styles.center}>
+            <Text style={styles.notice}>We couldn’t load your journal. Please check your internet connection.</Text>
+            <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+          </View>
+        ) : (
+          <View style={styles.skeleton}>
+            <JournalSkeleton />
+          </View>
+        )}
       </SafeAreaView>
     );
   }
@@ -116,7 +117,7 @@ export default function Journal() {
             <Text style={styles.emptyText}>Your earlier entries will appear here. Write a little each day, it adds up.</Text>
           </View>
         }
-        ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.accentText} style={{ marginTop: 16 }} /> : null}
+        ListFooterComponent={loadingMore ? <View style={{ marginTop: 16 }}><JournalSkeleton /></View> : null}
         ItemSeparatorComponent={() => <View style={{ height: 10 }} />}
         renderItem={({ item }) => {
           const expanded = open === item.date;
@@ -146,6 +147,7 @@ export default function Journal() {
 const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
+  skeleton: { padding: 16 },
   notice: { fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center' },
   content: { paddingHorizontal: 16, paddingBottom: 40 },
   intro: {

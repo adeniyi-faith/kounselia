@@ -16,7 +16,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBrowser } from '@/browser/BrowserProvider';
 import { Button } from '@/components/Button';
@@ -28,6 +28,7 @@ import { TablerIcon } from '@/components/TablerIcon';
 import { TextField } from '@/components/TextField';
 import { useSession } from '@/session';
 import { type Appearance, counselorColors, fonts, makeStyles, radius, shadows, useColors, useTheme } from '@/theme';
+import { showDialog } from '@/components/Dialog';
 
 const APPEARANCES: { key: Appearance; label: string; icon: string }[] = [
   { key: 'light', label: 'Light', icon: 'sun' },
@@ -103,10 +104,15 @@ export default function Settings() {
   }
 
   function confirmSignOut() {
-    Alert.alert('Sign out?', "You'll need your email and password to sign back in.", [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
-    ]);
+    showDialog({
+      title: 'Sign out?',
+      message: "You'll need your email and password to sign back in.",
+      icon: 'logout',
+      buttons: [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+      ],
+    });
   }
 
   const name = account?.user.name || user?.name || 'Your account';
