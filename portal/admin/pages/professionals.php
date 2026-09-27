@@ -13,25 +13,35 @@ require_once __DIR__ . '/../inc/admin-auth.php';
 require_once __DIR__ . '/../inc/admin-helpers.php';
 $kounselia_admin_active = 'professionals';
 
+if ( ! kounselia_admin_can( 'professionals' ) ) {
+    wp_die( 'You do not have permission to manage professionals.' );
+}
+
 global $wpdb;
 $nonce = wp_create_nonce( 'kounselia_admin_nonce' );
 
 $status_filter = isset( $_GET['status'] ) ? sanitize_key( $_GET['status'] ) : 'pending';
-if ( ! in_array( $status_filter, array( 'pending', 'verified', 'rejected', 'all' ), true ) ) {
+if ( ! in_array( $status_filter, array( 'pending', 'verified', 'suspended', 'rejected', 'all' ), true ) ) {
     $status_filter = 'pending';
 }
 
 $table = $wpdb->prefix . 'kounselia_professionals';
 
-$where = '';
+$search = isset( $_GET['s'] ) ? trim( sanitize_text_field( wp_unslash( $_GET['s'] ) ) ) : '';
+$where  = array();
 if ( 'all' !== $status_filter ) {
-    $where = $wpdb->prepare( 'WHERE status = %s', $status_filter );
+    $where[] = $wpdb->prepare( 'p.status = %s', $status_filter );
 }
+if ( '' !== $search ) {
+    $like    = '%' . $wpdb->esc_like( $search ) . '%';
+    $where[] = $wpdb->prepare( '(u.display_name LIKE %s OR u.user_email LIKE %s OR p.title LIKE %s OR p.specialty LIKE %s)', $like, $like, $like, $like );
+}
+$where_sql = $where ? 'WHERE ' . implode( ' AND ', $where ) : '';
 
-$applications = $wpdb->get_results( "SELECT * FROM {$table} {$where} ORDER BY submitted_at DESC" );
+$applications = $wpdb->get_results( "SELECT p.* FROM {$table} p LEFT JOIN {$wpdb->users} u ON u.ID = p.user_id {$where_sql} ORDER BY p.submitted_at DESC" );
 
 $counts = array();
-foreach ( array( 'pending', 'verified', 'rejected' ) as $s ) {
+foreach ( array( 'pending', 'verified', 'suspended', 'rejected' ) as $s ) {
     $counts[ $s ] = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE status = %s", $s ) );
 }
 ?>
@@ -71,14 +81,22 @@ foreach ( array( 'pending', 'verified', 'rejected' ) as $s ) {
 
 <div class="admin-body">
   <h1 class="admin-title">Professionals</h1>
-  <div class="admin-subtitle"><?php echo (int) $counts['pending']; ?> pending &middot; <?php echo (int) $counts['verified']; ?> verified &middot; <?php echo (int) $counts['rejected']; ?> rejected</div>
+  <div class="admin-subtitle"><?php echo (int) $counts['pending']; ?> pending &middot; <?php echo (int) $counts['verified']; ?> verified &middot; <?php echo (int) $counts['suspended']; ?> suspended &middot; <?php echo (int) $counts['rejected']; ?> rejected</div>
 
   <div class="tab-row">
     <a class="tab-link <?php echo 'pending' === $status_filter ? 'active' : ''; ?>" href="?status=pending">Pending (<?php echo (int) $counts['pending']; ?>)</a>
     <a class="tab-link <?php echo 'verified' === $status_filter ? 'active' : ''; ?>" href="?status=verified">Verified (<?php echo (int) $counts['verified']; ?>)</a>
+    <a class="tab-link <?php echo 'suspended' === $status_filter ? 'active' : ''; ?>" href="?status=suspended">Suspended (<?php echo (int) $counts['suspended']; ?>)</a>
     <a class="tab-link <?php echo 'rejected' === $status_filter ? 'active' : ''; ?>" href="?status=rejected">Rejected (<?php echo (int) $counts['rejected']; ?>)</a>
     <a class="tab-link <?php echo 'all' === $status_filter ? 'active' : ''; ?>" href="?status=all">All</a>
   </div>
+
+  <form class="filters" method="get" style="margin-bottom:16px">
+    <input type="hidden" name="status" value="<?php echo esc_attr( $status_filter ); ?>">
+    <input type="text" name="s" value="<?php echo esc_attr( $search ); ?>" placeholder="Search by name, email, title or specialty">
+    <button type="submit">Search</button>
+    <?php if ( '' !== $search ) : ?><a class="clear" href="?status=<?php echo esc_attr( $status_filter ); ?>">Clear</a><?php endif; ?>
+  </form>
 
   <div class="panel">
     <?php if ( empty( $applications ) ) : ?>
@@ -97,6 +115,15 @@ foreach ( array( 'pending', 'verified', 'rejected' ) as $s ) {
             echo 'pending' === $app->status ? 'var(--gold-light);color:#8a5a12' : ( 'verified' === $app->status ? 'var(--sage-light,#EAF2EC);color:var(--sage,#2E5C3E)' : 'var(--rose-light);color:var(--rose)' );
           ?>"><?php echo esc_html( ucfirst( $app->status ) ); ?></span>
         </div>
+        <?php
+          $badges = array();
+          if ( ! empty( $app->admin_hidden ) ) { $badges[] = '<i class="ti ti-eye-off"></i> Hidden by admin'; }
+          if ( '0' === (string) get_user_meta( $app->user_id, 'kounselia_public_profile', true ) ) { $badges[] = 'Hid own public profile'; }
+          if ( ! empty( $app->free_sessions_per_client ) && function_exists( 'kounselia_free_session_options' ) ) { $badges[] = '<i class="ti ti-gift"></i> ' . esc_html( kounselia_free_session_options()[ (int) $app->free_sessions_per_client ] ?? 'Free sessions' ); }
+          if ( 'suspended' === $app->status && $app->suspended_reason ) { $badges[] = 'Suspended: ' . esc_html( $app->suspended_reason ); }
+          if ( $badges ) : ?>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"><?php foreach ( $badges as $b ) { echo '<span style="font-size:11.5px;background:var(--surface2);border-radius:20px;padding:3px 10px;color:var(--text2)">' . $b . '</span>'; } ?></div>
+        <?php endif; ?>
 
         <div class="app-meta">
           <div><strong>Email</strong><?php echo esc_html( $user ? $user->user_email : '—' ); ?></div>
@@ -122,6 +149,10 @@ foreach ( array( 'pending', 'verified', 'rejected' ) as $s ) {
 
         <?php if ( 'verified' === $app->status && function_exists( 'kounselia_article_publishing_options' ) && kounselia_admin_can( 'blog' ) ) : ?>
           <div style="font-size:12.5px;color:var(--text2);margin-top:6px"><i class="ti ti-feather"></i> Articles: <?php echo esc_html( kounselia_article_publishing_options()[ $app->publishing ? $app->publishing : 'default' ] ?? 'Follow the site setting' ); ?> · <a href="/portal/admin/pages/articles.php?tab=writers">Change</a></div>
+        <?php endif; ?>
+
+        <?php if ( in_array( $app->status, array( 'verified', 'suspended' ), true ) ) : ?>
+          <div class="app-actions"><a class="btn-approve" style="text-decoration:none" href="/portal/admin/pages/professional.php?id=<?php echo (int) $app->id; ?>"><i class="ti ti-settings"></i> Manage</a></div>
         <?php endif; ?>
 
         <?php if ( 'rejected' === $app->status && $app->rejection_reason ) : ?>

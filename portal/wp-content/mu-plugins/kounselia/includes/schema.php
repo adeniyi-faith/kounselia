@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.23.0'; // Bumped version: professional articles, follows, loves, comments
+    $current_version   = '1.24.0'; // Bumped version: admin controls for professionals, free consultations
 
     if ( $installed_version === $current_version ) {
         return;
@@ -294,6 +294,10 @@ function kounselia_install_tables() {
         rejection_reason VARCHAR(500) NULL,
         publishing VARCHAR(16) NOT NULL DEFAULT 'default',
         publishing_note VARCHAR(500) NULL,
+        admin_hidden TINYINT(1) NOT NULL DEFAULT 0,
+        suspended_reason VARCHAR(500) NULL,
+        suspended_at DATETIME NULL,
+        free_sessions_per_client SMALLINT UNSIGNED NOT NULL DEFAULT 0,
         submitted_at DATETIME NOT NULL,
         reviewed_at DATETIME NULL,
         reviewed_by BIGINT UNSIGNED NULL,
@@ -403,12 +407,14 @@ function kounselia_install_tables() {
         cancel_reason VARCHAR(500) NULL,
         room_token VARCHAR(64) NULL,
         series_id BIGINT UNSIGNED NULL,
+        is_free TINYINT(1) NOT NULL DEFAULT 0,
         reminder_sent_at DATETIME NULL,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,
         PRIMARY KEY  (id),
         KEY professional_id (professional_id),
         KEY client_user_id (client_user_id),
+        KEY pro_client_free (professional_id, client_user_id, is_free),
         KEY scheduled_start (scheduled_start),
         KEY status (status),
         KEY series_id (series_id)

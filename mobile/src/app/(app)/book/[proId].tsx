@@ -48,6 +48,9 @@ export default function BookProfessional() {
   const [picked, setPicked] = useState<Slot | null>(null);
   const [note, setNote] = useState('');
   const [weekly, setWeekly] = useState(false);
+  // This member still has free sessions with them: no payment, and booked
+  // one at a time (a weekly series needs a card on file).
+  const isFree = !rescheduleId && !!pro?.free_label;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // After checkout opens: the booking we're waiting on and its payment page.
@@ -112,10 +115,22 @@ export default function BookProfessional() {
       return;
     }
 
-    const res = await createBooking(config, professionalId, picked.value, note.trim(), weekly);
+    const res = await createBooking(config, professionalId, picked.value, note.trim(), weekly && !isFree);
     setBusy(false);
     if (!res.ok) {
       setError(res.message);
+      return;
+    }
+    if (res.data.free) {
+      // The professional's free-session offer: no payment, booked at once.
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+      showDialog({
+        title: "You're booked in",
+        message: `Your free session is on ${picked.at.toLocaleString([], { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })}.`,
+        icon: 'calendar-check',
+        tone: 'success',
+      });
+      router.back();
       return;
     }
     // Pay on Paystack's page. Paystack tells the server directly when the
@@ -218,6 +233,7 @@ export default function BookProfessional() {
                 {pro.title}
                 {pro.specialty ? ` · ${pro.specialty}` : ''}
               </Text>
+              {isFree ? <Text style={styles.free}>{pro.free_label}</Text> : null}
               {pro.price && !rescheduleId ? (
                 <Text style={styles.price}>
                   {pro.price} / {slots.session_minutes}-minute session
@@ -287,13 +303,15 @@ export default function BookProfessional() {
                   style={styles.note}
                   textAlignVertical="top"
                 />
-                <View style={styles.weeklyRow}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.weeklyTitle}>Make it weekly</Text>
-                    <Text style={styles.weeklySub}>Same day and time every week. You pay for each session as it comes.</Text>
+                {!isFree && (
+                  <View style={styles.weeklyRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.weeklyTitle}>Make it weekly</Text>
+                      <Text style={styles.weeklySub}>Same day and time every week. You pay for each session as it comes.</Text>
+                    </View>
+                    <Switch value={weekly} onValueChange={setWeekly} trackColor={{ true: colors.accent, false: colors.border }} accessibilityLabel="Make it weekly" />
                   </View>
-                  <Switch value={weekly} onValueChange={setWeekly} trackColor={{ true: colors.accent, false: colors.border }} accessibilityLabel="Make it weekly" />
-                </View>
+                )}
               </>
             )}
           </>
@@ -312,7 +330,7 @@ export default function BookProfessional() {
       ) : days.length > 0 ? (
         <View style={styles.footer}>
           <Button
-            title={rescheduleId ? 'Move my session' : 'Continue to payment'}
+            title={rescheduleId ? 'Move my session' : isFree ? 'Book my free session' : 'Continue to payment'}
             onPress={confirm}
             busy={busy}
             disabled={!picked}
@@ -344,6 +362,7 @@ const useStyles = makeStyles((colors) => ({
   proName: { fontFamily: fonts.serifMedium, fontSize: 24, color: colors.text },
   proSpec: { fontFamily: fonts.regular, fontSize: 13, color: colors.text2, marginTop: 2 },
   price: { fontFamily: fonts.semibold, fontSize: 13, color: colors.accentText, marginTop: 4 },
+  free: { fontFamily: fonts.semibold, fontSize: 13, color: colors.sage, marginTop: 4 },
   label: { fontFamily: fonts.medium, fontSize: 13, color: colors.text2, marginTop: 24, marginBottom: 10 },
   days: { gap: 8, paddingRight: 20 },
   chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 50, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },

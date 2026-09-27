@@ -237,9 +237,11 @@ function kounselia_ajax_app_bookings() {
         $rating = function_exists( 'kounselia_get_professional_rating_summary' )
             ? kounselia_get_professional_rating_summary( $pro->id )
             : array( 'average' => 0, 'count' => 0 );
-        $price = null;
-        $full  = null;
-        if ( $pro->rate_amount ) {
+        $price     = null;
+        $full      = null;
+        $free_left = function_exists( 'kounselia_free_sessions_left' ) ? kounselia_free_sessions_left( $pro, $user_id ) : 0;
+        $all_free  = defined( 'KOUNSELIA_FREE_ALWAYS' ) && $free_left >= KOUNSELIA_FREE_ALWAYS;
+        if ( $pro->rate_amount && ! $all_free ) {
             $full_amount  = kounselia_convert_ngn( $pro->rate_amount, $currency );
             $price_amount = round( $full_amount * ( 1 - $discount / 100 ), 2 );
             $price        = kounselia_format_money( $price_amount, $currency );
@@ -256,6 +258,8 @@ function kounselia_ajax_app_bookings() {
             'review_count' => (int) $rating['count'],
             'price'        => $price, // e.g. "₦15,000", already with any Pro discount
             'full_price'   => $full,  // the undiscounted price, only when a discount applies
+            // e.g. "Your next session is free"; null when there's nothing free left.
+            'free_label'   => $free_left && function_exists( 'kounselia_free_sessions_label' ) ? kounselia_free_sessions_label( $pro, $user_id ) : null,
         );
     }
 

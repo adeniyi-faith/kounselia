@@ -20,8 +20,18 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+/**
+ * Whether this professional's public profile can be shown: they haven't
+ * hidden it themselves, and an admin hasn't hidden them (Admin →
+ * Professionals). Admin-hidden professionals also drop out of every
+ * list members book from (see kounselia_get_verified_professionals()).
+ */
 function kounselia_professional_is_public( $user_id ) {
-    return '0' !== (string) get_user_meta( $user_id, 'kounselia_public_profile', true );
+    if ( '0' === (string) get_user_meta( $user_id, 'kounselia_public_profile', true ) ) {
+        return false;
+    }
+    $pro = function_exists( 'kounselia_get_professional_application' ) ? kounselia_get_professional_application( $user_id ) : null;
+    return ! ( $pro && ! empty( $pro->admin_hidden ) );
 }
 
 /**
@@ -155,13 +165,16 @@ function kounselia_professional_card_html( $pro ) {
     foreach ( array_slice( $pro->specialties, 0, 3 ) as $s ) {
         $chips .= '<span>' . esc_html( $s ) . '</span>';
     }
-    $price = kounselia_public_session_price( $pro );
+    $price    = kounselia_public_session_price( $pro );
+    $free     = function_exists( 'kounselia_free_sessions_label' ) ? kounselia_free_sessions_label( $pro ) : '';
+    $free_all = defined( 'KOUNSELIA_FREE_ALWAYS' ) && isset( $pro->free_sessions_per_client ) && (int) $pro->free_sessions_per_client >= KOUNSELIA_FREE_ALWAYS;
     return '<a class="k-pro-card" href="' . esc_url( $pro->url ) . '" data-spec="' . esc_attr( strtolower( implode( '|', $pro->specialties ) ) ) . '" data-name="' . esc_attr( strtolower( $pro->display_name . ' ' . $pro->title . ' ' . $pro->specialty ) ) . '">'
-        . '<span class="k-pro-photo">' . ( $pro->avatar ? '<img src="' . esc_url( $pro->avatar ) . '" alt="" loading="lazy">' : '<span>' . esc_html( $pro->initial ) . '</span>' ) . '<b class="k-pro-verified" title="Licence verified by Kounselia"><i class="ti ti-rosette-discount-check-filled"></i></b></span>'
+        . '<span class="k-pro-photo">' . ( $pro->avatar ? '<img src="' . esc_url( $pro->avatar ) . '" alt="" loading="lazy">' : '<span>' . esc_html( $pro->initial ) . '</span>' ) . '<b class="k-pro-verified" title="Licence verified by Kounselia"><i class="ti ti-discount-check-filled"></i></b></span>'
         . '<span class="k-pro-body">'
         . '<span class="k-pro-name">' . esc_html( $pro->display_name ) . '</span>'
         . '<span class="k-pro-title">' . esc_html( $pro->title ) . ( $pro->years_experience ? ' · ' . (int) $pro->years_experience . ' yrs' : '' ) . '</span>'
         . ( $chips ? '<span class="k-pro-chips">' . $chips . '</span>' : '' )
-        . '<span class="k-pro-foot">' . $rating . ( $price ? '<span class="k-pro-price">' . esc_html( $price ) . '<small> / session</small></span>' : '' ) . '</span>'
+        . '<span class="k-pro-foot">' . $rating . ( $free_all ? '<span class="k-pro-price">Free<small> sessions</small></span>' : ( $price ? '<span class="k-pro-price">' . esc_html( $price ) . '<small> / session</small></span>' : '' ) ) . '</span>'
+        . ( $free && ! $free_all ? '<span class="k-pro-free"><i class="ti ti-gift"></i> ' . esc_html( $free ) . '</span>' : '' )
         . '</span></a>';
 }

@@ -124,6 +124,9 @@ export interface Professional {
   review_count: number;
   price: string | null;
   full_price: string | null;
+  // The professional's free-session offer for this member, e.g. "Your next
+  // session is free". null when they have nothing free left.
+  free_label: string | null;
 }
 
 export interface BookingsData {
@@ -149,8 +152,14 @@ export const fetchSlots = (config: KounseliaConfig, professionalId: number, resc
 
 // Reserves the slot and returns the Paystack page to pay on. The booking
 // is only confirmed once Paystack tells the server the payment went through.
+// A free session (the professional's offer) is confirmed at once instead:
+// `free` is true and there is no payment page.
+export type CreatedBooking =
+  | { free?: false; authorization_url: string; booking_id: number }
+  | { free: true; booking_id: number; message: string };
+
 export const createBooking = (config: KounseliaConfig, professionalId: number, slot: string, note: string, weekly: boolean) =>
-  call<{ authorization_url: string; booking_id: number }>(config, 'kounselia_create_booking', {
+  call<CreatedBooking>(config, 'kounselia_create_booking', {
     professional_id: professionalId,
     scheduled_start: slot,
     note,

@@ -115,8 +115,8 @@ function answer(p) {
         upcoming: [{ id: 42, professional_id: 6, pro_name: 'Tunde Bello', pro_title: 'Counsellor', start_local: 'x', start_utc: iso(3 * 864e5), series_id: 0, joinable: false }],
         past: [{ id: 30, pro_name: 'Dr. Amaka Eze', pro_title: 'Clinical Psychologist', start_utc: iso(-14 * 864e5), review_rating: 5 }],
         professionals: [
-          { id: 5, name: 'Dr. Amaka Eze', title: 'Clinical Psychologist', specialty: 'Anxiety', avatar_url: null, rating: 4.9, review_count: 23, price: '₦18,000', full_price: '₦20,000' },
-          { id: 6, name: 'Tunde Bello', title: 'Counsellor', specialty: 'Relationships', avatar_url: null, rating: 0, review_count: 0, price: '₦12,000', full_price: null },
+          { id: 5, name: 'Dr. Amaka Eze', title: 'Clinical Psychologist', specialty: 'Anxiety', avatar_url: null, rating: 4.9, review_count: 23, price: '₦18,000', full_price: '₦20,000', free_label: null },
+          { id: 6, name: 'Tunde Bello', title: 'Counsellor', specialty: 'Relationships', avatar_url: null, rating: 0, review_count: 0, price: '₦12,000', full_price: null, free_label: 'Your next session is free' },
         ],
       });
     case 'kounselia_get_professional_slots':
