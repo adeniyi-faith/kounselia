@@ -35,9 +35,11 @@ export function CareTeamCard({ care, joining, onJoin, onManage }: Props) {
 
   if (next) {
     const at = next.start_utc ? new Date(next.start_utc) : null;
+    // The professional's title isn't repeated here — it's already shown
+    // wherever their name first appears (their profile, the sessions
+    // list); tacked onto this line too it just reads as clutter.
     const details = [
       at ? `${dayWord(at)} · ${at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '',
-      next.pro_title,
       next.more_booked > 0 ? `+${next.more_booked} more booked` : '',
     ].filter(Boolean);
     return (

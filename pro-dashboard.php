@@ -233,6 +233,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .booking-join,.booking-message,.booking-cancel{border:1px solid var(--border);background:none;color:var(--text2);font-size:12.5px;font-weight:600;padding:8px 14px;border-radius:10px;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;justify-content:center;white-space:nowrap}
 .booking-join{border-color:var(--sage);color:var(--sage)}
 .booking-join:hover{background:var(--sage-light)}
+.booking-join[hidden]{display:none}
 .booking-message:hover{border-color:var(--accent);color:var(--accent)}
 .booking-cancel:hover{border-color:var(--rose);color:var(--rose)}
 @media (max-width:480px){.booking-row{flex-wrap:wrap}.booking-actions{flex-direction:row;flex-basis:100%;margin-top:10px}.booking-join,.booking-message,.booking-cancel{flex:1}}
@@ -434,7 +435,11 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 
       <form id="pro-form">
         <div class="form-field"><label>Full name</label><input type="text" name="full_name" id="pro-name" value="<?php echo esc_attr( $display_name ); ?>" placeholder="Your full name, as clients should see it"></div>
-        <div class="form-field"><label>Professional title</label><input type="text" name="title" id="pro-title" value="<?php echo esc_attr( $application->title ); ?>"></div>
+        <div class="form-field">
+          <label>Professional title</label>
+          <input type="text" name="title" id="pro-title" value="<?php echo esc_attr( $application->title ); ?>" placeholder="e.g. Licensed Clinical Psychologist">
+          <div class="section-sub" style="margin-top:6px">Shown next to your name everywhere clients see you — your role or qualification, not just "Dr" (your name already covers that).</div>
+        </div>
         <div class="form-row">
           <div class="form-field"><label>Specialty</label><input type="text" name="specialty" id="pro-specialty" value="<?php echo esc_attr( $application->specialty ); ?>"></div>
           <div class="form-field"><label>Years of experience</label><input type="number" name="years_experience" id="pro-years" min="0" max="60" value="<?php echo esc_attr( $application->years_experience ); ?>"></div>
@@ -646,7 +651,16 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <?php else : ?>
       <div class="booking-list" id="pro-booking-list">
         <?php foreach ( $upcoming_bookings as $booking ) : ?>
-        <?php $can_join = kounselia_booking_is_joinable( $booking ); ?>
+        <?php
+        $can_join = kounselia_booking_is_joinable( $booking );
+        // True (real, timezone-free) millisecond timestamps, for the
+        // "Join" button's live countdown below — the page is loaded once
+        // and often left open past session time, so without this the
+        // button only ever reflects whichever moment the page was last
+        // rendered and never appears on its own once it's time.
+        $kounselia_join_opens_at  = ( (int) get_gmt_from_date( $booking->scheduled_start, 'U' ) - 10 * MINUTE_IN_SECONDS ) * 1000;
+        $kounselia_join_closes_at = ( (int) get_gmt_from_date( $booking->scheduled_end, 'U' ) + 15 * MINUTE_IN_SECONDS ) * 1000;
+        ?>
         <div class="booking-row" data-booking-id="<?php echo (int) $booking->id; ?>">
           <div class="booking-icon"><i class="ti ti-calendar-event"></i></div>
           <div class="booking-meta">
@@ -657,9 +671,13 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
             <?php if ( $kounselia_where && $kounselia_where['external'] ) : ?><div class="booking-note" style="font-style:normal"><i class="ti ti-video"></i> On <?php echo esc_html( $kounselia_where['provider'] ); ?><?php echo $booking->video_link ? ' (link for this session)' : ''; ?></div><?php endif; ?>
           </div>
           <div class="booking-actions">
-            <?php if ( $can_join ) : ?>
-              <a class="booking-join" href="/video-call.php?booking_id=<?php echo (int) $booking->id; ?>"><i class="ti ti-video"></i> Join</a>
-            <?php endif; ?>
+            <a
+              class="booking-join js-booking-join"
+              href="/video-call.php?booking_id=<?php echo (int) $booking->id; ?>"
+              data-opens-at="<?php echo (int) $kounselia_join_opens_at; ?>"
+              data-closes-at="<?php echo (int) $kounselia_join_closes_at; ?>"
+              <?php echo $can_join ? '' : 'hidden'; ?>
+            ><i class="ti ti-video"></i> Join</a>
             <?php if ( function_exists( 'kounselia_video_own_allowed' ) && kounselia_video_own_allowed( $application ) ) : ?>
               <button type="button" class="booking-message" onclick="setSessionLink(<?php echo (int) $booking->id; ?>, <?php echo esc_attr( wp_json_encode( (string) $booking->video_link ) ); ?>)"><i class="ti ti-link"></i> Video link</button>
             <?php endif; ?>
@@ -1149,6 +1167,22 @@ function saveAvailability(){
 }
 
 /* ---------------- BOOKINGS ---------------- */
+
+// This page is rendered once and often stays open past session time (a
+// professional keeping the Bookings tab up in a background browser tab),
+// so "Join" showing or not was frozen at whatever moment the page loaded
+// and never appeared on its own once a session's time actually came.
+// This keeps every Join button in sync with the clock without a reload.
+function refreshJoinButtons(){
+  var now = Date.now();
+  document.querySelectorAll('.js-booking-join').forEach(function(el){
+    var opensAt = Number(el.dataset.opensAt);
+    var closesAt = Number(el.dataset.closesAt);
+    el.hidden = !(now >= opensAt && now <= closesAt);
+  });
+}
+refreshJoinButtons();
+setInterval(refreshJoinButtons, 15000);
 
 function cancelBooking(bookingId, btnEl){
   if (!confirm("Cancel this session? The client will be refunded and notified.")) return;

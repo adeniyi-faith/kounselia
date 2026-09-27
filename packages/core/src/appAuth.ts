@@ -74,3 +74,23 @@ export function appLogout(config: KounseliaConfig): Promise<void> {
     () => undefined,
   );
 }
+
+// A one-time code the in-app browser trades for a real sign-in on the
+// website (see app-sso.php): the app is already signed in with its own
+// token, but the WebView has never signed in there and has no way to
+// carry that token itself, so without this it always lands on the
+// website's own sign-in page. The code is only good for a few seconds
+// and only once, so it's safe to put in a URL. Null if the app isn't
+// signed in, or the server couldn't be reached.
+export async function fetchWebSsoCode(config: KounseliaConfig): Promise<string | null> {
+  if (config.client !== 'app' || !config.authToken) return null;
+  try {
+    // Short: the in-app browser is waiting on this before it can show
+    // anything, so a slow connection should fall back to opening the
+    // page signed out rather than leave the member staring at nothing.
+    const json = await postAction(config, 'kounselia_app_web_sso', {}, 8000);
+    return json?.success && json.data?.code ? json.data.code : null;
+  } catch {
+    return null;
+  }
+}

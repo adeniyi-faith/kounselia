@@ -31,6 +31,7 @@ export function articleHtml(post: BlogPost, colors: Palette, dark: boolean) {
 <meta name="color-scheme" content="${dark ? 'dark' : 'light'}">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500&family=Outfit:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/dist/tabler-icons.min.css" rel="stylesheet">
 <style>
   *{box-sizing:border-box}
   html{-webkit-text-size-adjust:100%}
@@ -64,14 +65,14 @@ export function articleHtml(post: BlogPost, colors: Palette, dark: boolean) {
   .rel img,.rel-ph{width:76px;height:58px;border-radius:12px;object-fit:cover;flex:none;background:${colors.goldLight}}
   .rel b{display:block;font-weight:500;font-size:15px;line-height:1.35}
   .rel small{color:${colors.text3};font-size:12px}
-  .tick{color:${colors.sage};font-size:.9em;margin-left:4px}
+  .tick{color:${colors.sage};font-size:.9em;margin-left:4px;vertical-align:-1px}
   .care{background:${colors.sageLight};color:${colors.text};border-radius:18px;padding:14px 16px;margin-top:28px;font-size:14px;line-height:1.6}
 </style>
 </head><body>
   ${topic ? `<div class="topic">${esc(topic)}</div>` : ''}
   <h1>${esc(post.title)}</h1>
   ${post.subtitle ? `<p class="sub">${esc(post.subtitle)}</p>` : ''}
-  <div class="by"><span class="av">${avatar}</span><span><b>${esc(post.author.name)}${post.author.is_professional ? '<span class="tick" aria-label="Verified professional">✓</span>' : ''}</b>${post.author.title ? `${esc(post.author.title)} · ` : ''}${esc(articleDate(post.published_utc))} · ${post.reading_minutes} min read</span></div>
+  <div class="by"><span class="av">${avatar}</span><span><b>${esc(post.author.name)}${post.author.is_professional ? '<i class="ti ti-discount-check-filled tick" aria-label="Verified professional"></i>' : ''}</b>${post.author.title ? `${esc(post.author.title)} · ` : ''}${esc(articleDate(post.published_utc))} · ${post.reading_minutes} min read</span></div>
   ${post.cover ? `<figure><img src="${esc(post.cover)}" alt="">${post.cover_caption ? `<figcaption>${esc(post.cover_caption)}</figcaption>` : ''}</figure>` : ''}
   <div class="body">${post.html}</div>
   ${post.community?.disclaimer ? `<div class="care">${esc(post.community.disclaimer)}</div>` : ''}

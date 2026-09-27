@@ -2,6 +2,13 @@
 // echo cancellation (so the counselor's voice through the speaker isn't
 // picked up by the microphone); dictation needs recording; listening to a
 // reply needs plain playback that still works with the ringer switch off.
+//
+// Android echo: setAudioSessionOptions below only takes iOS settings
+// (iosCategory/iosMode/iosOptions) — react-native-audio-api has no
+// Android equivalent yet, so unlike iOS's "voiceChat" mode, Android gets
+// no echo cancellation from this call. If a voice call still echoes on
+// Android after this, the fix has to come from a newer release of this
+// library (it doesn't exist in 0.13.6, the version installed here).
 import { AudioManager } from 'react-native-audio-api';
 
 export type SoundMode = 'call' | 'record' | 'listen';
