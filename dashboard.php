@@ -959,7 +959,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
               $pro_rating  = function_exists( 'kounselia_get_professional_rating_summary' ) ? kounselia_get_professional_rating_summary( $pro->id ) : array( 'average' => 0, 'count' => 0 );
           ?>
           <?php $kounselia_free_left = function_exists( 'kounselia_free_sessions_left' ) ? kounselia_free_sessions_left( $pro, $user->ID ) : 0; ?>
-          <a class="counselor-tile js-book-pro" href="javascript:void(0)" data-pro-id="<?php echo (int) $pro->id; ?>" data-free-left="<?php echo (int) $kounselia_free_left; ?>" data-pro-name="<?php echo esc_attr( $pro->display_name . ( $pro->title ? ' · ' . $pro->title : '' ) ); ?>">
+          <a class="counselor-tile js-book-pro" href="javascript:void(0)" data-pro-id="<?php echo (int) $pro->id; ?>" data-free-left="<?php echo (int) $kounselia_free_left; ?>" data-pro-name="<?php echo esc_attr( $pro->display_name . ( $pro->title ? ' · ' . $pro->title : '' ) ); ?>" data-pro-bio="<?php echo esc_attr( $pro->bio ? wp_trim_words( wp_strip_all_tags( $pro->bio ), 60 ) : '' ); ?>">
             <div class="tile-av ic-blue" style="overflow:hidden">
               <?php echo $pro_avatar ? '<img src="' . esc_url( $pro_avatar ) . '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : esc_html( $pro_initial ); ?>
             </div>
@@ -1247,6 +1247,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <h2 style="margin:0;font-size:26px" id="book-modal-name">Book a session</h2>
         <button onclick="closeBooking()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text3);padding:4px;"><i class="ti ti-x"></i></button>
       </div>
+      <p id="book-modal-bio" style="display:none;color:var(--text2);font-size:14px;line-height:1.5;margin:-8px 0 16px"></p>
       <p style="margin-bottom:20px">Pick an open time below. Sessions are <?php echo (int) ( function_exists( 'kounselia_session_length_minutes' ) ? kounselia_session_length_minutes() : 60 ); ?> minutes. You'll pay securely by card or transfer on the next screen — the slot is only reserved for a few minutes while you do.</p>
 
       <div id="book-slots" style="max-height:280px;overflow-y:auto;margin-bottom:20px">
@@ -1906,6 +1907,9 @@ function openBooking(professionalId, name){
   document.getElementById('book-note-field').style.display = 'none';
   // A free session is booked on its own (a weekly series needs a card on file).
   const tile = document.querySelector('.js-book-pro[data-pro-id="' + professionalId + '"]');
+  const bioEl = document.getElementById('book-modal-bio');
+  bioEl.textContent = (tile && tile.dataset.proBio) || '';
+  bioEl.style.display = (tile && tile.dataset.proBio) ? 'block' : 'none';
   bookingIsFree = !!(tile && parseInt(tile.dataset.freeLeft || '0', 10) > 0);
   document.getElementById('book-recurring-field').style.display = bookingIsFree ? 'none' : 'flex';
   document.getElementById('book-recurring').checked = false;
@@ -1922,6 +1926,7 @@ function openReschedule(bookingId, professionalId, name){
   bookingProfessionalId = professionalId;
   bookingSelectedSlot = null;
   document.getElementById('book-modal-name').textContent = 'Reschedule with ' + name;
+  document.getElementById('book-modal-bio').style.display = 'none';
   document.getElementById('book-note-field').style.display = 'none';
   document.getElementById('book-recurring-field').style.display = 'none';
   document.getElementById('book-confirm-btn').style.display = 'none';
