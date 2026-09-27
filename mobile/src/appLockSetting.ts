@@ -45,8 +45,15 @@ export async function unlockMethodName(): Promise<string | null> {
     if (level === LocalAuthentication.SecurityLevel.NONE) return null;
     if (level === LocalAuthentication.SecurityLevel.SECRET) return Platform.OS === 'ios' ? 'your passcode' : 'your screen lock';
     const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-    if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) return Platform.OS === 'ios' ? 'Face ID' : 'face unlock';
-    if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) return Platform.OS === 'ios' ? 'Touch ID' : 'your fingerprint';
+    const face = types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION);
+    const finger = types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT);
+    // An iPhone has one or the other.
+    if (Platform.OS === 'ios') return face ? 'Face ID' : finger ? 'Touch ID' : 'your passcode';
+    // Many Android phones have both, and the fingerprint is usually the one
+    // people use, so it comes first.
+    if (finger && face) return 'your fingerprint or face';
+    if (finger) return 'your fingerprint';
+    if (face) return 'face unlock';
     return 'your screen lock';
   } catch {
     return null;
