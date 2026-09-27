@@ -34,10 +34,13 @@ function kounselia_session_length_minutes() {
 
 /**
  * How far in advance a slot must start to be bookable at all — stops
- * someone booking a session for eleven minutes from now.
+ * someone booking a session for eleven minutes from now. Configurable
+ * from the admin Platform Configuration settings (in hours, fractions
+ * allowed — 0.5 for 30 minutes); defaults to 2 hours.
  */
 function kounselia_booking_lead_seconds() {
-    return 2 * HOUR_IN_SECONDS;
+    $hours = (float) get_option( 'kounselia_booking_lead_hours', 2 );
+    return max( 0, $hours ) * HOUR_IN_SECONDS;
 }
 
 /**
@@ -211,7 +214,14 @@ function kounselia_get_professional_by_id( $professional_id ) {
  * list rather than trusting the client's submitted time, so a slot that
  * was taken or dropped from availability a second ago can't be booked.
  */
-function kounselia_create_booking( $professional_id, $client_user_id, $scheduled_start_mysql, $note, $series_id = 0 ) {
+/**
+ * $skip_availability_check is for admin use only (see
+ * kounselia_ajax_admin_create_booking()) — it slots someone in by hand,
+ * so it isn't held to the professional's own weekly hours or the usual
+ * kounselia_booking_lead_seconds() notice the way a member's own booking
+ * is. The double-booking check right below still always applies.
+ */
+function kounselia_create_booking( $professional_id, $client_user_id, $scheduled_start_mysql, $note, $series_id = 0, $skip_availability_check = false ) {
     global $wpdb;
 
     $professional = kounselia_get_professional_by_id( $professional_id );
@@ -228,9 +238,11 @@ function kounselia_create_booking( $professional_id, $client_user_id, $scheduled
     }
     $normalized_start = date( 'Y-m-d H:i:s', $start_ts );
 
-    $valid_slots = kounselia_get_available_slots( $professional_id );
-    if ( ! in_array( $normalized_start, $valid_slots, true ) ) {
-        return new WP_Error( 'invalid_slot', 'That time is no longer available. Please pick another slot.' );
+    if ( ! $skip_availability_check ) {
+        $valid_slots = kounselia_get_available_slots( $professional_id );
+        if ( ! in_array( $normalized_start, $valid_slots, true ) ) {
+            return new WP_Error( 'invalid_slot', 'That time is no longer available. Please pick another slot.' );
+        }
     }
 
     // Last-moment race check: two people clicking the same slot in the
@@ -740,9 +752,39 @@ function kounselia_ajax_get_professional_slots() {
         // member's own time zone (it sends back the `slots` form).
         'slots_utc'       => array_map( 'kounselia_app_utc', $slots ),
         'session_minutes' => kounselia_session_length_minutes(),
+        'today_note'      => kounselia_today_unavailable_note( $professional_id, $slots ),
     ) );
 }
 add_action( 'wp_ajax_kounselia_get_professional_slots', 'kounselia_ajax_get_professional_slots' );
+
+/**
+ * When today is one of the professional's working days but every slot in
+ * it has already been ruled out by kounselia_booking_lead_seconds() (e.g.
+ * she's free until 8pm, but it's already past 5pm so the last hour-long
+ * slot no longer gives 2 hours' notice), $slots has nothing dated today
+ * at all — otherwise indistinguishable from today simply not being one
+ * of her working days. Told apart here so the app can still show a
+ * "today" day with an explanation, instead of it silently disappearing
+ * until the next day she works.
+ */
+function kounselia_today_unavailable_note( $professional_id, $slots ) {
+    $today = date( 'Y-m-d', current_time( 'timestamp' ) );
+    foreach ( $slots as $slot ) {
+        if ( 0 === strpos( $slot, $today ) ) {
+            return null; // Today already has open slots.
+        }
+    }
+
+    $dow   = (int) date( 'w', current_time( 'timestamp' ) );
+    $rules = kounselia_get_availability_rules( $professional_id );
+    foreach ( $rules as $rule ) {
+        if ( (int) $rule->day_of_week === $dow ) {
+            $lead_hours = kounselia_booking_lead_seconds() / HOUR_IN_SECONDS;
+            return sprintf( 'No more times available today — booking needs at least %s hours\' notice.', rtrim( rtrim( number_format( $lead_hours, 1 ), '0' ), '.' ) );
+        }
+    }
+    return null; // Not a working day today at all.
+}
 
 function kounselia_ajax_create_booking() {
     kounselia_verify_nonce();
@@ -892,6 +934,56 @@ function kounselia_count_all_bookings_admin( $status_filter = 'all' ) {
         $status_filter
     ) );
 }
+
+/**
+ * Slots a session in by hand — a phone booking, an emergency session,
+ * covering for a broken payment — for any professional, any client, at
+ * any time (see the $skip_availability_check note on
+ * kounselia_create_booking()). Confirmed immediately, the same way a
+ * free self-serve booking is (kounselia_confirm_free_booking()): no
+ * Paystack checkout, since an admin arranging this by hand isn't the
+ * client paying through the normal flow.
+ */
+function kounselia_ajax_admin_create_booking() {
+    check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
+
+    if ( ! kounselia_user_is_admin() ) {
+        kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
+    }
+
+    $professional_id = isset( $_POST['professional_id'] ) ? absint( $_POST['professional_id'] ) : 0;
+    $client_email    = isset( $_POST['client_email'] ) ? sanitize_email( wp_unslash( $_POST['client_email'] ) ) : '';
+    $scheduled_start = isset( $_POST['scheduled_start'] ) ? sanitize_text_field( wp_unslash( $_POST['scheduled_start'] ) ) : '';
+    $note            = isset( $_POST['note'] ) ? sanitize_textarea_field( wp_unslash( $_POST['note'] ) ) : '';
+
+    if ( ! $professional_id || ! $client_email || ! $scheduled_start ) {
+        kounselia_send_pure_json_error( array( 'message' => 'Please choose a professional, a client, and a time.' ), 400 );
+    }
+
+    $client = get_user_by( 'email', $client_email );
+    if ( ! $client ) {
+        kounselia_send_pure_json_error( array( 'message' => 'No member found with that email address.' ), 404 );
+    }
+
+    $booking_id = kounselia_create_booking( $professional_id, $client->ID, $scheduled_start, $note, 0, true );
+    if ( is_wp_error( $booking_id ) ) {
+        kounselia_send_pure_json_error( array( 'message' => $booking_id->get_error_message() ), 400 );
+    }
+
+    if ( ! function_exists( 'kounselia_confirm_free_booking' ) ) {
+        kounselia_delete_unpaid_booking( $booking_id );
+        kounselia_send_pure_json_error( array( 'message' => 'Booking could not be confirmed.' ), 500 );
+    }
+    $confirmed = kounselia_confirm_free_booking( $booking_id );
+    if ( is_wp_error( $confirmed ) ) {
+        kounselia_delete_unpaid_booking( $booking_id );
+        kounselia_send_pure_json_error( array( 'message' => $confirmed->get_error_message() ), 500 );
+    }
+
+    kounselia_admin_log( 'create_booking', 'booking', $booking_id );
+    kounselia_send_pure_json_success( array( 'message' => 'Session booked and confirmed.', 'booking_id' => $booking_id ) );
+}
+add_action( 'wp_ajax_kounselia_admin_create_booking', 'kounselia_ajax_admin_create_booking' );
 
 function kounselia_ajax_admin_cancel_booking() {
     check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );

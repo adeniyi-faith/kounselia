@@ -279,6 +279,7 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
         update_option( 'kounselia_voice_pro_minutes', absint( $_POST['voice_pro_minutes'] ) );
         update_option( 'kounselia_live_model', sanitize_text_field( wp_unslash( $_POST['live_model'] ) ) );
         update_option( 'kounselia_booking_commission_percent', max( 0, min( 100, (float) $_POST['booking_commission_percent'] ) ) );
+        update_option( 'kounselia_booking_lead_hours', max( 0, (float) $_POST['booking_lead_hours'] ) );
 
         kounselia_admin_log( 'update_platform_settings', 'settings' );
         $kounselia_notice = 'Platform configuration saved successfully.';
@@ -318,6 +319,7 @@ $opt_voice_free    = (int) get_option('kounselia_voice_free_minutes', 5);
 $opt_voice_pro     = (int) get_option('kounselia_voice_pro_minutes', 15);
 $opt_live_model    = get_option('kounselia_live_model', 'gemini-3.1-flash-live-preview');
 $opt_booking_commission_percent = (float) get_option( 'kounselia_booking_commission_percent', 15 );
+$opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_hours', 2 );
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -719,6 +721,11 @@ $opt_booking_commission_percent = (float) get_option( 'kounselia_booking_commiss
           <label class="op-label" for="booking_commission_percent">Booking Platform Commission (%)</label>
           <input type="number" id="booking_commission_percent" name="booking_commission_percent" class="op-val-input" min="0" max="100" step="0.1" value="<?php echo esc_attr( $opt_booking_commission_percent ); ?>">
           <div class="op-desc">Kounselia's cut of each paid session. The rest is what a professional's payout balance accrues.</div>
+        </div>
+        <div class="op-card">
+          <label class="op-label" for="booking_lead_hours">Booking Notice Period (hours)</label>
+          <input type="number" id="booking_lead_hours" name="booking_lead_hours" class="op-val-input" min="0" step="0.25" value="<?php echo esc_attr( $opt_booking_lead_hours ); ?>">
+          <div class="op-desc">How far ahead a client must book — the app hides any slot closer than this. Fractions allowed (0.5 = 30 minutes); 0 allows booking right up to the start time. Applies platform-wide, to every professional.</div>
         </div>
       </div>
       <div style="margin-top: 20px;">
