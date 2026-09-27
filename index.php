@@ -290,7 +290,7 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
         </div>
       <?php else : ?>
         <div class="pros-empty">
-          <div><i class="ti ti-rosette-discount-check"></i><b>Licences verified</b>We check every professional's credentials with the body that issued them.</div>
+          <div><i class="ti ti-discount-check"></i><b>Licences verified</b>We check every professional's credentials with the body that issued them.</div>
           <div><i class="ti ti-video"></i><b>Private video sessions</b>Book a time that suits you and meet from your dashboard.</div>
           <div><i class="ti ti-star"></i><b>Real reviews</b>Rated by clients after real sessions — anonymously.</div>
         </div>
@@ -416,7 +416,7 @@ document.addEventListener('DOMContentLoaded',function(){
   // ?auth=register to open the sign-in / sign-up box.
   const auth=new URLSearchParams(location.search).get('auth');
   if(auth==='login'||auth==='register'){
-    if(loggedIn){ window.location.href='/dashboard.php'; return; }
+    if(loggedIn){ window.location.href=kounseliaReturnPath()||'/dashboard.php'; return; }
     openModal(auth);
   } else if(slug&&C[slug]){
     startChat(slug);

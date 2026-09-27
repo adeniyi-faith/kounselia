@@ -11,6 +11,7 @@
  * pages link to each other. Logic lives in includes/professionals-public.php.
  */
 require dirname( __DIR__ ) . '/inc/kounselia-boot.php';
+require dirname( __DIR__ ) . '/inc/kounselia-community.php';
 
 $kounselia_segments    = kounselia_request_segments( 'professionals' );
 $kounselia_nav_current = 'professionals';
@@ -102,7 +103,8 @@ if ( '' !== $kounselia_view ) {
         wp_safe_redirect( $pro->url, 301 ); // Their name changed: send people to the current address.
         exit;
     }
-    $reviews = kounselia_public_professional_reviews( $pro->id );
+    $reviews  = kounselia_public_professional_reviews( $pro->id );
+    $articles = function_exists( 'kounselia_blog_query' ) ? kounselia_blog_query( array( 'professional_id' => $pro->id, 'per_page' => 6 ) ) : array( 'items' => array(), 'total' => 0 );
     $price   = kounselia_public_session_price( $pro );
     // "Dr. Amara Nwosu" -> "Dr. Amara" (a title alone reads oddly: "About Dr.").
     $name_parts = preg_split( '/\s+/', trim( $pro->display_name ) );
@@ -129,12 +131,14 @@ if ( '' !== $kounselia_view ) {
       <header class="k-profile-head">
         <span class="k-pro-photo big"><?php echo $pro->avatar ? '<img src="' . esc_url( $pro->avatar ) . '" alt="">' : '<span>' . esc_html( $pro->initial ) . '</span>'; ?></span>
         <div>
-          <div class="k-verified-line"><i class="ti ti-rosette-discount-check-filled"></i> Licence verified by Kounselia</div>
+          <div class="k-verified-line"><i class="ti ti-discount-check-filled"></i> Licence verified by Kounselia</div>
           <h1><?php echo esc_html( $pro->display_name ); ?></h1>
           <p class="k-profile-title"><?php echo esc_html( $pro->title ); ?><?php echo $pro->years_experience ? ' · ' . (int) $pro->years_experience . ' years of experience' : ''; ?></p>
           <?php if ( $pro->rating['count'] ) : ?>
             <p class="k-profile-rating"><span class="stars"><?php echo str_repeat( '★', (int) round( $pro->rating['average'] ) ) . str_repeat( '☆', 5 - (int) round( $pro->rating['average'] ) ); ?></span> <?php echo esc_html( number_format( (float) $pro->rating['average'], 1 ) ); ?> from <?php echo (int) $pro->rating['count']; ?> session review<?php echo 1 === $pro->rating['count'] ? '' : 's'; ?></p>
           <?php endif; ?>
+          <?php $follow_html = kounselia_follow_button_html( $pro->id, array( 'count' => true ) ); ?>
+          <?php if ( $follow_html ) : ?><div class="k-profile-follow"><?php echo $follow_html; ?></div><?php endif; ?>
         </div>
       </header>
 
@@ -146,6 +150,22 @@ if ( '' !== $kounselia_view ) {
         <h2>About <?php echo esc_html( $first ); ?></h2>
         <?php echo $pro->bio ? wpautop( esc_html( $pro->bio ) ) : '<p>' . esc_html( $first ) . ' hasn\'t written a bio yet.</p>'; ?>
       </section>
+
+      <?php if ( $articles['items'] ) : ?>
+        <section class="k-profile-articles">
+          <h2>Articles by <?php echo esc_html( $first ); ?></h2>
+          <div class="k-cards">
+            <?php foreach ( $articles['items'] as $a ) : ?>
+              <a class="k-card" href="<?php echo esc_url( kounselia_blog_url( $a->slug ) ); ?>">
+                <div class="k-card-img"><?php if ( $a->cover_image ) : ?><img src="<?php echo esc_url( $a->cover_image ); ?>" alt="" loading="lazy"><?php endif; ?></div>
+                <h4><?php echo esc_html( $a->title ); ?></h4>
+                <p><?php echo esc_html( kounselia_blog_summary( $a, 24 ) ); ?></p>
+                <div class="k-meta"><?php echo (int) $a->reading_minutes; ?> min read<?php echo $a->love_count ? ' <span class="dot"></span> <i class="ti ti-heart"></i> ' . esc_html( number_format_i18n( $a->love_count ) ) : ''; ?></div>
+              </a>
+            <?php endforeach; ?>
+          </div>
+        </section>
+      <?php endif; ?>
 
       <?php if ( $reviews ) : ?>
         <section class="k-profile-reviews">
@@ -183,6 +203,7 @@ if ( '' !== $kounselia_view ) {
   </div>
 </main>
 <?php require dirname( __DIR__ ) . '/inc/kounselia-footer.php'; ?>
+<?php kounselia_community_assets(); ?>
 </body>
 </html>
     <?php
@@ -216,7 +237,7 @@ kounselia_public_head( array(
 
   <section class="k-wrap">
     <div class="k-trust-row">
-      <span><i class="ti ti-rosette-discount-check"></i> Licences verified</span>
+      <span><i class="ti ti-discount-check"></i> Licences verified</span>
       <span><i class="ti ti-video"></i> Private video sessions</span>
       <span><i class="ti ti-star"></i> Reviewed by real clients</span>
       <?php if ( $kounselia_pro_discount > 0 ) : ?><span><i class="ti ti-sparkles"></i> <?php echo esc_html( $kounselia_discount_txt ); ?>% off with Pro</span><?php endif; ?>

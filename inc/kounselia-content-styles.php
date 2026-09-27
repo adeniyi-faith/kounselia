@@ -309,6 +309,35 @@ a.social-btn{text-decoration:none}
 .k-card:hover h4{color:var(--accent)}
 .k-card p{font-family:'Source Serif 4',Georgia,serif;font-size:15px;color:var(--text2);line-height:1.55;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 
+/* ---------- Professionals' articles (see inc/kounselia-community.php for follow/love/comments) ---------- */
+.k-pro-tick{color:var(--teal);font-size:.95em;vertical-align:-1px}
+.k-byline-who{flex-wrap:wrap;row-gap:10px}
+.k-byline-name a,.k-byline-av-link{color:inherit;text-decoration:none}
+.k-byline-name a:hover{color:var(--accent)}
+.k-byline-follow{margin-left:4px}
+.k-care-note{max-width:680px;margin:8px auto 0;display:flex;gap:12px;align-items:flex-start;background:var(--sage-light);border-radius:18px;padding:16px 18px;color:#1f3d2a}
+.k-care-note i{font-size:22px;flex-shrink:0;margin-top:1px}
+.k-care-note p{font-size:14.5px;line-height:1.6;margin:0}
+.k-care-note a{color:inherit;font-weight:600}
+.k-article-foot .k-react{margin-bottom:22px}
+.k-author-card .k-author-title{font-size:14px;color:var(--text3);margin:-2px 0 8px}
+.k-author-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px}
+.k-author-actions .k-follow-count{margin-left:0}
+.k-author-link{display:inline-flex;align-items:center;gap:6px;font-size:14px;font-weight:500;color:var(--accent);text-decoration:none;padding:8px 14px;min-height:38px;border-radius:50px;border:1px solid var(--border);background:var(--surface)}
+.k-author-link:hover{border-color:var(--accent)}
+.k-author-link.book{background:var(--gold-light);border-color:rgba(176,125,58,.25);color:#7a5220}
+.k-author-card.pro{background:var(--surface);border:1px solid var(--border);border-radius:24px;padding:22px}
+@media (max-width:520px){ .k-author-card{flex-direction:column;gap:12px} }
+.k-topics .k-pill i{font-size:15px;vertical-align:-2px}
+.k-feed-foot i{font-size:14px;vertical-align:-2px}
+.k-feed-foot{flex-wrap:wrap;row-gap:4px}
+.k-feed-foot > span{white-space:nowrap}
+.k-profile-articles{margin-top:40px}
+.k-profile-articles h2{font-family:'Cormorant Garamond',serif;font-weight:400;font-size:32px;color:var(--text);margin-bottom:6px}
+@media (min-width:720px){ .k-profile-articles .k-cards{grid-template-columns:repeat(2,1fr)} }
+.k-profile-follow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px}
+.k-profile-follow .k-follow-count{margin-left:0}
+
 .k-draft-bar{background:var(--gold);color:#fff;text-align:center;font-size:13.5px;padding:10px 16px}
 .k-draft-bar a{color:#fff;font-weight:600}
 
