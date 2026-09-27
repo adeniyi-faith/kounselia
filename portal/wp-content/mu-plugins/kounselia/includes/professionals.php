@@ -20,6 +20,19 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+/**
+ * True when a professional title is just an honorific on its own ("Dr",
+ * "Dr.", "Prof", "Mr" …) rather than an actual role or qualification.
+ * It's an easy thing to type out of habit, but it reads oddly wherever
+ * the title is shown next to the name — a name that, for a "Dr", is
+ * usually already "Dr. So-and-so" — and tells a client nothing about
+ * what the person actually does.
+ */
+function kounselia_title_is_bare_honorific( $title ) {
+    $bare = array( 'dr', 'dr.', 'doctor', 'prof', 'prof.', 'professor', 'mr', 'mr.', 'mrs', 'mrs.', 'ms', 'ms.', 'miss', 'mx', 'mx.' );
+    return in_array( strtolower( trim( (string) $title ) ), $bare, true );
+}
+
 /* -------------------------------------------------------------------------
  * ROLE
  * ---------------------------------------------------------------------- */
@@ -250,6 +263,9 @@ function kounselia_ajax_apply_professional() {
 
     if ( '' === $title ) {
         wp_send_json_error( array( 'message' => 'Please enter your professional title.' ), 400 );
+    }
+    if ( kounselia_title_is_bare_honorific( $title ) ) {
+        wp_send_json_error( array( 'message' => 'Your professional title should say what you do, e.g. "Licensed Clinical Psychologist" — not just an honorific like "Dr".' ), 400 );
     }
     if ( $rate <= 0 ) {
         wp_send_json_error( array( 'message' => 'Please enter your rate per session.' ), 400 );
@@ -496,6 +512,9 @@ function kounselia_ajax_update_professional_profile() {
 
     if ( '' === $title ) {
         wp_send_json_error( array( 'message' => 'Please enter your professional title.' ), 400 );
+    }
+    if ( kounselia_title_is_bare_honorific( $title ) ) {
+        wp_send_json_error( array( 'message' => 'Your professional title should say what you do, e.g. "Licensed Clinical Psychologist" — not just an honorific like "Dr".' ), 400 );
     }
     // A rate is needed unless every session is free.
     if ( $rate <= 0 && ! $all_free ) {

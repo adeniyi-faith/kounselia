@@ -434,7 +434,11 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 
       <form id="pro-form">
         <div class="form-field"><label>Full name</label><input type="text" name="full_name" id="pro-name" value="<?php echo esc_attr( $display_name ); ?>" placeholder="Your full name, as clients should see it"></div>
-        <div class="form-field"><label>Professional title</label><input type="text" name="title" id="pro-title" value="<?php echo esc_attr( $application->title ); ?>"></div>
+        <div class="form-field">
+          <label>Professional title</label>
+          <input type="text" name="title" id="pro-title" value="<?php echo esc_attr( $application->title ); ?>" placeholder="e.g. Licensed Clinical Psychologist">
+          <div class="section-sub" style="margin-top:6px">Shown next to your name everywhere clients see you — your role or qualification, not just "Dr" (your name already covers that).</div>
+        </div>
         <div class="form-row">
           <div class="form-field"><label>Specialty</label><input type="text" name="specialty" id="pro-specialty" value="<?php echo esc_attr( $application->specialty ); ?>"></div>
           <div class="form-field"><label>Years of experience</label><input type="number" name="years_experience" id="pro-years" min="0" max="60" value="<?php echo esc_attr( $application->years_experience ); ?>"></div>
