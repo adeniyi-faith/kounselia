@@ -404,3 +404,26 @@ function kounselia_ajax_cancel_subscription() {
     wp_send_json_success( array( 'message' => 'Subscription cancelled. You will keep access until your current period ends.' ) );
 }
 add_action( 'wp_ajax_kounselia_cancel_subscription', 'kounselia_ajax_cancel_subscription' );
+
+/**
+ * Plan choices for the app's "My plan" screen — the same plans and
+ * prices the website's upgrade tab shows, in the viewer's currency.
+ */
+function kounselia_ajax_app_plans() {
+    $currency = kounselia_viewer_currency();
+    $plans    = array();
+    foreach ( kounselia_get_plans( true ) as $plan ) {
+        $amount   = kounselia_plan_price( $plan, $currency );
+        $plans[]  = array(
+            'id'         => $plan['id'],
+            'name'       => $plan['name'],
+            'price'      => kounselia_money( $amount, $currency ),
+            'interval'   => ( 'yearly' === ( $plan['interval'] ?? 'monthly' ) ) ? 'year' : 'month',
+            'features'   => array_values( array_map( 'strval', (array) $plan['features'] ) ),
+            'is_popular' => ! empty( $plan['is_popular'] ),
+        );
+    }
+    wp_send_json_success( array( 'plans' => $plans ) );
+}
+add_action( 'wp_ajax_kounselia_app_plans', 'kounselia_ajax_app_plans' );
+add_action( 'wp_ajax_nopriv_kounselia_app_plans', 'kounselia_ajax_app_plans' );
