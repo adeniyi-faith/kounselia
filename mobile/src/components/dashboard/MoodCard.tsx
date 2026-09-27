@@ -2,7 +2,7 @@
 // a row of dots for the last seven days, coloured by that day's mood.
 import type { HomeData } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { counselorColors, fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 import { Card } from './Card';
@@ -36,7 +36,15 @@ export function MoodCard({ mood, saving, onPick }: Props) {
           </View>
         ) : null}
       </View>
-      <View style={styles.options} accessibilityRole="radiogroup">
+      {/* Tiles wide enough for a full label ("Overwhelmed"); on narrow phones
+          the row scrolls sideways a little rather than shrinking the words. */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.optionsScroll}
+        contentContainerStyle={styles.options}
+        accessibilityRole="radiogroup"
+      >
         {mood.options.map((o) => {
           const selected = shown === o.key;
           const { fg, bg } = counselorColors(o.color, colors);
@@ -57,13 +65,13 @@ export function MoodCard({ mood, saving, onPick }: Props) {
               ]}
             >
               <TablerIcon name={o.icon} size={24} color={selected ? fg : colors.text2} />
-              <Text style={[styles.optionLabel, selected && { color: fg, fontFamily: fonts.semibold }]} numberOfLines={1} adjustsFontSizeToFit>
+              <Text style={[styles.optionLabel, selected && { color: fg, fontFamily: fonts.semibold }]} numberOfLines={1}>
                 {o.label}
               </Text>
             </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
       <View style={styles.rhythm} accessible accessibilityLabel="Your moods over the last seven days">
         {mood.week.map((day) => {
           const color = colorOf(day.mood);
@@ -84,19 +92,22 @@ const useStyles = makeStyles((colors) => ({
   title: { fontFamily: fonts.serifMedium, fontSize: 20, color: colors.text, flexShrink: 1 },
   saved: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.sageLight, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 50 },
   savedText: { fontFamily: fonts.semibold, fontSize: 11, letterSpacing: 0.3, textTransform: 'uppercase', color: colors.sage },
-  options: { flexDirection: 'row', gap: 8, marginBottom: 18 },
+  // Bleeds to the card's edges so tiles scroll right up to them.
+  optionsScroll: { marginHorizontal: -20, marginBottom: 18 },
+  options: { flexDirection: 'row', gap: 8, paddingHorizontal: 20, flexGrow: 1 },
   option: {
-    flex: 1,
+    flexGrow: 1,
+    minWidth: 76,
     alignItems: 'center',
     gap: 6,
     paddingVertical: 12,
-    paddingHorizontal: 2,
+    paddingHorizontal: 6,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: colors.border,
     backgroundColor: colors.bg,
   },
-  optionLabel: { fontFamily: fonts.medium, fontSize: 11, color: colors.text2 },
+  optionLabel: { fontFamily: fonts.medium, fontSize: 12, color: colors.text2 },
   rhythm: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 16, borderTopWidth: 1, borderTopColor: colors.border },
   day: { alignItems: 'center', gap: 7 },
   dot: { width: 14, height: 14, borderRadius: 7, backgroundColor: colors.surface3, borderWidth: 1.5, borderColor: colors.border },

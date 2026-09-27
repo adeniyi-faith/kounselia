@@ -141,7 +141,10 @@ function InAppBrowser({
   }, [backRef, nav.canGoBack]);
 
   const secure = nav.url.startsWith('https://');
-  const title = nav.title && !/^https?:\/\//.test(nav.title) ? nav.title : options.title || hostOf(nav.url) || 'Loading…';
+  // Website pages end their titles with the site name ("Safety resources — Kounselia");
+  // the address under the title already says where the page is from.
+  const pageTitle = nav.title.replace(/\s+[—–|-]\s+Kounselia\s*$/i, '').trim();
+  const title = pageTitle && !/^https?:\/\//.test(pageTitle) ? pageTitle : options.title || hostOf(nav.url) || 'Loading…';
 
   function onLoaded(loadedUrl: string) {
     setProgress(1);
