@@ -155,6 +155,17 @@ export const fetchSlots = (config: KounseliaConfig, professionalId: number, resc
     reschedule_booking_id: rescheduleBookingId,
   });
 
+// What clients said about a professional: the star average, how many
+// ratings, and the latest written reviews (anonymous: no names).
+export interface ProfessionalReviews {
+  average: number; // 0 when nobody has rated them yet
+  count: number;
+  reviews: { rating: number; comment: string; date_utc: string | null }[];
+}
+
+export const fetchProfessionalReviews = (config: KounseliaConfig, professionalId: number) =>
+  call<ProfessionalReviews>(config, 'kounselia_app_professional_reviews', { professional_id: professionalId });
+
 // Reserves the slot and returns the Paystack page to pay on. The booking
 // is only confirmed once Paystack tells the server the payment went through.
 // A free session (the professional's offer) is confirmed at once instead:

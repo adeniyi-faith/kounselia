@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useBrowser } from '@/browser/BrowserProvider';
 import { Button } from '@/components/Button';
 import { ProfessionalAvatar } from '@/components/dashboard/ProfessionalAvatar';
+import { RatingLine, ReviewsSection } from '@/components/dashboard/ProfessionalReviews';
 import { FormMessage } from '@/components/FormMessage';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
@@ -18,6 +19,15 @@ import { showBookedDialog } from '@/notifications';
 interface Slot {
   value: string; // site time, sent back to the server
   at: Date; // shown in the member's time zone
+}
+
+// "Dr" isn't worth repeating beside "Dr. Michele Blessing"; a title that
+// says more ("Clinical Psychologist") still shows.
+function titleBesideName(name: string, title: string) {
+  const words = (t: string) => t.toLowerCase().split(/\s+/).map((w) => w.replace(/[^a-z]/g, '')).filter(Boolean);
+  const t = words(title);
+  const start = words(name).slice(0, t.length);
+  return t.length && t.join(' ') === start.join(' ') ? '' : title;
 }
 
 function dayKey(d: Date) {
@@ -229,10 +239,11 @@ export default function BookProfessional() {
               <ProfessionalAvatar pro={pro} size={56} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.proName}>{pro.name}</Text>
+                {/* The title, unless the name already starts with it ("Dr" beside "Dr. Michele"). */}
                 <Text style={styles.proSpec}>
-                  {pro.title}
-                  {pro.specialty ? ` · ${pro.specialty}` : ''}
+                  {[titleBesideName(pro.name, pro.title), pro.specialty].filter(Boolean).join(' · ')}
                 </Text>
+                {!rescheduleId ? <RatingLine average={pro.rating} count={pro.review_count} /> : null}
                 {pro.video_provider && !rescheduleId ? (
                   <Text style={styles.proSpec}>Sessions are on {pro.video_provider}. You join from here when it&apos;s time.</Text>
                 ) : null}
@@ -250,6 +261,7 @@ export default function BookProfessional() {
               </View>
             ) : null}
             {pro.bio && !rescheduleId ? <Text style={styles.bio}>{pro.bio}</Text> : null}
+            {!rescheduleId && pro.review_count > 0 ? <ReviewsSection config={config} professionalId={professionalId} /> : null}
           </>
         )}
 
