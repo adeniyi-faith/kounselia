@@ -34,10 +34,13 @@ function kounselia_session_length_minutes() {
 
 /**
  * How far in advance a slot must start to be bookable at all — stops
- * someone booking a session for eleven minutes from now.
+ * someone booking a session for eleven minutes from now. Configurable
+ * from the admin Platform Configuration settings (in hours, fractions
+ * allowed — 0.5 for 30 minutes); defaults to 2 hours.
  */
 function kounselia_booking_lead_seconds() {
-    return 2 * HOUR_IN_SECONDS;
+    $hours = (float) get_option( 'kounselia_booking_lead_hours', 2 );
+    return max( 0, $hours ) * HOUR_IN_SECONDS;
 }
 
 /**
