@@ -177,6 +177,7 @@ function Chip({ label, active, onPress, icon }: { label: string; active: boolean
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ selected: active }}
       style={({ pressed }) => [styles.chip, active && styles.chipActive, pressed && { opacity: 0.85 }]}
     >
