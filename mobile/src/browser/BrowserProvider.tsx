@@ -7,6 +7,7 @@
 //
 // The one exception is a video session: its video room (Jitsi) only works
 // properly in the phone's own browser, so joinSession() keeps using that.
+import { fetchWebSsoCode, type KounseliaConfig } from '@kounselia/core';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -15,6 +16,8 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { TablerIcon } from '@/components/TablerIcon';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { PageSkeleton } from '@/components/Skeleton';
+import { SITE_URL } from '@/config';
+import { useSession } from '@/session';
 import { WebFrame, type NavState, type WebFrameHandle } from './WebFrame';
 
 interface OpenOptions {
@@ -49,7 +52,28 @@ export function hostOf(url: string) {
   return m ? m[1].replace(/^www\./, '') : '';
 }
 
+function pathOf(url: string): string {
+  const m = /^https?:\/\/[^/?#]+(.*)$/i.exec(url);
+  return m && m[1] ? m[1] : '/';
+}
+
+// The app is signed in with its own token (see appAuth.ts); the WebView
+// this opens has never signed in on the website itself and has no way to
+// carry that token, so a page that needs a member signed in would always
+// show the website's own sign-in screen. For a page on our own site,
+// while the member is signed in, this trades a one-time code for a link
+// that signs the browser in too before landing on the page — see
+// app-sso.php. Left unchanged for anything else (a payment page on
+// Paystack's own site, or when signed out — there's nothing to carry
+// over then).
+async function resolveUrl(config: KounseliaConfig, url: string): Promise<string> {
+  if (config.client !== 'app' || !config.loggedIn || hostOf(url) !== hostOf(SITE_URL)) return url;
+  const code = await fetchWebSsoCode(config);
+  return code ? `${SITE_URL}/app-sso.php?code=${encodeURIComponent(code)}&to=${encodeURIComponent(pathOf(url))}` : url;
+}
+
 export function BrowserProvider({ children }: { children: ReactNode }) {
+  const { config } = useSession();
   const [page, setPage] = useState<{ url: string; options: OpenOptions; key: number } | null>(null);
   const resolver = useRef<(() => void) | null>(null);
 
@@ -97,7 +121,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
       >
         {/* A Modal is its own window, so it needs its own safe-area measurements. */}
         <SafeAreaProvider>
-          {page && <InAppBrowser key={page.key} url={page.url} options={page.options} onClose={close} backRef={back} />}
+          {page && <InAppBrowser key={page.key} url={page.url} config={config} options={page.options} onClose={close} backRef={back} />}
         </SafeAreaProvider>
       </Modal>
     </BrowserContext.Provider>
@@ -112,11 +136,13 @@ export function useBrowser() {
 
 function InAppBrowser({
   url,
+  config,
   options,
   onClose,
   backRef,
 }: {
   url: string;
+  config: KounseliaConfig;
   options: OpenOptions;
   onClose: () => void;
   backRef: { current: () => boolean };
@@ -129,6 +155,18 @@ function InAppBrowser({
   const [failed, setFailed] = useState(false);
   const [copied, setCopied] = useState(false);
   const closing = useRef(false);
+  // Resolved before the page is actually requested, so a signed-in member
+  // never briefly sees the website's own sign-in page flash up first.
+  const [target, setTarget] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    resolveUrl(config, url).then((resolved) => {
+      if (!cancelled) setTarget(resolved);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [config, url]);
 
   useEffect(() => {
     backRef.current = () => {
@@ -199,26 +237,28 @@ function InAppBrowser({
       </SafeAreaView>
 
       <View style={styles.body}>
-        <WebFrame
-          ref={frame}
-          source={{ uri: url }}
-          style={styles.web}
-          shouldLoad={(next) => {
-            if (isExternal(next)) {
-              Linking.openURL(next).catch(() => undefined);
-              return false;
-            }
-            return true;
-          }}
-          onNav={(s) => {
-            setNav(s);
-            setFailed(false);
-          }}
-          onProgress={setProgress}
-          onLoaded={onLoaded}
-          onFail={() => setFailed(true)}
-        />
-        {progress === 0 && !failed && (
+        {target && (
+          <WebFrame
+            ref={frame}
+            source={{ uri: target }}
+            style={styles.web}
+            shouldLoad={(next) => {
+              if (isExternal(next)) {
+                Linking.openURL(next).catch(() => undefined);
+                return false;
+              }
+              return true;
+            }}
+            onNav={(s) => {
+              setNav(s);
+              setFailed(false);
+            }}
+            onProgress={setProgress}
+            onLoaded={onLoaded}
+            onFail={() => setFailed(true)}
+          />
+        )}
+        {(!target || progress === 0) && !failed && (
           <View style={styles.pageCover} pointerEvents="none">
             <PageSkeleton />
           </View>
