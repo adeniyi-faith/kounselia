@@ -336,6 +336,8 @@ function kounselia_ajax_app_upload_avatar() {
         wp_send_json_error( array( 'message' => 'Could not save that photo, please try again.' ), 500 );
     }
 
+    kounselia_compress_attachment( $attachment_id, 1024, 82 );
+
     $old = (int) get_user_meta( $user_id, 'kounselia_avatar_id', true );
     if ( $old && $old !== (int) $attachment_id ) {
         wp_delete_attachment( $old, true );

@@ -1036,17 +1036,8 @@ function kounselia_content_store_image( $file, $max_mb = 8 ) {
         return new WP_Error( 'upload_failed', $upload['error'] );
     }
 
-    if ( 'image/gif' !== $upload['type'] ) {
-        $editor = wp_get_image_editor( $upload['file'] );
-        if ( ! is_wp_error( $editor ) ) {
-            $size = $editor->get_size();
-            if ( $size['width'] > 2000 ) {
-                $editor->resize( 2000, null, false );
-                $editor->set_quality( 84 );
-                $editor->save( $upload['file'] );
-            }
-        }
-    }
+    kounselia_compress_image_file( $upload['file'], 2000, 84 );
+
     return $upload['url'];
 }
 
