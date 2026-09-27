@@ -195,15 +195,14 @@ export default function Settings() {
 
         {plan && (
           <Group title="Your plan">
-            <View style={styles.planRow}>
-              <View style={[styles.tile, { backgroundColor: plan.is_pro ? colors.goldLight : colors.sageLight }]}>
-                <TablerIcon name={plan.is_pro ? 'sparkles' : 'leaf'} size={18} color={plan.is_pro ? colors.gold : colors.sage} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.rowLabel}>{plan.title}</Text>
-                <Text style={styles.rowSub}>{plan.detail}</Text>
-              </View>
-            </View>
+            <Row
+              icon={plan.is_pro ? 'sparkles' : 'leaf'}
+              tint={plan.is_pro ? 'gold' : 'sage'}
+              label={plan.title}
+              sub={plan.detail}
+              onPress={() => router.push('/plan')}
+              last
+            />
           </Group>
         )}
 
@@ -584,7 +583,6 @@ const useStyles = makeStyles((colors) => ({
   segmentOn: { backgroundColor: colors.accentLight, borderWidth: 1, borderColor: colors.accentBorder },
   segmentText: { fontFamily: fonts.medium, fontSize: 13, color: colors.text2 },
   segmentTextOn: { color: colors.accentText, fontFamily: fonts.semibold },
-  planRow: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 },
   signOut: { marginTop: 32 },
   footer: { fontFamily: fonts.regular, fontSize: 12, color: colors.text3, textAlign: 'center', marginTop: 18 },
   sheetText: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.text2, marginBottom: 16 },
