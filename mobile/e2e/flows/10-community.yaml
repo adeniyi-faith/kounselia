@@ -12,10 +12,12 @@ appId: com.kounselia.app
     direction: DOWN
 - tapOn: "See all"
 - extendedWaitUntil:
-    visible: "Grief comes in waves"
+    visible: "How to sleep when your mind races"
     timeout: 15000
 - tapOn: "From our professionals"
-- waitForAnimationToEnd
+- extendedWaitUntil:
+    visible: "Grief comes in waves"
+    timeout: 15000
 - takeScreenshot: ${P}22-articles-professionals
 - tapOn: "Grief comes in waves"
 - waitForAnimationToEnd
@@ -29,13 +31,17 @@ appId: com.kounselia.app
 - takeScreenshot: ${P}23-article-actions
 - tapOn:
     text: "Conversation.*"
-- extendedWaitUntil:
-    visible: "Join the conversation"
-    timeout: 15000
-- tapOn: "Join the conversation"
 - waitForAnimationToEnd
-- takeScreenshot: ${P}24-choose-name
-- tapOn: "Save"
+# The first run (light mode) chooses how the name is shown; the second run
+# (dark mode) talks to the same stand-in server, so it's already chosen.
+- runFlow:
+    when:
+      visible: "Join the conversation"
+    commands:
+      - tapOn: "Join the conversation"
+      - waitForAnimationToEnd
+      - takeScreenshot: ${P}24-choose-name
+      - tapOn: "Save"
 - extendedWaitUntil:
     visible: "Posting as Samson.*"
     timeout: 10000
