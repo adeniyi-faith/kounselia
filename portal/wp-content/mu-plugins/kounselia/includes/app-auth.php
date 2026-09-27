@@ -301,6 +301,41 @@ function kounselia_ajax_app_me() {
 add_action( 'wp_ajax_kounselia_app_me', 'kounselia_ajax_app_me' );
 add_action( 'wp_ajax_nopriv_kounselia_app_me', 'kounselia_ajax_app_me' );
 
+/* -------------------------------------------------------------------------
+ * APP: SIGN IN TO THE WEBSITE (for the in-app browser)
+ * ---------------------------------------------------------------------- */
+
+// How long a code is good for. It's handed straight to the in-app browser
+// and used within moments, so this only needs to survive that trip — kept
+// short because, unlike the app token, it needs no password to redeem.
+define( 'KOUNSELIA_APP_SSO_CODE_TTL', 60 );
+
+function kounselia_app_sso_transient_key( $code ) {
+    return 'kounselia_sso_' . hash( 'sha256', (string) $code );
+}
+
+// Called by the app right before it opens one of our own pages in its
+// in-app browser, so that browser (which has never signed in on the
+// website — it only ever sees this token, never a login cookie) can be
+// signed in too. See app-sso.php, which redeems this.
+function kounselia_ajax_app_web_sso() {
+    kounselia_verify_nonce();
+
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( array( 'message' => 'Please sign in again.', 'signed_out' => true ), 401 );
+    }
+    if ( kounselia_rate_limited( 'app_web_sso', 30, 600 ) ) {
+        wp_send_json_error( array( 'message' => 'Too many attempts. Please try again later.' ), 429 );
+    }
+
+    $code = bin2hex( random_bytes( 32 ) );
+    set_transient( kounselia_app_sso_transient_key( $code ), get_current_user_id(), KOUNSELIA_APP_SSO_CODE_TTL );
+
+    wp_send_json_success( array( 'code' => $code ) );
+}
+add_action( 'wp_ajax_kounselia_app_web_sso', 'kounselia_ajax_app_web_sso' );
+add_action( 'wp_ajax_nopriv_kounselia_app_web_sso', 'kounselia_ajax_app_web_sso' );
+
 // Signs out this phone only.
 function kounselia_ajax_app_logout() {
     global $wpdb;
