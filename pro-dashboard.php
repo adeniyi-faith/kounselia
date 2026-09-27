@@ -63,6 +63,19 @@ $payout_history  = function_exists( 'kounselia_get_payout_history' ) ? kounselia
 $payout_banks    = function_exists( 'kounselia_paystack_list_banks' ) ? kounselia_paystack_list_banks() : array();
 $payout_status_labels = array( 'pending' => 'Processing', 'success' => 'Paid', 'failed' => 'Failed' );
 
+// Articles for the Journal (includes/articles.php + community.php).
+$article_access   = function_exists( 'kounselia_article_access' ) ? kounselia_article_access( $application ) : array( 'allowed' => false, 'mode' => '', 'message' => '' );
+$article_settings = function_exists( 'kounselia_article_settings' ) ? kounselia_article_settings() : array();
+$articles         = function_exists( 'kounselia_pro_articles' ) ? kounselia_pro_articles( $application->id ) : array();
+$article_followers = function_exists( 'kounselia_follower_count' ) ? kounselia_follower_count( $application->id ) : 0;
+$article_totals   = array( 'views' => 0, 'loves' => 0, 'comments' => 0 );
+foreach ( $articles as $a ) {
+    $article_totals['views']    += (int) $a->views;
+    $article_totals['loves']    += (int) $a->love_count;
+    $article_totals['comments'] += (int) $a->comment_count;
+}
+$show_articles_tab = ! empty( $article_settings['enabled'] ) || $articles;
+
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_auth' );
 ?>
@@ -241,6 +254,35 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .chat-input-row input:focus{border-color:var(--accent)}
 .chat-input-row button{width:40px;height:40px;border-radius:50%;border:none;background:var(--accent);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
+.art-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.art-head h2{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:23px}
+.art-new{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border-radius:50px;background:var(--accent);color:#fff;text-decoration:none;font-size:14px;font-weight:500}
+.art-new:hover{background:var(--accent2)}
+.art-mode{font-size:13.5px;line-height:1.55;border-radius:14px;padding:12px 16px;margin-bottom:18px;background:var(--surface);border:1px solid var(--border);color:var(--text2);display:flex;gap:10px;align-items:flex-start}
+.art-mode i{font-size:18px;color:var(--accent);flex-shrink:0;margin-top:1px}
+.art-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:22px}
+@media (max-width:720px){.art-stats{grid-template-columns:1fr 1fr}}
+.art-stats .stat-card{padding:16px}
+.art-stats .stat-num{font-size:24px}
+.art-list{display:grid;gap:12px}
+.art-card{display:flex;gap:14px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow-sm)}
+.art-thumb{width:84px;height:84px;border-radius:12px;object-fit:cover;flex-shrink:0;background:linear-gradient(135deg,var(--accent-light),var(--gold-light));display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:22px}
+.art-body{flex:1;min-width:0}
+.art-title{font-weight:600;font-size:15px;color:var(--text);line-height:1.35;word-break:break-word}
+.art-meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12.5px;color:var(--text3);margin-top:6px}
+.art-meta i{font-size:14px;vertical-align:-2px}
+.art-pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:999px;background:var(--surface2);color:var(--text2)}
+.art-pill.live{background:var(--sage-light);color:var(--sage)}
+.art-pill.pending,.art-pill.live_pending{background:var(--gold-light);color:#8a5a12}
+.art-pill.changes,.art-pill.rejected,.art-pill.removed{background:var(--rose-light);color:var(--rose)}
+.art-note{margin-top:10px;font-size:13px;line-height:1.5;background:var(--bg);border-radius:10px;padding:10px 12px;color:var(--text2)}
+.art-note b{color:var(--text)}
+.art-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.art-actions a,.art-actions button{border:1px solid var(--border);background:none;color:var(--text2);font-size:12.5px;font-weight:600;padding:8px 12px;border-radius:10px;cursor:pointer;font-family:inherit;text-decoration:none;display:inline-flex;align-items:center;gap:6px;min-height:36px}
+.art-actions a:hover,.art-actions button:hover{border-color:var(--accent);color:var(--accent)}
+.art-actions .danger:hover{border-color:var(--rose);color:var(--rose)}
+@media (max-width:480px){.art-card{flex-direction:column}img.art-thumb{width:100%;height:140px}div.art-thumb{display:none}.art-stats .stat-icon{display:none}.art-stats .stat-card{padding:14px}}
+
 .coming-soon{background:var(--surface);border:1px dashed var(--border);border-radius:20px;padding:56px 32px;text-align:center}
 .coming-soon-icon{width:56px;height:56px;border-radius:16px;background:var(--accent-light);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 18px}
 .coming-soon h3{font-family:'Cormorant Garamond',serif;font-weight:500;font-size:22px;margin-bottom:8px}
@@ -282,6 +324,9 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <button class="nav-link js-nav active" id="desk-tab-overview" onclick="switchTab('overview')"><i class="ti ti-layout-dashboard"></i><span>Overview</span></button>
         <button class="nav-link js-nav" id="desk-tab-profile" onclick="switchTab('profile')"><i class="ti ti-user-edit"></i><span>Profile &amp; Rate</span></button>
         <button class="nav-link js-nav" id="desk-tab-bookings" onclick="switchTab('bookings')"><i class="ti ti-calendar-event"></i><span>Bookings</span></button>
+<?php if ( $show_articles_tab ) : ?>
+        <button class="nav-link js-nav" id="desk-tab-articles" onclick="switchTab('articles')"><i class="ti ti-feather"></i><span>Articles</span></button>
+<?php endif; ?>
         <button class="nav-link js-nav" id="desk-tab-earnings" onclick="switchTab('earnings')"><i class="ti ti-cash"></i><span>Earnings</span></button>
       </nav>
       <div class="nav-divider"></div>
@@ -367,6 +412,9 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="capability-row unlocked"><i class="ti ti-heart-handshake"></i> Use Kounselia as a client too<span class="tag">Available</span></div>
         <div class="capability-row <?php echo $is_verified ? 'unlocked' : 'locked'; ?>"><i class="ti ti-calendar-event"></i> Receive client bookings<span class="tag"><?php echo $is_verified ? 'Available' : 'Locked until verified'; ?></span></div>
         <div class="capability-row <?php echo $is_verified ? 'unlocked' : 'locked'; ?>"><i class="ti ti-cash"></i> Earnings &amp; payouts<span class="tag"><?php echo $is_verified ? 'Available' : 'Locked until verified'; ?></span></div>
+        <?php if ( ! empty( $article_settings['enabled'] ) ) : ?>
+          <div class="capability-row <?php echo $article_access['allowed'] ? 'unlocked' : 'locked'; ?>"><i class="ti ti-feather"></i> Write articles for the Journal<span class="tag"><?php echo $article_access['allowed'] ? 'Available' : ( $is_verified ? 'Not available' : 'Locked until verified' ); ?></span></div>
+        <?php endif; ?>
       </div>
     </div>
   </div>
@@ -583,6 +631,82 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     </div>
   </div>
 
+  <!-- ARTICLES -->
+<?php if ( $show_articles_tab ) :
+    $state_icons = array( 'live' => 'circle-check', 'pending' => 'clock', 'live_pending' => 'clock', 'changes' => 'message-dots', 'rejected' => 'circle-x', 'removed' => 'eye-off', 'draft' => 'pencil', 'live_draft' => 'pencil', 'scheduled' => 'calendar' );
+?>
+  <div class="view-panel" id="view-articles">
+    <div class="art-head">
+      <h2>Your articles</h2>
+      <?php if ( $article_access['allowed'] ) : ?>
+        <a class="art-new" href="/pro-write.php"><i class="ti ti-pencil-plus"></i> Write an article</a>
+      <?php endif; ?>
+    </div>
+
+    <?php if ( ! $article_access['allowed'] ) : ?>
+      <div class="art-mode"><i class="ti ti-info-circle"></i><div><?php echo esc_html( $article_access['message'] ); ?></div></div>
+    <?php elseif ( 'trusted' === $article_access['mode'] ) : ?>
+      <div class="art-mode"><i class="ti ti-rosette-discount-check"></i><div><b>You're a trusted writer.</b> Your articles go live on the Journal as soon as you publish them.</div></div>
+    <?php else : ?>
+      <div class="art-mode"><i class="ti ti-eye-check"></i><div>An editor reads every article before it goes live, usually within two working days. You'll get a notification and an email either way.</div></div>
+    <?php endif; ?>
+
+    <div class="art-stats">
+      <div class="stat-card"><div class="stat-icon" style="background:var(--accent-light);color:var(--accent);"><i class="ti ti-users"></i></div><div class="stat-num"><?php echo esc_html( number_format_i18n( $article_followers ) ); ?></div><div class="stat-label"><?php echo 1 === $article_followers ? 'Follower' : 'Followers'; ?></div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--sage-light);color:var(--sage);"><i class="ti ti-eye"></i></div><div class="stat-num"><?php echo esc_html( number_format_i18n( $article_totals['views'] ) ); ?></div><div class="stat-label">Reads</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--rose-light);color:var(--rose);"><i class="ti ti-heart"></i></div><div class="stat-num"><?php echo esc_html( number_format_i18n( $article_totals['loves'] ) ); ?></div><div class="stat-label">Loves</div></div>
+      <div class="stat-card"><div class="stat-icon" style="background:var(--gold-light);color:var(--gold);"><i class="ti ti-message-circle"></i></div><div class="stat-num"><?php echo esc_html( number_format_i18n( $article_totals['comments'] ) ); ?></div><div class="stat-label">Comments</div></div>
+    </div>
+
+    <?php if ( ! $articles ) : ?>
+      <div class="coming-soon">
+        <div class="coming-soon-icon"><i class="ti ti-feather"></i></div>
+        <h3>Share what you know</h3>
+        <p>Articles help people understand what they're going through, and help them find you. Readers can follow you and hear whenever you publish.</p>
+      </div>
+    <?php else : ?>
+      <div class="art-list">
+        <?php foreach ( $articles as $a ) :
+            $state = kounselia_article_state( $a );
+            $live  = in_array( $state, array( 'live', 'live_pending', 'live_draft' ), true );
+            $date  = $a->published_at ? $a->published_at : $a->updated_at;
+            ?>
+          <div class="art-card" data-article="<?php echo (int) $a->id; ?>">
+            <?php if ( $a->cover_image ) : ?><img class="art-thumb" src="<?php echo esc_url( $a->cover_image ); ?>" alt="" loading="lazy"><?php else : ?><div class="art-thumb"><i class="ti ti-feather"></i></div><?php endif; ?>
+            <div class="art-body">
+              <div class="art-title"><?php echo esc_html( $a->title ); ?></div>
+              <div class="art-meta">
+                <span class="art-pill <?php echo esc_attr( $state ); ?>"><i class="ti ti-<?php echo esc_attr( $state_icons[ $state ] ?? 'point' ); ?>"></i> <?php echo esc_html( kounselia_article_state_label( $state ) ); ?></span>
+                <span><?php echo esc_html( date_i18n( 'M j, Y', strtotime( $date ) ) ); ?></span>
+                <?php if ( $live ) : ?>
+                  <span title="Reads"><i class="ti ti-eye"></i> <?php echo esc_html( number_format_i18n( $a->views ) ); ?></span>
+                  <span title="Loves"><i class="ti ti-heart"></i> <?php echo esc_html( number_format_i18n( $a->love_count ) ); ?></span>
+                  <span title="Comments"><i class="ti ti-message-circle"></i> <?php echo esc_html( number_format_i18n( $a->comment_count ) ); ?></span>
+                <?php endif; ?>
+              </div>
+              <?php if ( $a->review_note && in_array( $state, array( 'changes', 'rejected', 'removed', 'live_draft' ), true ) && in_array( $a->review_status, array( 'changes_requested', 'rejected', 'removed' ), true ) ) : ?>
+                <div class="art-note"><b>Note from the editor:</b> <?php echo nl2br( esc_html( $a->review_note ) ); ?></div>
+              <?php endif; ?>
+              <div class="art-actions">
+                <?php if ( $article_access['allowed'] ) : ?>
+                  <a href="/pro-write.php?id=<?php echo (int) $a->id; ?>"><i class="ti ti-pencil"></i> Edit</a>
+                <?php endif; ?>
+                <a href="<?php echo esc_url( kounselia_blog_url( $a->slug ) ); ?>" target="_blank" rel="noopener"><i class="ti ti-eye"></i> <?php echo $live ? 'View' : 'Preview'; ?></a>
+                <?php if ( in_array( $state, array( 'pending', 'live_pending' ), true ) ) : ?>
+                  <button type="button" onclick="articleAction('withdraw', <?php echo (int) $a->id; ?>, 'Take this back from the review queue? You can send it again any time.')"><i class="ti ti-arrow-back-up"></i> Withdraw</button>
+                <?php elseif ( $live ) : ?>
+                  <button type="button" onclick="articleAction('withdraw', <?php echo (int) $a->id; ?>, 'Unpublish this article? It will leave the Journal and go back to your drafts. Loves and comments are kept.')"><i class="ti ti-eye-off"></i> Unpublish</button>
+                <?php endif; ?>
+                <button type="button" class="danger" onclick="articleAction('delete', <?php echo (int) $a->id; ?>, 'Delete this article for good? Its comments and loves are deleted too. This cannot be undone.')"><i class="ti ti-trash"></i> Delete</button>
+              </div>
+            </div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    <?php endif; ?>
+  </div>
+<?php endif; ?>
+
   <!-- EARNINGS -->
   <div class="view-panel" id="view-earnings">
     <div class="section-head">
@@ -696,6 +820,9 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     <button class="mob-tab active" id="mob-tab-overview" onclick="switchTab('overview')"><i class="ti ti-layout-dashboard"></i>Overview</button>
     <button class="mob-tab" id="mob-tab-profile" onclick="switchTab('profile')"><i class="ti ti-user-edit"></i>Profile</button>
     <button class="mob-tab" id="mob-tab-bookings" onclick="switchTab('bookings')"><i class="ti ti-calendar-event"></i>Bookings</button>
+<?php if ( $show_articles_tab ) : ?>
+    <button class="mob-tab" id="mob-tab-articles" onclick="switchTab('articles')"><i class="ti ti-feather"></i>Articles</button>
+<?php endif; ?>
     <button class="mob-tab" id="mob-tab-earnings" onclick="switchTab('earnings')"><i class="ti ti-cash"></i>Earnings</button>
   </nav>
 
@@ -1386,6 +1513,26 @@ function openNotifications(){
 function closeNotifications(){
   document.getElementById('notif-overlay').classList.remove('active');
 }
+
+/* ---------------- ARTICLES ---------------- */
+
+function articleAction(kind, id, question){
+  if (!confirm(question)) return;
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: kind === 'delete' ? 'kounselia_pro_article_delete' : 'kounselia_pro_article_withdraw', nonce: KOUNSELIA.nonce, id: id })
+  }).then(r => r.json()).then(res => {
+    if (!res.success) { alert((res.data && res.data.message) || 'Something went wrong, please try again.'); return; }
+    location.href = '/pro-dashboard.php?tab=articles';
+  }).catch(() => alert('Something went wrong, please check your connection and try again.'));
+}
+
+// Open a tab straight from a link or notification (?tab=articles).
+(function(){
+  const tab = new URLSearchParams(location.search).get('tab');
+  if (tab && document.getElementById('view-' + tab)) switchTab(tab);
+})();
 </script>
 
 </body>
