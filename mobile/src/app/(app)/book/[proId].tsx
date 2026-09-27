@@ -13,6 +13,7 @@ import { useSession } from '@/session';
 import { fonts, makeStyles, radius, useColors } from '@/theme';
 import { showDialog } from '@/components/Dialog';
 import { DetailSkeleton } from '@/components/Skeleton';
+import { showBookedDialog } from '@/notifications';
 
 interface Slot {
   value: string; // site time, sent back to the server
@@ -124,12 +125,11 @@ export default function BookProfessional() {
     if (res.data.free) {
       // The professional's free-session offer: no payment, booked at once.
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-      showDialog({
-        title: "You're booked in",
-        message: `Your free session is on ${picked.at.toLocaleString([], { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })}.`,
-        icon: 'calendar-check',
-        tone: 'success',
-      });
+      showBookedDialog(
+        config,
+        "You're booked in",
+        `Your free session is on ${picked.at.toLocaleString([], { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })}.`,
+      );
       router.back();
       return;
     }
@@ -156,12 +156,11 @@ export default function BookProfessional() {
       if (res.ok && res.data.status === 'confirmed') {
         done.current = true;
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-        showDialog({
-          title: "You're booked",
-          message: `Your session with ${pro?.name ?? 'your professional'} is confirmed. You'll find it under Book, with a Join button 10 minutes before it starts.`,
-          icon: 'circle-check',
-          tone: 'success',
-        });
+        showBookedDialog(
+          config,
+          "You're booked",
+          `Your session with ${pro?.name ?? 'your professional'} is confirmed. You'll find it under Book, with a Join button 10 minutes before it starts.`,
+        );
         router.back();
       } else if (!res.ok && !res.offline) {
         // The hold ran out before payment arrived; the time was released.

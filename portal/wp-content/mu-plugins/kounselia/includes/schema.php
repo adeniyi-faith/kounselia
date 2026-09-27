@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.25.0'; // Bumped version: professionals' own video links
+    $current_version   = '1.26.0'; // Bumped version: push tokens tied to the app sign-in that registered them
 
     if ( $installed_version === $current_version ) {
         return;
@@ -569,7 +569,7 @@ function kounselia_install_tables() {
     // new bookings, all of it. Email is sent from the same call site
     // that inserts this row (see kounselia_notify_user() in
     // notifications.php); this row is what a bell icon reads today and
-    // what a future mobile app's push notification is built from too,
+    // what the mobile app's push notification is built from too,
     // so "notification history" isn't email-only trivia.
     $sql_notifications = "CREATE TABLE {$prefix}kounselia_notifications (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -585,21 +585,23 @@ function kounselia_install_tables() {
         KEY read_at (read_at)
     ) {$charset_collate};";
 
-    // A device's push-notification token, registered by a mobile app.
-    // Nothing in this codebase sends a real push yet (there is no app to
-    // register a device) — kounselia_send_push_to_user() reads this
-    // table and no-ops if it's empty or no push provider key is
-    // configured, so this exists now purely so the day the app ships,
-    // wiring it up is "add a provider key," not "add a device registry."
+    // A phone's push-notification token (an Expo push token), registered
+    // by the mobile app once the member allows notifications. One row per
+    // phone per member; kounselia_send_push_to_user() sends to each.
+    // app_token_id is the phone's sign-in (kounselia_app_tokens): when that
+    // sign-in ends for any reason (signed out, password changed, expired),
+    // the phone stops getting that member's notifications too.
     $sql_push_tokens = "CREATE TABLE {$prefix}kounselia_push_tokens (
         id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
         user_id BIGINT UNSIGNED NOT NULL,
+        app_token_id BIGINT UNSIGNED NULL,
         platform VARCHAR(16) NOT NULL,
         token VARCHAR(255) NOT NULL,
         created_at DATETIME NOT NULL,
         PRIMARY KEY  (id),
         UNIQUE KEY user_token (user_id, token(191)),
-        KEY user_id (user_id)
+        KEY user_id (user_id),
+        KEY app_token_id (app_token_id)
     ) {$charset_collate};";
 
     // A mobile app sign-in. The app can't use browser cookies, so signing
@@ -1049,4 +1051,4 @@ function kounselia_cleanup_message_slashes() {
             $wpdb->update( $table, array( 'content' => $clean ), array( 'id' => $row->id ) );
         }
     }
-}
+}

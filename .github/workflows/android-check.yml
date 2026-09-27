@@ -38,6 +38,8 @@ jobs:
       # The emulator reaches the computer it runs on at 10.0.2.2.
       EXPO_PUBLIC_KOUNSELIA_AJAX_URL: http://10.0.2.2:8787/portal/wp-admin/admin-ajax.php
       NODE_ENV: production
+      # This test build isn't released, so it sends Sentry (crash reports) nothing.
+      SENTRY_DISABLE_AUTO_UPLOAD: 'true'
 
     steps:
       - name: Checkout
