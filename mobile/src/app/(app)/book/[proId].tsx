@@ -234,6 +234,9 @@ export default function BookProfessional() {
                 {pro.specialty ? ` · ${pro.specialty}` : ''}
               </Text>
               {isFree ? <Text style={styles.free}>{pro.free_label}</Text> : null}
+              {pro.video_provider && !rescheduleId ? (
+                <Text style={styles.proSpec}>Sessions are on {pro.video_provider}. You join from here when it&apos;s time.</Text>
+              ) : null}
               {pro.price && !rescheduleId ? (
                 <Text style={styles.price}>
                   {pro.price} / {slots.session_minutes}-minute session

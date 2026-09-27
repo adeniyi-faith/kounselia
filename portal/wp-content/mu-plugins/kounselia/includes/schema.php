@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.24.0'; // Bumped version: admin controls for professionals, free consultations
+    $current_version   = '1.25.0'; // Bumped version: professionals' own video links
 
     if ( $installed_version === $current_version ) {
         return;
@@ -298,6 +298,9 @@ function kounselia_install_tables() {
         suspended_reason VARCHAR(500) NULL,
         suspended_at DATETIME NULL,
         free_sessions_per_client SMALLINT UNSIGNED NOT NULL DEFAULT 0,
+        video_link_allowed TINYINT(1) NOT NULL DEFAULT 0,
+        video_mode VARCHAR(16) NOT NULL DEFAULT 'kounselia',
+        video_link VARCHAR(500) NULL,
         submitted_at DATETIME NOT NULL,
         reviewed_at DATETIME NULL,
         reviewed_by BIGINT UNSIGNED NULL,
@@ -408,6 +411,7 @@ function kounselia_install_tables() {
         room_token VARCHAR(64) NULL,
         series_id BIGINT UNSIGNED NULL,
         is_free TINYINT(1) NOT NULL DEFAULT 0,
+        video_link VARCHAR(500) NULL,
         reminder_sent_at DATETIME NULL,
         created_at DATETIME NOT NULL,
         updated_at DATETIME NOT NULL,

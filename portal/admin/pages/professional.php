@@ -44,7 +44,7 @@ $free_opts   = kounselia_free_session_options();
 $history_labels = array(
     'approve_professional' => 'Approved', 'reject_professional' => 'Rejected', 'edited_professional' => 'Profile edited',
     'hid_professional' => 'Hidden from members', 'unhid_professional' => 'Made visible', 'suspended_professional' => 'Suspended',
-    'reinstated_professional' => 'Reinstated',
+    'reinstated_professional' => 'Reinstated', 'allowed_own_video' => 'Allowed own video link', 'stopped_own_video' => 'Stopped own video link',
 );
 ?>
 <!DOCTYPE html>
@@ -192,6 +192,23 @@ $history_labels = array(
         <?php endif; ?>
       </div>
 
+      <?php if ( function_exists( 'kounselia_professional_video_provider' ) ) :
+          $kounselia_vprov = kounselia_professional_video_provider( $pro ); ?>
+      <div class="panel">
+        <h2>Video calls</h2>
+        <p style="font-size:13.5px;color:var(--text2);margin-bottom:10px;line-height:1.55">
+          <?php if ( ! $pro->video_link_allowed ) : ?>
+            Sessions use Kounselia's private video room.
+          <?php elseif ( $kounselia_vprov ) : ?>
+            Allowed. Their sessions are on <b><?php echo esc_html( $kounselia_vprov ); ?></b>: <span class="muted" style="word-break:break-all"><?php echo esc_html( $pro->video_link ); ?></span>
+          <?php else : ?>
+            Allowed, but they still use Kounselia's video room.
+          <?php endif; ?>
+        </p>
+        <label class="check"><input type="checkbox" id="v-allow" <?php checked( ! empty( $pro->video_link_allowed ) ); ?>> <span><b>Allow their own video link</b><small>Zoom, Google Meet, Microsoft Teams or Whereby. Booking, payment and messages stay on Kounselia, and clients still join through Kounselia. Turning this off moves every session back to Kounselia's room at once.</small></span></label>
+      </div>
+      <?php endif; ?>
+
       <div class="panel">
         <h2>Articles</h2>
         <p style="font-size:13.5px;color:var(--text2);margin-bottom:10px">Publishing: <b><?php echo esc_html( kounselia_article_publishing_options()[ $pro->publishing ? $pro->publishing : 'default' ] ?? 'Follow the site setting' ); ?></b></p>
@@ -231,6 +248,11 @@ $history_labels = array(
       professional_id: id, name: $('p-name').value, title: $('p-title').value, specialty: $('p-spec').value,
       years_experience: $('p-years').value, bio: $('p-bio').value, rate_amount: $('p-rate').value, free_sessions_per_client: $('p-free').value
     }).then(function(d){ KAdmin.toast(d.message); }).catch(fail);
+  });
+  if ($('v-allow')) $('v-allow').addEventListener('change', function(){
+    var box = this;
+    if (!box.checked && !confirm('Stop their own video link? All their sessions will use Kounselia\'s video room again, and they will be told.')) { box.checked = true; return; }
+    KAdmin.post('kounselia_admin_professional_video', { professional_id: id, allow: box.checked ? 1 : 0 }).then(done).catch(function(e){ box.checked = !box.checked; fail(e); });
   });
   if ($('a-hide')) $('a-hide').addEventListener('click', function(){
     var hide = this.dataset.hidden === '1';

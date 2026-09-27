@@ -242,6 +242,7 @@ function ProfessionalTile({ pro }: { pro: Professional }) {
         {pro.review_count ? `★ ${pro.rating.toFixed(1)} (${pro.review_count})` : 'No reviews yet'}
       </Text>
       {pro.free_label ? <Text style={styles.free}>{pro.free_label}</Text> : null}
+      {pro.video_provider ? <Text style={styles.video}>Sessions on {pro.video_provider}</Text> : null}
       {pro.price ? <Text style={styles.price}>{pro.price} / session</Text> : null}
       {pro.full_price ? (
         // Pro members pay less; show what it would have been, as the website does.
@@ -309,6 +310,7 @@ const useStyles = makeStyles((colors) => ({
   tileSpec: { fontFamily: fonts.regular, fontSize: 12, lineHeight: 16, color: colors.text3, textAlign: 'center', marginTop: 2 },
   price: { fontFamily: fonts.semibold, fontSize: 13, color: colors.accentText, marginTop: 6, textAlign: 'center' },
   free: { fontFamily: fonts.semibold, fontSize: 12.5, color: colors.sage, marginTop: 4 },
+  video: { fontFamily: fonts.regular, fontSize: 12.5, color: colors.text3, marginTop: 2 },
   proPrice: { fontFamily: fonts.medium, fontSize: 12, color: colors.gold, marginTop: 2, textAlign: 'center' },
   fullPrice: { fontFamily: fonts.regular, color: colors.text3, textDecorationLine: 'line-through' },
 }));

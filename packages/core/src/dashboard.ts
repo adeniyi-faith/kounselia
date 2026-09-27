@@ -127,6 +127,9 @@ export interface Professional {
   // The professional's free-session offer for this member, e.g. "Your next
   // session is free". null when they have nothing free left.
   free_label: string | null;
+  // "Zoom", "Google Meet", "Microsoft Teams" or "Whereby" when their sessions
+  // happen there instead of Kounselia's own video room (joined from Kounselia).
+  video_provider: string | null;
 }
 
 export interface BookingsData {
@@ -180,8 +183,11 @@ export const cancelBooking = (config: KounseliaConfig, bookingId: number, reason
 export const cancelSeries = (config: KounseliaConfig, seriesId: number, reason = '') =>
   call<{ message: string }>(config, 'kounselia_cancel_series', { series_id: seriesId, reason });
 
+// The way into a booked session, only for the two people on it and only
+// at session time. `external` is true when the professional holds their
+// sessions on their own Zoom / Meet / Teams / Whereby link.
 export const fetchBookingRoom = (config: KounseliaConfig, bookingId: number) =>
-  call<{ url: string }>(config, 'kounselia_get_booking_room', { booking_id: bookingId });
+  call<{ url: string; external: boolean; provider: string }>(config, 'kounselia_get_booking_room', { booking_id: bookingId });
 
 export const submitReview = (config: KounseliaConfig, bookingId: number, rating: number, comment: string) =>
   call<{ message: string }>(config, 'kounselia_submit_review', { booking_id: bookingId, rating, comment });
