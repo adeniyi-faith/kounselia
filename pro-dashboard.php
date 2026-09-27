@@ -464,6 +464,34 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       </form>
     </div>
 
+    <?php if ( $is_verified && function_exists( 'kounselia_video_own_allowed' ) ) :
+        $kounselia_video_ok = kounselia_video_own_allowed( $application ); ?>
+    <div class="section" style="margin-top:32px">
+      <div class="section-head">
+        <h2>Video calls</h2>
+        <span class="section-sub">Where your sessions happen</span>
+      </div>
+      <div class="pro-card">
+        <?php if ( ! $kounselia_video_ok ) : ?>
+          <p style="font-size:14px;color:var(--text2);line-height:1.6">Your sessions use Kounselia's private video room: nothing to install, and it opens right from your dashboard. Prefer to use your own Zoom, Google Meet, Teams or Whereby link? Email <a href="mailto:hello@kounselia.com">hello@kounselia.com</a> and we'll switch it on for you.</p>
+        <?php else : ?>
+          <div class="form-field">
+            <label class="avail-toggle" style="margin-bottom:10px"><input type="radio" name="video-mode" value="kounselia" <?php checked( 'own' !== $application->video_mode ); ?>> Kounselia's private video room (recommended)</label>
+            <label class="avail-toggle"><input type="radio" name="video-mode" value="own" <?php checked( 'own', $application->video_mode ); ?>> My own meeting link</label>
+          </div>
+          <div class="form-field" id="video-link-field" style="<?php echo 'own' === $application->video_mode ? '' : 'display:none'; ?>">
+            <label>Meeting link</label>
+            <input type="url" id="video-link" value="<?php echo esc_attr( (string) $application->video_link ); ?>" placeholder="https://zoom.us/j/… or https://meet.google.com/…" inputmode="url" autocomplete="off" style="width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:12px;font-family:inherit;font-size:15px;background:var(--bg)">
+            <div class="section-sub" style="margin-top:6px;line-height:1.5">Zoom, Google Meet, Microsoft Teams or Whereby. Clients only get it by pressing Join on Kounselia at session time; it's never emailed. Please turn on a waiting room or passcode, or set a separate link for each session (from Bookings).</div>
+          </div>
+          <p class="section-sub" style="line-height:1.55;margin-bottom:6px">Bookings, payments and messages always stay on Kounselia. Kounselia's safety checks only cover what's said on Kounselia.</p>
+          <button type="button" class="pro-submit" id="video-save-btn">Save video setting</button>
+          <div class="pro-msg" id="video-msg"></div>
+        <?php endif; ?>
+      </div>
+    </div>
+    <?php endif; ?>
+
     <div class="section" style="margin-top:32px">
       <div class="section-head">
         <h2>Documents</h2>
@@ -625,10 +653,15 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
             <div class="booking-when"><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?><?php if ( $booking->series_id ) : ?><span class="weekly-tag">Weekly</span><?php endif; ?><?php if ( ! empty( $booking->is_free ) ) : ?><span class="weekly-tag" style="color:var(--sage);background:var(--sage-light)">Free</span><?php endif; ?></div>
             <div class="booking-with"><?php echo esc_html( $booking->client_name ?: $booking->client_email ); ?></div>
             <?php if ( $booking->client_note ) : ?><div class="booking-note"><?php echo esc_html( $booking->client_note ); ?></div><?php endif; ?>
+            <?php $kounselia_where = function_exists( 'kounselia_booking_video' ) ? kounselia_booking_video( $booking, $application ) : null; ?>
+            <?php if ( $kounselia_where && $kounselia_where['external'] ) : ?><div class="booking-note" style="font-style:normal"><i class="ti ti-video"></i> On <?php echo esc_html( $kounselia_where['provider'] ); ?><?php echo $booking->video_link ? ' (link for this session)' : ''; ?></div><?php endif; ?>
           </div>
           <div class="booking-actions">
             <?php if ( $can_join ) : ?>
               <a class="booking-join" href="/video-call.php?booking_id=<?php echo (int) $booking->id; ?>"><i class="ti ti-video"></i> Join</a>
+            <?php endif; ?>
+            <?php if ( function_exists( 'kounselia_video_own_allowed' ) && kounselia_video_own_allowed( $application ) ) : ?>
+              <button type="button" class="booking-message" onclick="setSessionLink(<?php echo (int) $booking->id; ?>, <?php echo esc_attr( wp_json_encode( (string) $booking->video_link ) ); ?>)"><i class="ti ti-link"></i> Video link</button>
             <?php endif; ?>
             <button type="button" class="booking-message js-booking-chat" data-booking-id="<?php echo (int) $booking->id; ?>" data-other-name="<?php echo esc_attr( $booking->client_name ?: $booking->client_email ); ?>"><i class="ti ti-message-circle"></i> Message</button>
             <button type="button" class="booking-message js-reschedule" data-booking-id="<?php echo (int) $booking->id; ?>" data-other-name="<?php echo esc_attr( $booking->client_name ?: $booking->client_email ); ?>">Reschedule</button>
@@ -1526,6 +1559,42 @@ function openNotifications(){
 
 function closeNotifications(){
   document.getElementById('notif-overlay').classList.remove('active');
+}
+
+/* ---------------- VIDEO CALLS ---------------- */
+
+document.querySelectorAll('input[name="video-mode"]').forEach(function(r){
+  r.addEventListener('change', function(){
+    if (r.checked) document.getElementById('video-link-field').style.display = r.value === 'own' ? '' : 'none';
+  });
+});
+if (document.getElementById('video-save-btn')) document.getElementById('video-save-btn').addEventListener('click', function(){
+  const btn = this, msg = document.getElementById('video-msg');
+  const mode = (document.querySelector('input[name="video-mode"]:checked') || {}).value || 'kounselia';
+  msg.className = 'pro-msg'; btn.disabled = true;
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_pro_video_settings', nonce: KOUNSELIA.nonce, mode: mode, link: document.getElementById('video-link').value })
+  }).then(r => r.json()).then(res => {
+    msg.classList.add(res.success ? 'notice' : 'error');
+    msg.textContent = (res.data && res.data.message) || (res.success ? 'Saved.' : 'Something went wrong, please try again.');
+  }).catch(() => { msg.classList.add('error'); msg.textContent = 'Something went wrong, please check your connection and try again.'; })
+    .finally(() => { btn.disabled = false; });
+});
+
+// A different meeting link for one session; empty goes back to the usual setting.
+function setSessionLink(bookingId, current){
+  const link = prompt('Meeting link for this session only (Zoom, Google Meet, Teams or Whereby).\nLeave empty to use your usual video setting.', current || '');
+  if (link === null) return;
+  fetch(KOUNSELIA.ajaxUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ action: 'kounselia_pro_booking_video_link', nonce: KOUNSELIA.nonce, booking_id: bookingId, link: link })
+  }).then(r => r.json()).then(res => {
+    alert((res.data && res.data.message) || (res.success ? 'Saved.' : 'Something went wrong, please try again.'));
+    if (res.success) location.href = '/pro-dashboard.php?tab=bookings';
+  }).catch(() => alert('Something went wrong, please check your connection and try again.'));
 }
 
 /* ---------------- ARTICLES ---------------- */

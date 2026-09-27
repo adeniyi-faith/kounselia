@@ -897,7 +897,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="session-row booking-session-row" data-booking-id="<?php echo (int) $booking->id; ?>">
           <div class="session-av ic-gold"><i class="ti ti-calendar-event"></i></div>
           <div class="session-meta">
-            <h4><?php echo esc_html( $booking->pro_name ); ?><?php echo $booking->pro_title ? ' · ' . esc_html( $booking->pro_title ) : ''; ?><?php if ( $booking->series_id ) : ?><span class="weekly-tag">Weekly</span><?php endif; ?><?php if ( ! empty( $booking->is_free ) ) : ?><span class="weekly-tag" style="color:var(--sage);background:var(--sage-light)">Free</span><?php endif; ?></h4>
+            <h4><?php echo esc_html( $booking->pro_name ); ?><?php echo $booking->pro_title ? ' · ' . esc_html( $booking->pro_title ) : ''; ?><?php if ( $booking->series_id ) : ?><span class="weekly-tag">Weekly</span><?php endif; ?><?php if ( ! empty( $booking->is_free ) ) : ?><span class="weekly-tag" style="color:var(--sage);background:var(--sage-light)">Free</span><?php endif; ?><?php $kounselia_where = function_exists( 'kounselia_booking_video' ) ? kounselia_booking_video( $booking ) : null; if ( $kounselia_where && $kounselia_where['external'] ) : ?><span class="weekly-tag" title="Press Join here when it's time">On <?php echo esc_html( $kounselia_where['provider'] ); ?></span><?php endif; ?></h4>
             <p><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?></p>
           </div>
           <div class="booking-actions">

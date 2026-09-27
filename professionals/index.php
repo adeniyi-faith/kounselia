@@ -193,7 +193,8 @@ if ( '' !== $kounselia_view ) {
       <?php if ( $free_label && ! $free_all ) : ?><div class="k-book-perk k-book-free"><i class="ti ti-gift"></i> <?php echo esc_html( $free_label ); ?></div><?php endif; ?>
       <?php if ( $kounselia_pro_discount > 0 ) : ?><div class="k-book-perk"><i class="ti ti-sparkles"></i> Pro members save <?php echo esc_html( $kounselia_discount_txt ); ?>%</div><?php endif; ?>
       <ul>
-        <li><i class="ti ti-video"></i> Private video session</li>
+        <?php $video_on = function_exists( 'kounselia_professional_video_provider' ) ? kounselia_professional_video_provider( $pro ) : ''; ?>
+        <li><i class="ti ti-video"></i> <?php echo $video_on ? 'Video session on ' . esc_html( $video_on ) : 'Private video session'; ?></li>
         <li><i class="ti ti-calendar-event"></i> Pick a time that suits you</li>
         <li><i class="ti ti-lock"></i> Secure payment by Paystack</li>
         <li><i class="ti ti-message-circle"></i> Message <?php echo esc_html( $first ); ?> before and after</li>
