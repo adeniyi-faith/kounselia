@@ -249,6 +249,13 @@ export const updateName = (config: KounseliaConfig, name: string) => callAction<
 export const changePassword = (config: KounseliaConfig, currentPassword: string, newPassword: string) =>
   callAction<{ message: string }>(config, 'kounselia_update_password', { current_password: currentPassword, new_password: newPassword });
 
+// Permanently deletes the member's account and everything private in it
+// (includes/account-deletion.php). Asks for the password again. Can be
+// refused with an explanation, e.g. while a session with a professional
+// is still booked.
+export const deleteAccount = (config: KounseliaConfig, password: string) =>
+  callAction<{ message: string }>(config, 'kounselia_delete_account', { password });
+
 export const uploadAvatar = (config: KounseliaConfig, imageBase64: string, mimeType: string) =>
   callAction<{ avatar: string | null }>(config, 'kounselia_app_upload_avatar', { image_b64: imageBase64, mime_type: mimeType });
 

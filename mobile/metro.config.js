@@ -2,9 +2,11 @@
 // inside this folder; the shared code in ../packages/core (used by the
 // website chat too) lives outside it, so tell Metro to watch that as well.
 const path = require('path');
-const { getDefaultConfig } = require('expo/metro-config');
+// Expo's usual settings plus Sentry's (crash reports): it tags each build's
+// code so a crash report can point at the exact line (see src/monitoring.ts).
+const { getSentryExpoConfig } = require('@sentry/react-native/metro');
 
-const config = getDefaultConfig(__dirname);
+const config = getSentryExpoConfig(__dirname);
 config.watchFolders = [...(config.watchFolders ?? []), path.resolve(__dirname, '../packages/core')];
 
 // This app never renders Expo Router's <NativeTabs> — see

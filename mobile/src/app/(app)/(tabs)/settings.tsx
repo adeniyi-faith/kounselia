@@ -1,6 +1,8 @@
 // Settings: everything the website's "Profile and settings" tab has, laid
 // out like a phone's settings — your profile and photo, your plan, account
-// details, what your counselors remember, emails, reading, help and about.
+// details, privacy and security (app lock, notifications), what your
+// counselors remember, emails, reading, help and about, and deleting the
+// account.
 import {
   changePassword,
   fetchAccount,
@@ -18,7 +20,9 @@ import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { confirmOwner, LOCK_AFTER_CHOICES, unlockMethodName, withoutLocking } from '@/appLockSetting';
 import { useBrowser } from '@/browser/BrowserProvider';
+import { useAppLock } from '@/components/AppLock';
 import { Button } from '@/components/Button';
 import { Toast, useToast } from '@/components/chat/Toast';
 import { FormMessage } from '@/components/FormMessage';
@@ -26,6 +30,7 @@ import { openSafetyResources } from '@/components/openSafety';
 import { Sheet } from '@/components/Sheet';
 import { TablerIcon } from '@/components/TablerIcon';
 import { TextField } from '@/components/TextField';
+import { pushState, turnOffPush, turnOnPush, type PushState } from '@/notifications';
 import { useSession } from '@/session';
 import { type Appearance, counselorColors, fonts, makeStyles, radius, shadows, useColors, useTheme } from '@/theme';
 import { showDialog } from '@/components/Dialog';
@@ -39,7 +44,7 @@ const APPEARANCES: { key: Appearance; label: string; icon: string }[] = [
 export default function Settings() {
   const styles = useStyles();
   const colors = useColors();
-  const { user, config, signOut, updateUser } = useSession();
+  const { user, config, signOut, updateUser, deleteAccount } = useSession();
   const { appearance, setAppearance, scheme } = useTheme();
   const appearanceNote = appearance === 'system' ? `Matches your phone, which is using ${scheme} mode now.` : undefined;
   const { openInApp } = useBrowser();
@@ -47,18 +52,29 @@ export default function Settings() {
   const [account, setAccount] = useState<Account | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
-  const [sheet, setSheet] = useState<'name' | 'password' | null>(null);
+  const [sheet, setSheet] = useState<'name' | 'password' | 'delete' | null>(null);
+  const lock = useAppLock();
+  const [unlockWith, setUnlockWith] = useState<string | null>(null);
+  const [push, setPush] = useState<PushState>('unavailable');
 
   const load = useCallback(async () => {
     const res = await fetchAccount(config);
     if (res.ok && res.data.user) setAccount(res.data);
   }, [config]);
 
+  // What the phone allows can change in its own Settings while we're away.
+  const loadPhone = useCallback(async () => {
+    const [method, state] = await Promise.all([unlockMethodName(), pushState()]);
+    setUnlockWith(method);
+    setPush(state);
+  }, []);
+
   // Fresh every time Settings is opened (e.g. after editing memory).
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [load]),
+      loadPhone();
+    }, [load, loadPhone]),
   );
 
   async function refresh() {
@@ -68,7 +84,7 @@ export default function Settings() {
   }
 
   async function changePhoto() {
-    const pick = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 });
+    const pick = await withoutLocking(() => ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 }));
     if (pick.canceled || !pick.assets[0]) return;
     setPhotoBusy(true);
     try {
@@ -100,6 +116,54 @@ export default function Settings() {
     if (!res.ok) {
       setAccount((a) => (a ? { ...a, emails: before } : a));
       toast.show(res.message);
+    }
+  }
+
+  async function toggleLock(on: boolean) {
+    if (on) {
+      const method = await unlockMethodName();
+      if (!method) {
+        showDialog({
+          title: 'Set a screen lock first',
+          message: 'App lock uses your phone’s own Face ID, fingerprint or passcode. Set one up in your phone’s settings, then come back here.',
+          icon: 'lock',
+        });
+        return;
+      }
+      const res = await confirmOwner('Turn on app lock');
+      if (!res.ok) return;
+      await lock.setAfter(0);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+      toast.show('App lock is on');
+    } else {
+      const res = await confirmOwner('Turn off app lock');
+      if (!res.ok) return;
+      await lock.setAfter(null);
+      toast.show('App lock is off');
+    }
+  }
+
+  function notificationsBlocked() {
+    showDialog({
+      title: 'Notifications are off',
+      message: 'Notifications for Kounselia are turned off in your phone’s settings. Turn them on there to get session reminders and replies.',
+      icon: 'bell-off',
+      buttons: [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Open settings', onPress: () => Linking.openSettings().catch(() => undefined) },
+      ],
+    });
+  }
+
+  async function togglePush(on: boolean) {
+    if (on) {
+      setPush('on');
+      const next = await withoutLocking(() => turnOnPush(config));
+      setPush(next);
+      if (next === 'blocked') notificationsBlocked();
+    } else {
+      setPush('off');
+      await turnOffPush(config);
     }
   }
 
@@ -238,6 +302,66 @@ export default function Settings() {
           <Row icon="key" label="Password" value="Change" onPress={() => setSheet('password')} last />
         </Group>
 
+        <Group title="Privacy and security" note={lock.after !== null && lock.after !== undefined ? 'Kounselia also hides its screen in your phone’s list of open apps.' : undefined}>
+          <Row
+            icon="lock"
+            tint="plum"
+            label="App lock"
+            sub={unlockWith ? `Ask for ${unlockWith} to open Kounselia` : 'Ask for Face ID, fingerprint or passcode to open Kounselia'}
+            right={
+              <Switch
+                value={lock.after !== null && lock.after !== undefined}
+                disabled={lock.after === undefined}
+                onValueChange={toggleLock}
+                trackColor={{ true: colors.accent, false: colors.surface3 }}
+                accessibilityLabel="App lock"
+              />
+            }
+            last={push === 'unavailable' && (lock.after === null || lock.after === undefined)}
+          />
+          {lock.after !== null && lock.after !== undefined ? (
+            <View style={[styles.segment, push !== 'unavailable' && styles.rowBorder]} accessibilityRole="radiogroup" accessibilityLabel="When to lock">
+              {LOCK_AFTER_CHOICES.map((c) => {
+                const on = lock.after === c.value;
+                return (
+                  <Pressable
+                    key={c.value}
+                    onPress={() => {
+                      Haptics.selectionAsync().catch(() => undefined);
+                      lock.setAfter(c.value);
+                    }}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: on }}
+                    aria-checked={on}
+                    accessibilityLabel={`Lock ${c.label.toLowerCase()}`}
+                    style={[styles.segmentItem, styles.segmentItemSmall, on && styles.segmentOn]}
+                  >
+                    <Text style={[styles.segmentText, on && styles.segmentTextOn]}>{c.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+          {push === 'blocked' ? (
+            <Row icon="bell-off" label="Notifications" sub="Turned off in your phone’s settings" onPress={notificationsBlocked} last />
+          ) : push !== 'unavailable' ? (
+            <Row
+              icon="bell"
+              label="Notifications"
+              sub="Session reminders, booking changes and replies"
+              right={
+                <Switch
+                  value={push === 'on'}
+                  onValueChange={togglePush}
+                  trackColor={{ true: colors.accent, false: colors.surface3 }}
+                  accessibilityLabel="Notifications"
+                />
+              }
+              last
+            />
+          ) : null}
+        </Group>
+
         <Group title="Your counselors" note="What they remember helps them know you">
           <Row
             icon="brain"
@@ -300,6 +424,17 @@ export default function Settings() {
           <Row icon="info-circle" label="App version" value={Constants.expoConfig?.version ?? ''} last />
         </Group>
 
+        <Group title="Your data">
+          <Row
+            icon="trash"
+            tint="rose"
+            label="Delete account"
+            sub="Permanently erase your account, conversations and journal"
+            onPress={() => setSheet('delete')}
+            last
+          />
+        </Group>
+
         <Button title="Sign out" variant="ghost" onPress={confirmSignOut} style={styles.signOut} />
         <Text style={styles.footer}>Made with care by Kounselia</Text>
       </ScrollView>
@@ -327,6 +462,21 @@ export default function Settings() {
           setSheet(null);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
           toast.show('Password changed. Other phones have been signed out.');
+          return null;
+        }}
+      />
+      <DeleteAccountSheet
+        visible={sheet === 'delete'}
+        onClose={() => setSheet(null)}
+        onDelete={async (password) => {
+          const problem = await deleteAccount(password);
+          if (problem) return problem;
+          // Signed out already: the welcome screen is showing underneath.
+          showDialog({
+            title: 'Your account has been deleted',
+            message: 'Your conversations, mood check-ins, journal and everything your counselors remembered have been erased. Take care of yourself. You’re always welcome back.',
+            icon: 'heart',
+          });
           return null;
         }}
       />
@@ -498,6 +648,65 @@ function PasswordSheet({
   );
 }
 
+function DeleteAccountSheet({
+  visible,
+  onClose,
+  onDelete,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onDelete: (password: string) => Promise<string | null>;
+}) {
+  const styles = useStyles();
+  const colors = useColors();
+  const [password, setPassword] = useState('');
+  const [sure, setSure] = useState(false);
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [wasVisible, setWasVisible] = useState(visible);
+  if (visible !== wasVisible) {
+    setWasVisible(visible);
+    if (visible) {
+      setPassword('');
+      setSure(false);
+      setError('');
+    }
+  }
+
+  async function remove() {
+    if (!password) return setError('Please enter your password.');
+    if (!sure) return setError('Please confirm you understand this can’t be undone.');
+    setBusy(true);
+    const problem = await onDelete(password);
+    setBusy(false);
+    if (problem) setError(problem);
+  }
+
+  return (
+    <Sheet visible={visible} title="Delete your account" onClose={onClose}>
+      <Text style={styles.sheetText}>
+        This permanently erases your account and everything in it: your conversations with counselors, mood check-ins, journal, what your counselors
+        remember about you, and your comments. If you’re on a paid plan, it ends and you won’t be charged again.
+      </Text>
+      <Text style={styles.sheetText}>
+        Records of sessions you had with professionals and payments you made are kept for their records and ours, with your name removed.
+      </Text>
+      <TextField label="Your password" password value={password} onChangeText={setPassword} autoComplete="current-password" />
+      <View style={styles.sureRow}>
+        <Switch
+          value={sure}
+          onValueChange={setSure}
+          trackColor={{ true: colors.rose, false: colors.surface3 }}
+          accessibilityLabel="I understand this can’t be undone"
+        />
+        <Text style={styles.sureText}>I understand this can’t be undone</Text>
+      </View>
+      {error ? <FormMessage tone="error" text={error} /> : null}
+      <Button title="Delete my account" variant="danger" onPress={remove} busy={busy} style={styles.sheetButton} />
+    </Sheet>
+  );
+}
+
 const useStyles = makeStyles((colors) => ({
   safe: { flex: 1, backgroundColor: colors.bg },
   content: { padding: 16, paddingBottom: 48 },
@@ -580,6 +789,7 @@ const useStyles = makeStyles((colors) => ({
   rowValue: { fontFamily: fonts.regular, fontSize: 14, color: colors.text3, maxWidth: '45%' },
   segment: { flexDirection: 'row', padding: 6, gap: 6 },
   segmentItem: { flex: 1, alignItems: 'center', gap: 4, paddingVertical: 12, borderRadius: 14 },
+  segmentItemSmall: { paddingVertical: 10 },
   segmentOn: { backgroundColor: colors.accentLight, borderWidth: 1, borderColor: colors.accentBorder },
   segmentText: { fontFamily: fonts.medium, fontSize: 13, color: colors.text2 },
   segmentTextOn: { color: colors.accentText, fontFamily: fonts.semibold },
@@ -587,4 +797,6 @@ const useStyles = makeStyles((colors) => ({
   footer: { fontFamily: fonts.regular, fontSize: 12, color: colors.text3, textAlign: 'center', marginTop: 18 },
   sheetText: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 20, color: colors.text2, marginBottom: 16 },
   sheetButton: { marginTop: 8 },
+  sureRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4, marginBottom: 12 },
+  sureText: { flex: 1, fontFamily: fonts.medium, fontSize: 14, color: colors.text },
 }));

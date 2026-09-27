@@ -90,6 +90,38 @@ function kounselia_issue_app_token( $user_id, $device_name = '' ) {
 }
 
 /**
+ * The id of the sign-in (kounselia_app_tokens row) this request was made
+ * with, or 0. Push tokens are tied to it (see notifications.php).
+ */
+function kounselia_app_token_id_from_request() {
+    global $wpdb;
+    $raw = kounselia_app_token_from_request();
+    if ( '' === $raw ) {
+        return 0;
+    }
+    return (int) $wpdb->get_var( $wpdb->prepare(
+        "SELECT id FROM {$wpdb->prefix}kounselia_app_tokens WHERE token_hash = %s",
+        kounselia_app_token_hash( $raw )
+    ) );
+}
+
+/**
+ * Ends the given sign-ins, and with them the push notifications to the
+ * phones they were on: a phone signed out of an account (by the member, a
+ * password change, or time) mustn't keep showing that account's news.
+ */
+function kounselia_delete_app_token_rows( $ids ) {
+    global $wpdb;
+    $ids = array_filter( array_map( 'intval', (array) $ids ) );
+    if ( empty( $ids ) ) {
+        return;
+    }
+    $in = implode( ',', $ids );
+    $wpdb->query( "DELETE FROM {$wpdb->prefix}kounselia_push_tokens WHERE app_token_id IN ({$in})" );
+    $wpdb->query( "DELETE FROM {$wpdb->prefix}kounselia_app_tokens WHERE id IN ({$in})" );
+}
+
+/**
  * The user a raw token belongs to, or 0 if it's unknown or expired.
  * Also slides the expiry forward, at most once an hour so a busy chat
  * doesn't write to the database on every message.
@@ -120,7 +152,7 @@ function kounselia_user_id_from_app_token( $raw_token ) {
 
     $now = time();
     if ( strtotime( $row->expires_at . ' UTC' ) < $now ) {
-        $wpdb->delete( $table, array( 'id' => $row->id ) );
+        kounselia_delete_app_token_rows( array( $row->id ) );
         return 0;
     }
 
@@ -143,14 +175,15 @@ function kounselia_revoke_app_tokens( $user_id, $keep_raw_token = '' ) {
     $table = $wpdb->prefix . 'kounselia_app_tokens';
 
     if ( '' !== $keep_raw_token ) {
-        $wpdb->query( $wpdb->prepare(
-            "DELETE FROM {$table} WHERE user_id = %d AND token_hash <> %s",
+        $ids = $wpdb->get_col( $wpdb->prepare(
+            "SELECT id FROM {$table} WHERE user_id = %d AND token_hash <> %s",
             $user_id,
             kounselia_app_token_hash( $keep_raw_token )
         ) );
-        return;
+    } else {
+        $ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM {$table} WHERE user_id = %d", $user_id ) );
     }
-    $wpdb->delete( $table, array( 'user_id' => (int) $user_id ) );
+    kounselia_delete_app_token_rows( $ids );
 }
 
 /**
@@ -336,13 +369,20 @@ function kounselia_ajax_app_web_sso() {
 add_action( 'wp_ajax_kounselia_app_web_sso', 'kounselia_ajax_app_web_sso' );
 add_action( 'wp_ajax_nopriv_kounselia_app_web_sso', 'kounselia_ajax_app_web_sso' );
 
-// Signs out this phone only.
+// Signs out this phone only, which also stops its push notifications (see
+// kounselia_delete_app_token_rows). The app sends its push token too, in
+// case it was registered some other way.
 function kounselia_ajax_app_logout() {
     global $wpdb;
     kounselia_verify_nonce();
-    $wpdb->delete( $wpdb->prefix . 'kounselia_app_tokens', array(
-        'token_hash' => kounselia_app_token_hash( kounselia_app_token_from_request() ),
-    ) );
+    $push_token = isset( $_POST['push_token'] ) ? sanitize_text_field( wp_unslash( $_POST['push_token'] ) ) : '';
+    if ( '' !== $push_token && is_user_logged_in() ) {
+        $wpdb->delete( $wpdb->prefix . 'kounselia_push_tokens', array(
+            'user_id' => get_current_user_id(),
+            'token'   => $push_token,
+        ) );
+    }
+    kounselia_delete_app_token_rows( array( kounselia_app_token_id_from_request() ) );
     wp_send_json_success();
 }
 add_action( 'wp_ajax_kounselia_app_logout', 'kounselia_ajax_app_logout' );

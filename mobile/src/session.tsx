@@ -8,6 +8,7 @@ import {
   appLogin,
   appLogout,
   appRegister,
+  deleteAccount as deleteAccountOnServer,
   fetchAppUser,
   type AppAuthResult,
   type AppUser,
@@ -15,8 +16,10 @@ import {
 } from '@kounselia/core';
 import * as Device from 'expo-device';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { clearLockSetting } from './appLockSetting';
 import { showDialog } from './components/Dialog';
 import { AJAX_URL } from './config';
+import { forgetPush, savedPushToken } from './notifications';
 import { deleteSecure, readSecure, writeSecure } from './secureStorage';
 
 const TOKEN_KEY = 'kounselia_app_token';
@@ -32,6 +35,9 @@ interface Session {
   signIn(email: string, password: string): Promise<AppAuthResult>;
   signUp(name: string, email: string, password: string): Promise<AppAuthResult>;
   signOut(): Promise<void>;
+  // Permanently deletes the account on the server, then signs out here.
+  // Resolves to the server's reason if it refused, or null when done.
+  deleteAccount(password: string): Promise<string | null>;
   // After the member changes their details in Settings.
   updateUser(changes: Partial<AppUser>): void;
 }
@@ -87,9 +93,13 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     setStatus('signed-out');
+    // The app lock and notification choice belong to whoever was signed
+    // in; the next person starts fresh.
     await Promise.all([
       deleteSecure(TOKEN_KEY),
       deleteSecure(USER_KEY),
+      clearLockSetting(),
+      forgetPush(),
     ]);
   }
 
@@ -145,8 +155,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       signOut: async () => {
         // Forget locally first, so signing out works even with no signal.
         const old = config;
+        const pushToken = await savedPushToken();
         await forget();
-        await appLogout(old);
+        await appLogout(old, pushToken);
+      },
+      deleteAccount: async (password) => {
+        const res = await deleteAccountOnServer(config, password);
+        if (!res.ok) return res.message;
+        // The server has already signed this phone out and erased its push token.
+        expired.current = true;
+        await forget();
+        return null;
       },
       updateUser: (changes) => {
         if (!user) return;
