@@ -85,20 +85,31 @@ export default function BookProfessional() {
     })();
   }, [config, professionalId, rescheduleId, proParam]);
 
-  // Group the free slots by day, in the member's time zone.
+  // Group the free slots by day, in the member's time zone. Today gets its
+  // own entry even with no slots left in it (see `today_note`) — otherwise
+  // a day that's only just run out of bookable notice (see
+  // kounselia_booking_lead_seconds() server-side) would silently vanish
+  // from the row instead of explaining why there's nothing left today.
   const days = useMemo(() => {
-    const groups = new Map<string, { label: string; slots: Slot[] }>();
+    const groups = new Map<string, { date: Date; label: string; slots: Slot[]; note?: string }>();
+    const dayGroup = (at: Date) => {
+      const key = dayKey(at);
+      if (!groups.has(key)) {
+        groups.set(key, { date: at, label: at.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }), slots: [] });
+      }
+      return groups.get(key)!;
+    };
     (slots?.slots ?? []).forEach((value, i) => {
       const utc = slots?.slots_utc?.[i];
       if (!utc) return;
-      const at = new Date(utc);
-      const key = dayKey(at);
-      if (!groups.has(key)) {
-        groups.set(key, { label: at.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }), slots: [] });
-      }
-      groups.get(key)!.slots.push({ value, at });
+      dayGroup(new Date(utc)).slots.push({ value, at: new Date(utc) });
     });
-    return [...groups.entries()].map(([key, g]) => ({ key, ...g }));
+    if (slots?.today_note) {
+      dayGroup(new Date()).note = slots.today_note;
+    }
+    return [...groups.values()]
+      .sort((a, b) => a.date.getTime() - b.date.getTime())
+      .map(({ date, ...g }) => ({ key: dayKey(date), ...g }));
   }, [slots]);
 
   const currentDay = days.find((d) => d.key === day) ?? days[0];
@@ -292,25 +303,29 @@ export default function BookProfessional() {
             </ScrollView>
 
             <Text style={styles.label}>Time</Text>
-            <View style={styles.times}>
-              {currentDay?.slots.map((s) => {
-                const on = picked?.value === s.value;
-                return (
-                  <Pressable
-                    key={s.value}
-                    onPress={() => {
-                      Haptics.selectionAsync().catch(() => undefined);
-                      setPicked(s);
-                    }}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: on }}
-                    style={[styles.time, on && styles.chipOn]}
-                  >
-                    <Text style={[styles.chipText, on && styles.chipTextOn]}>{s.at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
+            {currentDay?.note && currentDay.slots.length === 0 ? (
+              <Text style={styles.notice}>{currentDay.note}</Text>
+            ) : (
+              <View style={styles.times}>
+                {currentDay?.slots.map((s) => {
+                  const on = picked?.value === s.value;
+                  return (
+                    <Pressable
+                      key={s.value}
+                      onPress={() => {
+                        Haptics.selectionAsync().catch(() => undefined);
+                        setPicked(s);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: on }}
+                      style={[styles.time, on && styles.chipOn]}
+                    >
+                      <Text style={[styles.chipText, on && styles.chipTextOn]}>{s.at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
 
             {!rescheduleId && (
               <>
