@@ -253,6 +253,7 @@ function kounselia_ajax_app_bookings() {
             'name'         => $pro->display_name,
             'title'        => (string) $pro->title,
             'specialty'    => (string) $pro->specialty,
+            'bio'          => $pro->bio ? wp_trim_words( wp_strip_all_tags( $pro->bio ), 60 ) : null,
             'avatar_url'   => $avatar ? $avatar : null,
             'rating'       => (float) $rating['average'],
             'review_count' => (int) $rating['count'],

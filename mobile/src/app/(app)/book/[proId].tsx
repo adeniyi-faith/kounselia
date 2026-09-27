@@ -225,25 +225,33 @@ export default function BookProfessional() {
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         {pro && (
-          <View style={styles.proRow}>
-            <ProfessionalAvatar pro={pro} size={56} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.proName}>{pro.name}</Text>
-              <Text style={styles.proSpec}>
-                {pro.title}
-                {pro.specialty ? ` · ${pro.specialty}` : ''}
-              </Text>
-              {isFree ? <Text style={styles.free}>{pro.free_label}</Text> : null}
-              {pro.video_provider && !rescheduleId ? (
-                <Text style={styles.proSpec}>Sessions are on {pro.video_provider}. You join from here when it&apos;s time.</Text>
-              ) : null}
-              {pro.price && !rescheduleId ? (
-                <Text style={styles.price}>
-                  {pro.price} / {slots.session_minutes}-minute session
+          <>
+            <View style={styles.proRow}>
+              <ProfessionalAvatar pro={pro} size={56} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.proName}>{pro.name}</Text>
+                <Text style={styles.proSpec}>
+                  {pro.title}
+                  {pro.specialty ? ` · ${pro.specialty}` : ''}
                 </Text>
-              ) : null}
+                {pro.video_provider && !rescheduleId ? (
+                  <Text style={styles.proSpec}>Sessions are on {pro.video_provider}. You join from here when it&apos;s time.</Text>
+                ) : null}
+                {pro.price && !rescheduleId ? (
+                  <Text style={styles.price}>
+                    {pro.price} / {slots.session_minutes}-minute session
+                  </Text>
+                ) : null}
+              </View>
             </View>
-          </View>
+            {isFree ? (
+              <View style={styles.freeBadge}>
+                <TablerIcon name="gift" size={16} color={colors.sage} />
+                <Text style={styles.freeBadgeText}>{pro.free_label}</Text>
+              </View>
+            ) : null}
+            {pro.bio && !rescheduleId ? <Text style={styles.bio}>{pro.bio}</Text> : null}
+          </>
         )}
 
         {days.length === 0 ? (
@@ -365,7 +373,19 @@ const useStyles = makeStyles((colors) => ({
   proName: { fontFamily: fonts.serifMedium, fontSize: 24, color: colors.text },
   proSpec: { fontFamily: fonts.regular, fontSize: 13, color: colors.text2, marginTop: 2 },
   price: { fontFamily: fonts.semibold, fontSize: 13, color: colors.accentText, marginTop: 4 },
-  free: { fontFamily: fonts.semibold, fontSize: 13, color: colors.sage, marginTop: 4 },
+  freeBadge: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.sageLight,
+    borderRadius: radius.pill,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    marginTop: 14,
+  },
+  freeBadgeText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.sage },
+  bio: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 21, color: colors.text2, marginTop: 14 },
   label: { fontFamily: fonts.medium, fontSize: 13, color: colors.text2, marginTop: 24, marginBottom: 10 },
   days: { gap: 8, paddingRight: 20 },
   chip: { paddingVertical: 10, paddingHorizontal: 14, borderRadius: 50, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },

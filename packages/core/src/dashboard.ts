@@ -119,6 +119,8 @@ export interface Professional {
   name: string;
   title: string;
   specialty: string;
+  // A few sentences about them, in their own words, if they've written one.
+  bio: string | null;
   avatar_url: string | null;
   rating: number;
   review_count: number;
