@@ -158,7 +158,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 .status-banner{border-radius:16px;padding:16px 18px;margin-bottom:24px;font-size:14px;line-height:1.55}
 .status-banner.pending{background:var(--gold-light);color:#6B4A1F}
 .status-banner.verified{background:var(--sage-light);color:var(--sage)}
-.status-banner.rejected{background:var(--rose-light);color:var(--rose)}
+.status-banner.rejected,.status-banner.suspended{background:var(--rose-light);color:var(--rose)}
 .status-banner strong{display:block;font-size:13px;text-transform:uppercase;letter-spacing:.03em;margin-bottom:4px}
 
 .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px}
@@ -378,6 +378,8 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 
     <?php if ( 'pending' === $application->status ) : ?>
       <div class="status-banner pending"><strong>Under review</strong>We're checking your documents — we'll email you once there's a decision, usually within a few business days.</div>
+    <?php elseif ( 'suspended' === $application->status ) : ?>
+      <div class="status-banner suspended"><strong>Account suspended</strong><?php echo $application->suspended_reason ? esc_html( $application->suspended_reason ) : 'Your account is under review.'; ?><br>Clients can't find or book you while your account is suspended. Questions? Email <a href="mailto:hello@kounselia.com" style="color:inherit;text-decoration:underline">hello@kounselia.com</a>.</div>
     <?php elseif ( 'rejected' === $application->status ) : ?>
       <div class="status-banner rejected"><strong>Not approved yet</strong><?php echo $application->rejection_reason ? esc_html( $application->rejection_reason ) : 'Update your documents and reapply when you\'re ready.'; ?> — <a href="/apply.php" style="color:inherit;text-decoration:underline">reapply with new documents</a>.</div>
     <?php else : ?>
@@ -387,7 +389,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     <div class="stats-row">
       <div class="stat-card">
         <div class="stat-icon" style="background:var(--accent-light);color:var(--accent);"><i class="ti ti-cash"></i></div>
-        <div class="stat-num"><?php echo $application->rate_amount ? '₦' . esc_html( number_format( (float) $application->rate_amount ) ) : 'Not set'; ?></div>
+        <div class="stat-num"><?php echo ( defined( 'KOUNSELIA_FREE_ALWAYS' ) && (int) $application->free_sessions_per_client >= KOUNSELIA_FREE_ALWAYS ) ? 'Free' : ( $application->rate_amount ? '₦' . esc_html( number_format( (float) $application->rate_amount ) ) : 'Not set' ); ?></div>
         <div class="stat-label">Rate per session</div>
       </div>
       <div class="stat-card">
@@ -445,6 +447,17 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
             <div class="section-sub" style="margin-top:6px">Clients outside Nigeria see about <?php echo esc_html( kounselia_format_money( kounselia_convert_ngn( $application->rate_amount, 'USD' ), 'USD' ) ); ?>. You are always paid in naira.</div>
           <?php endif; ?>
         </div>
+        <?php if ( function_exists( 'kounselia_free_session_options' ) ) : ?>
+        <div class="form-field">
+          <label>Free sessions</label>
+          <select name="free_sessions_per_client" id="pro-free">
+            <?php foreach ( kounselia_free_session_options() as $kounselia_v => $kounselia_label ) : ?>
+              <option value="<?php echo (int) $kounselia_v; ?>" <?php selected( (int) $application->free_sessions_per_client, (int) $kounselia_v ); ?>><?php echo esc_html( $kounselia_label ); ?></option>
+            <?php endforeach; ?>
+          </select>
+          <div class="section-sub" style="margin-top:6px">A free first session is a gentle way for someone to see if you're the right fit. Each client gets the free sessions once; after that they pay your rate. Choose "every session" if you offer your time pro bono (your rate isn't needed then).</div>
+        </div>
+        <?php endif; ?>
 
         <button type="submit" class="pro-submit" id="pro-save-btn">Save changes</button>
         <div class="pro-msg" id="pro-msg"></div>
@@ -609,7 +622,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="booking-row" data-booking-id="<?php echo (int) $booking->id; ?>">
           <div class="booking-icon"><i class="ti ti-calendar-event"></i></div>
           <div class="booking-meta">
-            <div class="booking-when"><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?><?php if ( $booking->series_id ) : ?><span class="weekly-tag">Weekly</span><?php endif; ?></div>
+            <div class="booking-when"><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?><?php if ( $booking->series_id ) : ?><span class="weekly-tag">Weekly</span><?php endif; ?><?php if ( ! empty( $booking->is_free ) ) : ?><span class="weekly-tag" style="color:var(--sage);background:var(--sage-light)">Free</span><?php endif; ?></div>
             <div class="booking-with"><?php echo esc_html( $booking->client_name ?: $booking->client_email ); ?></div>
             <?php if ( $booking->client_note ) : ?><div class="booking-note"><?php echo esc_html( $booking->client_note ); ?></div><?php endif; ?>
           </div>
@@ -922,7 +935,8 @@ document.getElementById('pro-form').addEventListener('submit', function(e){
         specialty: document.getElementById('pro-specialty').value,
         years_experience: document.getElementById('pro-years').value,
         bio: document.getElementById('pro-bio').value,
-        rate_amount: document.getElementById('pro-rate').value
+        rate_amount: document.getElementById('pro-rate').value,
+        free_sessions_per_client: document.getElementById('pro-free') ? document.getElementById('pro-free').value : ''
       })
     }).then(r => r.json())
   ];

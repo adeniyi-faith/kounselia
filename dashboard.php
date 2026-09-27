@@ -897,7 +897,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="session-row booking-session-row" data-booking-id="<?php echo (int) $booking->id; ?>">
           <div class="session-av ic-gold"><i class="ti ti-calendar-event"></i></div>
           <div class="session-meta">
-            <h4><?php echo esc_html( $booking->pro_name ); ?><?php echo $booking->pro_title ? ' · ' . esc_html( $booking->pro_title ) : ''; ?><?php if ( $booking->series_id ) : ?><span class="weekly-tag">Weekly</span><?php endif; ?></h4>
+            <h4><?php echo esc_html( $booking->pro_name ); ?><?php echo $booking->pro_title ? ' · ' . esc_html( $booking->pro_title ) : ''; ?><?php if ( $booking->series_id ) : ?><span class="weekly-tag">Weekly</span><?php endif; ?><?php if ( ! empty( $booking->is_free ) ) : ?><span class="weekly-tag" style="color:var(--sage);background:var(--sage-light)">Free</span><?php endif; ?></h4>
             <p><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?></p>
           </div>
           <div class="booking-actions">
@@ -958,7 +958,8 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
               $pro_initial = mb_strtoupper( mb_substr( $pro->display_name, 0, 1 ) );
               $pro_rating  = function_exists( 'kounselia_get_professional_rating_summary' ) ? kounselia_get_professional_rating_summary( $pro->id ) : array( 'average' => 0, 'count' => 0 );
           ?>
-          <a class="counselor-tile js-book-pro" href="javascript:void(0)" data-pro-id="<?php echo (int) $pro->id; ?>" data-pro-name="<?php echo esc_attr( $pro->display_name . ( $pro->title ? ' · ' . $pro->title : '' ) ); ?>">
+          <?php $kounselia_free_left = function_exists( 'kounselia_free_sessions_left' ) ? kounselia_free_sessions_left( $pro, $user->ID ) : 0; ?>
+          <a class="counselor-tile js-book-pro" href="javascript:void(0)" data-pro-id="<?php echo (int) $pro->id; ?>" data-free-left="<?php echo (int) $kounselia_free_left; ?>" data-pro-name="<?php echo esc_attr( $pro->display_name . ( $pro->title ? ' · ' . $pro->title : '' ) ); ?>">
             <div class="tile-av ic-blue" style="overflow:hidden">
               <?php echo $pro_avatar ? '<img src="' . esc_url( $pro_avatar ) . '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : esc_html( $pro_initial ); ?>
             </div>
@@ -969,8 +970,11 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
             <?php else : ?>
               <div class="tile-spec" style="margin-top:4px;color:var(--text3)">No reviews yet</div>
             <?php endif; ?>
+            <?php if ( $kounselia_free_left ) : ?>
+              <div class="tile-spec" style="margin-top:6px;font-weight:600;color:var(--sage)">🎁 <?php echo esc_html( kounselia_free_sessions_label( $pro, $user->ID ) ); ?></div>
+            <?php endif; ?>
             <div class="tile-spec" style="margin-top:4px;font-weight:600;color:var(--accent)"><?php
-              if ( $pro->rate_amount ) {
+              if ( $pro->rate_amount && ( ! defined( 'KOUNSELIA_FREE_ALWAYS' ) || $kounselia_free_left < KOUNSELIA_FREE_ALWAYS ) ) {
                   // Shown in the viewer's currency, with the Pro discount (if any) applied.
                   $kounselia_full  = kounselia_convert_ngn( $pro->rate_amount, $viewer_currency );
                   $kounselia_price = round( $kounselia_full * ( 1 - (float) $kounselia_session_discount / 100 ), 2 );
@@ -1548,7 +1552,10 @@ function saveJournal(sourceId,msgId){
   }
 
   const bookingResult = params.get('booking');
-  if(bookingResult === 'success'){
+  if(bookingResult === 'free'){
+    toast("You're booked in. This session is free.");
+    switchTab('professionals');
+  } else if(bookingResult === 'success'){
     toast('Payment confirmed — your session is booked.');
     switchTab('professionals');
   } else if(bookingResult === 'failed'){
@@ -1872,6 +1879,7 @@ function finishIntake() {
 /* ---------------- BOOK A PROFESSIONAL ---------------- */
 
 let bookingProfessionalId = null;
+let bookingIsFree = false;
 let bookingSelectedSlot = null;
 let bookingMode = 'book'; // 'book' | 'reschedule'
 let rescheduleBookingId = null;
@@ -1896,10 +1904,13 @@ function openBooking(professionalId, name){
   document.getElementById('book-modal-name').textContent = name;
   document.getElementById('book-note').value = '';
   document.getElementById('book-note-field').style.display = 'none';
-  document.getElementById('book-recurring-field').style.display = 'flex';
+  // A free session is booked on its own (a weekly series needs a card on file).
+  const tile = document.querySelector('.js-book-pro[data-pro-id="' + professionalId + '"]');
+  bookingIsFree = !!(tile && parseInt(tile.dataset.freeLeft || '0', 10) > 0);
+  document.getElementById('book-recurring-field').style.display = bookingIsFree ? 'none' : 'flex';
   document.getElementById('book-recurring').checked = false;
   document.getElementById('book-confirm-btn').style.display = 'none';
-  document.getElementById('book-confirm-btn').textContent = 'Confirm booking';
+  document.getElementById('book-confirm-btn').textContent = bookingIsFree ? 'Book free session' : 'Confirm booking';
   document.getElementById('book-slots').innerHTML = '<p style="color:var(--text3);font-size:14px">Loading available times...</p>';
   document.getElementById('book-overlay').classList.add('active');
   loadBookingSlots(professionalId, 0);
@@ -1997,7 +2008,7 @@ function confirmBooking(){
 
   const btn = document.getElementById('book-confirm-btn');
   btn.disabled = true;
-  btn.textContent = 'Taking you to payment...';
+  btn.textContent = bookingIsFree ? 'Booking...' : 'Taking you to payment...';
 
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
@@ -2013,19 +2024,21 @@ function confirmBooking(){
   })
   .then(r => r.json())
   .then(res => {
-    if (res.success && res.data.authorization_url) {
+    if (res.success && res.data.free) {
+      window.location.href = '/dashboard.php?booking=free#professionals';
+    } else if (res.success && res.data.authorization_url) {
       // This slot is now reserved pending payment — leaving the page to
       // pay on Paystack is the point, not an error state to recover from.
       window.location.href = res.data.authorization_url;
     } else {
       btn.disabled = false;
-      btn.textContent = 'Confirm booking';
+      btn.textContent = bookingIsFree ? 'Book free session' : 'Confirm booking';
       toast((res.data && res.data.message) || 'Could not book that slot.', true);
     }
   })
   .catch(() => {
     btn.disabled = false;
-    btn.textContent = 'Confirm booking';
+    btn.textContent = bookingIsFree ? 'Book free session' : 'Confirm booking';
     toast('Something went wrong. Please try again.', true);
   });
 }

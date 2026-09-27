@@ -51,6 +51,124 @@ function kounselia_booking_payout_split( $rate_ngn ) {
 }
 
 /* -------------------------------------------------------------------------
+ * FREE SESSIONS — a professional can offer each new client their first
+ * few sessions free, or make every session free (pro bono). The setting
+ * is kounselia_professionals.free_sessions_per_client:
+ *   0                      none
+ *   1..20                  that many per client
+ *   KOUNSELIA_FREE_ALWAYS  every session
+ * A free booking skips Paystack entirely: it's confirmed straight away,
+ * marked is_free, and gets a 'free' payment row for ₦0 so every list of
+ * bookings and earnings stays accurate (and cancelling it never tries a
+ * refund). Every free booking counts towards the allowance, even if it
+ * is later cancelled, so the offer can't be used over and over.
+ * ---------------------------------------------------------------------- */
+
+if ( ! defined( 'KOUNSELIA_FREE_ALWAYS' ) ) {
+    define( 'KOUNSELIA_FREE_ALWAYS', 1000 );
+}
+
+/** The choices a professional (or admin) can pick from. */
+function kounselia_free_session_options() {
+    return array(
+        0                     => 'No free sessions',
+        1                     => 'First session free for each new client',
+        2                     => 'First 2 sessions free for each new client',
+        3                     => 'First 3 sessions free for each new client',
+        5                     => 'First 5 sessions free for each new client',
+        KOUNSELIA_FREE_ALWAYS => 'Every session is free (pro bono)',
+    );
+}
+
+/** A valid stored value from whatever was posted. */
+function kounselia_free_sessions_clean( $value ) {
+    $value = (int) $value;
+    if ( $value >= KOUNSELIA_FREE_ALWAYS ) {
+        return KOUNSELIA_FREE_ALWAYS;
+    }
+    return max( 0, min( 20, $value ) );
+}
+
+function kounselia_free_sessions_used( $professional_id, $client_user_id ) {
+    global $wpdb;
+    return (int) $wpdb->get_var( $wpdb->prepare(
+        "SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_bookings WHERE professional_id = %d AND client_user_id = %d AND is_free = 1",
+        $professional_id, $client_user_id
+    ) );
+}
+
+/**
+ * How many more free sessions this client has with this professional
+ * (KOUNSELIA_FREE_ALWAYS when every session is free).
+ */
+function kounselia_free_sessions_left( $pro, $client_user_id ) {
+    $offer = isset( $pro->free_sessions_per_client ) ? (int) $pro->free_sessions_per_client : 0;
+    if ( $offer >= KOUNSELIA_FREE_ALWAYS ) {
+        return KOUNSELIA_FREE_ALWAYS;
+    }
+    if ( $offer <= 0 ) {
+        return 0;
+    }
+    return $client_user_id ? max( 0, $offer - kounselia_free_sessions_used( $pro->id, $client_user_id ) ) : $offer;
+}
+
+/** A short line about the offer for profiles and booking screens, or ''. */
+function kounselia_free_sessions_label( $pro, $client_user_id = 0 ) {
+    $offer = isset( $pro->free_sessions_per_client ) ? (int) $pro->free_sessions_per_client : 0;
+    if ( $offer >= KOUNSELIA_FREE_ALWAYS ) {
+        return 'Sessions are free';
+    }
+    if ( $offer <= 0 ) {
+        return '';
+    }
+    if ( $client_user_id ) {
+        $left = kounselia_free_sessions_left( $pro, $client_user_id );
+        if ( ! $left ) {
+            return '';
+        }
+        return 1 === $left ? 'Your next session is free' : 'Your next ' . $left . ' sessions are free';
+    }
+    return 1 === $offer ? 'First session free' : 'First ' . $offer . ' sessions free';
+}
+
+/**
+ * Confirms a freshly reserved booking as a free session. Returns true or
+ * WP_Error. Called from kounselia_ajax_create_booking() instead of
+ * starting a Paystack checkout.
+ */
+function kounselia_confirm_free_booking( $booking_id ) {
+    global $wpdb;
+    $booking = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}kounselia_bookings WHERE id = %d", $booking_id ) );
+    if ( ! $booking || 'pending_payment' !== $booking->status ) {
+        return new WP_Error( 'not_found', 'Booking not found.' );
+    }
+    $now = current_time( 'mysql' );
+    $wpdb->update( $wpdb->prefix . 'kounselia_bookings', array(
+        'status'     => 'confirmed',
+        'is_free'    => 1,
+        'updated_at' => $now,
+    ), array( 'id' => $booking->id, 'status' => 'pending_payment' ) );
+    $wpdb->insert( $wpdb->prefix . 'kounselia_booking_payments', array(
+        'booking_id'          => $booking->id,
+        'client_user_id'      => $booking->client_user_id,
+        'professional_id'     => $booking->professional_id,
+        'amount'              => 0,
+        'currency'            => 'NGN',
+        'platform_fee_amount' => 0,
+        'professional_amount' => 0,
+        'payout_currency'     => 'NGN',
+        'reference'           => 'KOUNSELIA-FREE-' . $booking->id . '-' . time(),
+        'status'              => 'free',
+        'created_at'          => $now,
+        'updated_at'          => $now,
+    ) );
+    if ( function_exists( 'kounselia_notify_booking_created' ) ) {
+        kounselia_notify_booking_created( (int) $booking->id );
+    }
+    return true;
+}
+
+/* -------------------------------------------------------------------------
  * CHARGE — collecting payment for a booking
  * ---------------------------------------------------------------------- */
 

@@ -183,7 +183,14 @@ if ( '' !== $kounselia_view ) {
     </article>
 
     <aside class="k-book-card">
-      <?php if ( $price ) : ?><div class="k-book-price"><?php echo esc_html( $price ); ?><small> / session</small></div><?php endif; ?>
+      <?php
+        $free_all   = defined( 'KOUNSELIA_FREE_ALWAYS' ) && (int) $pro->free_sessions_per_client >= KOUNSELIA_FREE_ALWAYS;
+        $free_label = function_exists( 'kounselia_free_sessions_label' ) ? kounselia_free_sessions_label( $pro, get_current_user_id() ) : '';
+      ?>
+      <?php if ( $free_all ) : ?>
+        <div class="k-book-price">Free<small> sessions</small></div>
+      <?php elseif ( $price ) : ?><div class="k-book-price"><?php echo esc_html( $price ); ?><small> / session</small></div><?php endif; ?>
+      <?php if ( $free_label && ! $free_all ) : ?><div class="k-book-perk k-book-free"><i class="ti ti-gift"></i> <?php echo esc_html( $free_label ); ?></div><?php endif; ?>
       <?php if ( $kounselia_pro_discount > 0 ) : ?><div class="k-book-perk"><i class="ti ti-sparkles"></i> Pro members save <?php echo esc_html( $kounselia_discount_txt ); ?>%</div><?php endif; ?>
       <ul>
         <li><i class="ti ti-video"></i> Private video session</li>
@@ -191,7 +198,7 @@ if ( '' !== $kounselia_view ) {
         <li><i class="ti ti-lock"></i> Secure payment by Paystack</li>
         <li><i class="ti ti-message-circle"></i> Message <?php echo esc_html( $first ); ?> before and after</li>
       </ul>
-      <a class="k-btn" href="<?php echo esc_url( kounselia_professional_book_url( $pro ) ); ?>">Book a session</a>
+      <a class="k-btn" href="<?php echo esc_url( kounselia_professional_book_url( $pro ) ); ?>"><?php echo $free_label ? 'Book a free session' : 'Book a session'; ?></a>
       <p class="k-note"><?php echo is_user_logged_in() ? 'Opens your dashboard to choose a time.' : 'Create a free account to book — it takes a minute.'; ?></p>
     </aside>
   </div>

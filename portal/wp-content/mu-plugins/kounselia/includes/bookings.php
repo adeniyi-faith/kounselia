@@ -190,7 +190,7 @@ function kounselia_get_verified_professionals() {
         "SELECT p.*, u.display_name, u.ID AS user_id
          FROM {$wpdb->prefix}kounselia_professionals p
          INNER JOIN {$wpdb->users} u ON u.ID = p.user_id
-         WHERE p.status = 'verified'
+         WHERE p.status = 'verified' AND p.admin_hidden = 0
          ORDER BY u.display_name ASC"
     );
 }
@@ -763,6 +763,14 @@ function kounselia_ajax_create_booking() {
         wp_send_json_error( array( 'message' => 'Please choose a time.' ), 400 );
     }
 
+    // A free session is booked on its own: a weekly series needs a card
+    // on file to charge the following weeks, and a free booking has none.
+    $pro_row   = kounselia_get_professional_by_id( $professional_id );
+    $free_left = ( $pro_row && function_exists( 'kounselia_free_sessions_left' ) ) ? kounselia_free_sessions_left( $pro_row, get_current_user_id() ) : 0;
+    if ( $free_left > 0 ) {
+        $make_recurring = false;
+    }
+
     $series_id = 0;
     if ( $make_recurring && function_exists( 'kounselia_create_booking_series' ) ) {
         $start_ts = strtotime( $scheduled_start );
@@ -780,6 +788,15 @@ function kounselia_ajax_create_booking() {
             kounselia_delete_booking_series( $series_id );
         }
         wp_send_json_error( array( 'message' => $booking_id->get_error_message() ), 400 );
+    }
+
+    if ( $free_left > 0 && function_exists( 'kounselia_confirm_free_booking' ) ) {
+        $confirmed = kounselia_confirm_free_booking( $booking_id );
+        if ( is_wp_error( $confirmed ) ) {
+            kounselia_delete_unpaid_booking( $booking_id );
+            wp_send_json_error( array( 'message' => $confirmed->get_error_message() ), 500 );
+        }
+        wp_send_json_success( array( 'free' => true, 'booking_id' => $booking_id, 'message' => 'You are booked in. This session is free.' ) );
     }
 
     if ( ! function_exists( 'kounselia_init_booking_payment' ) ) {
