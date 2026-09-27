@@ -120,6 +120,10 @@ foreach ( array( 'pending', 'verified', 'rejected' ) as $s ) {
           <?php endforeach; endif; ?>
         </div>
 
+        <?php if ( 'verified' === $app->status && function_exists( 'kounselia_article_publishing_options' ) && kounselia_admin_can( 'blog' ) ) : ?>
+          <div style="font-size:12.5px;color:var(--text2);margin-top:6px"><i class="ti ti-feather"></i> Articles: <?php echo esc_html( kounselia_article_publishing_options()[ $app->publishing ? $app->publishing : 'default' ] ?? 'Follow the site setting' ); ?> · <a href="/portal/admin/pages/articles.php?tab=writers">Change</a></div>
+        <?php endif; ?>
+
         <?php if ( 'rejected' === $app->status && $app->rejection_reason ) : ?>
           <div class="rejected-reason">Rejected: <?php echo esc_html( $app->rejection_reason ); ?></div>
         <?php endif; ?>

@@ -945,3 +945,36 @@ function kounselia_ajax_follow_emails() {
     wp_send_json_success( array( 'on' => $on ) );
 }
 add_action( 'wp_ajax_kounselia_follow_emails', 'kounselia_ajax_follow_emails' );
+
+/* -------------------------------------------------------------------------
+ * ADMIN AJAX (Admin → Articles → Community)
+ * ---------------------------------------------------------------------- */
+
+function kounselia_ajax_admin_comment_moderate() {
+    kounselia_content_admin_guard( 'blog' );
+    $act    = sanitize_key( kounselia_post_field( 'act' ) );
+    $result = kounselia_comment_moderate( get_current_user_id(), (int) kounselia_post_field( 'comment_id', 0 ), $act );
+    if ( is_wp_error( $result ) ) {
+        kounselia_send_pure_json_error( array( 'message' => $result->get_error_message() ), 400 );
+    }
+    kounselia_send_pure_json_success( array( 'message' => 'Done.' ) );
+}
+add_action( 'wp_ajax_kounselia_admin_comment_moderate', 'kounselia_ajax_admin_comment_moderate' );
+
+/** Stops (or lets again) one member from commenting anywhere. */
+function kounselia_ajax_admin_community_ban() {
+    kounselia_content_admin_guard( 'blog' );
+    $user_id = (int) kounselia_post_field( 'user_id', 0 );
+    if ( ! $user_id || ! get_userdata( $user_id ) ) {
+        kounselia_send_pure_json_error( array( 'message' => 'That member no longer exists.' ), 404 );
+    }
+    $ban = '1' === (string) kounselia_post_field( 'ban', '1' );
+    if ( $ban ) {
+        update_user_meta( $user_id, 'kounselia_community_banned', 1 );
+    } else {
+        delete_user_meta( $user_id, 'kounselia_community_banned' );
+    }
+    kounselia_admin_log( $ban ? 'community_ban' : 'community_unban', 'user', $user_id );
+    kounselia_send_pure_json_success( array( 'message' => $ban ? 'This member can no longer comment.' : 'This member can comment again.' ) );
+}
+add_action( 'wp_ajax_kounselia_admin_community_ban', 'kounselia_ajax_admin_community_ban' );

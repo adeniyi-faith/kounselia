@@ -142,6 +142,13 @@ function kounselia_admin_post_status_pill( $p, $now ) {
           <label for="b-excerpt">Short summary</label>
           <textarea id="b-excerpt" placeholder="Shown on the blog list and in emails. Leave empty to use the subtitle."><?php echo esc_textarea( (string) ( $post ? $post->excerpt : '' ) ); ?></textarea>
         </div>
+        <?php if ( $post && function_exists( 'kounselia_is_pro_article' ) && kounselia_is_pro_article( $post ) ) : ?>
+        <div class="field">
+          <label>Author</label>
+          <div class="hint" style="font-size:13px;color:var(--text)"><i class="ti ti-stethoscope"></i> <?php echo esc_html( kounselia_blog_author( $post )['name'] ); ?>, a professional. <a href="/portal/admin/pages/articles.php?tab=all">Manage in Articles</a></div>
+          <input type="hidden" id="b-author" value="<?php echo (int) $post->author_id; ?>">
+        </div>
+        <?php else : ?>
         <div class="field">
           <label for="b-author">Author</label>
           <select id="b-author">
@@ -151,6 +158,7 @@ function kounselia_admin_post_status_pill( $p, $now ) {
             <?php endforeach; ?>
           </select>
         </div>
+        <?php endif; ?>
         <label class="check"><input type="checkbox" id="b-featured" <?php checked( $post && $post->featured ); ?>> <span>Feature at the top of the blog</span></label>
       </div>
 
@@ -258,7 +266,7 @@ function kounselia_admin_post_status_pill( $p, $now ) {
         $where[]  = 'title LIKE %s';
         $params[] = '%' . $wpdb->esc_like( $search ) . '%';
     }
-    $sql   = "SELECT id, slug, title, status, published_at, updated_at, author_id, views, cover_image, featured, notify_campaign_id, tags FROM {$posts_table} WHERE " . implode( ' AND ', $where ) . ' ORDER BY COALESCE(published_at, updated_at) DESC LIMIT 200';
+    $sql   = "SELECT id, slug, title, status, published_at, updated_at, author_id, author_type, views, cover_image, featured, notify_campaign_id, tags FROM {$posts_table} WHERE " . implode( ' AND ', $where ) . ' ORDER BY COALESCE(published_at, updated_at) DESC LIMIT 200';
     $posts = $wpdb->get_results( $params ? $wpdb->prepare( $sql, $params ) : $sql );
     $counts = $wpdb->get_row( $wpdb->prepare(
         "SELECT COUNT(*) AS total, SUM(status='draft') AS drafts, SUM(status='published' AND published_at > %s) AS scheduled, SUM(status='published' AND published_at <= %s) AS published, COALESCE(SUM(views),0) AS views FROM {$posts_table}",
@@ -327,7 +335,7 @@ function kounselia_admin_post_status_pill( $p, $now ) {
             <tr>
               <td data-label="Post"><div class="post-cell">
                 <?php if ( $p->cover_image ) : ?><img class="thumb" src="<?php echo esc_url( $p->cover_image ); ?>" alt=""><?php else : ?><span class="thumb"></span><?php endif; ?>
-                <div><a href="?edit=<?php echo (int) $p->id; ?>" class="row-title"><?php echo esc_html( $p->title ); ?></a><?php echo $p->featured ? ' <span class="pill blue">Featured</span>' : ''; ?>
+                <div><a href="?edit=<?php echo (int) $p->id; ?>" class="row-title"><?php echo esc_html( $p->title ); ?></a><?php echo $p->featured ? ' <span class="pill blue">Featured</span>' : ''; ?><?php echo 'professional' === $p->author_type ? ' <span class="pill plum">Professional</span>' : ''; ?>
                 <div class="row-sub"><?php echo esc_html( $author ? $author->display_name : '—' ); ?><?php echo $p->tags ? ' · ' . esc_html( $p->tags ) : ''; ?></div></div>
               </div></td>
               <td data-label="Status"><?php echo kounselia_admin_post_status_pill( $p, $now ); ?></td>

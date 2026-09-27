@@ -27,6 +27,10 @@ if ( ! function_exists( 'kounselia_nav_allowed' ) ) {
         if ( $kounselia_nav_is_super || 'dashboard' === $slug || 'settings' === $slug ) {
             return true;
         }
+        // Articles & community is part of the Blog permission.
+        if ( 'articles' === $slug ) {
+            $slug = 'blog';
+        }
         return is_array( $kounselia_nav_perms ) && in_array( $slug, $kounselia_nav_perms, true );
     }
 }
@@ -41,6 +45,9 @@ if ( kounselia_nav_allowed( 'safety' ) ) {
 }
 if ( kounselia_nav_allowed( 'professionals' ) ) {
     $kounselia_nav_badges['professionals'] = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_professionals WHERE status = 'pending'" );
+}
+if ( kounselia_nav_allowed( 'articles' ) && function_exists( 'kounselia_article_pending_count' ) ) {
+    $kounselia_nav_badges['articles'] = kounselia_article_pending_count() + kounselia_community_attention_count();
 }
 $wpdb->suppress_errors( $kounselia_nav_quiet );
 
@@ -64,6 +71,7 @@ $kounselia_nav_groups = array(
     'Content & outreach' => array(
         array( 'broadcasts', '/portal/admin/pages/newsletter.php', 'Newsletter', 'mail' ),
         array( 'blog', '/portal/admin/pages/blog.php', 'Blog', 'feather' ),
+        array( 'articles', '/portal/admin/pages/articles.php', 'Articles & community', 'users-group' ),
         array( 'pages', '/portal/admin/pages/pages.php', 'Pages', 'file-text' ),
     ),
     'Business'          => array(
