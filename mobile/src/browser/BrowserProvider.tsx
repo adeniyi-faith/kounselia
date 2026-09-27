@@ -12,7 +12,7 @@ import * as Clipboard from 'expo-clipboard';
 import { router } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Linking, Modal, Platform, Pressable, Share, Text, View } from 'react-native';
+import { BackHandler, Linking, Modal, Platform, Pressable, Share, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { TablerIcon } from '@/components/TablerIcon';
 import { fonts, makeStyles, useColors } from '@/theme';
@@ -206,6 +206,23 @@ function InAppBrowser({
       return false;
     };
   }, [backRef, nav.canGoBack]);
+
+  // The Modal's own onRequestClose (below) is the documented way to catch
+  // Android's back button, but it's a passive prop rather than a real
+  // listener, and can lose the race to whatever's already listening on
+  // the screen underneath — which is how back ends up closing the app
+  // instead of the browser catching it. An explicit BackHandler listener
+  // is the reliable version: RN calls the most-recently-added one first,
+  // so as long as this browser is open, its press is always ours to
+  // take before anything underneath ever sees it.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (backRef.current()) return true;
+      onClose();
+      return true;
+    });
+    return () => sub.remove();
+  }, [backRef, onClose]);
 
   const secure = nav.url.startsWith('https://');
   // Website pages end their titles with the site name ("Safety resources — Kounselia");
