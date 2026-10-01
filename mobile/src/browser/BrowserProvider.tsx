@@ -28,6 +28,9 @@ interface OpenOptions {
   // Closes the browser by itself once a page matching this has loaded
   // (e.g. the "payment received" page Paystack sends people back to).
   closeWhen?: (url: string) => boolean;
+  // Show the web page even where the app has its own screen for it (an
+  // author previewing an article that isn't on the Journal yet).
+  web?: boolean;
 }
 
 interface Browser {
@@ -114,7 +117,7 @@ export function BrowserProvider({ children }: { children: ReactNode }) {
         Linking.openURL(url).catch(() => undefined);
         return Promise.resolve();
       }
-      const native = nativeRoute(url);
+      const native = options.web ? null : nativeRoute(url);
       if (native) {
         router.push(native);
         return Promise.resolve();
