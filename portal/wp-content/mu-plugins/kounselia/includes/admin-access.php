@@ -220,8 +220,10 @@ function kounselia_ajax_admin_force_password() {
     wp_set_password( $new_password, $user_id );
     delete_user_meta( $user_id, 'kounselia_force_password_change' );
 
-    // Re-authenticate them immediately so they aren't logged out
-    wp_set_auth_cookie( $user_id, false, is_ssl() );
+    // Re-authenticate them immediately so they aren't logged out. They
+    // reached this from inside the admin panel, so the new session is
+    // marked as an admin one too.
+    kounselia_admin_set_auth_cookie( $user_id );
 
     kounselia_send_pure_json_success();
 }
@@ -239,7 +241,7 @@ add_action( 'wp_ajax_kounselia_admin_force_password', 'kounselia_ajax_admin_forc
 
 function kounselia_ajax_admin_save_counselor() {
     check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
-    if ( ! kounselia_user_is_admin() ) kounselia_send_pure_json_error( array( 'message' => 'Unauthorized access.' ), 403 );
+    if ( ! kounselia_admin_can( 'counselors' ) ) kounselia_send_pure_json_error( array( 'message' => 'Unauthorized access.' ), 403 );
 
     global $wpdb;
     
@@ -304,7 +306,7 @@ add_action( 'wp_ajax_kounselia_admin_save_counselor', 'kounselia_ajax_admin_save
 
 function kounselia_ajax_admin_get_member() {
     check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
-    if ( ! kounselia_user_is_admin() ) kounselia_send_pure_json_error( array('message' => 'Unauthorized'), 403 );
+    if ( ! kounselia_admin_can( 'members' ) ) kounselia_send_pure_json_error( array('message' => 'Unauthorized'), 403 );
 
     $user_id = (int) $_POST['user_id'];
     $user = get_userdata( $user_id );
@@ -359,6 +361,18 @@ function kounselia_admin_apply_member_action( $user_id, $action ) {
         return array( 'ok' => false, 'message' => 'User not found.' );
     }
 
+    // Banning, trashing or purging is for members. Staff could otherwise
+    // lock out (or erase) a Super Admin, or each other, from the Members
+    // page, and nobody should be able to lock themselves out by accident.
+    if ( in_array( $action, array( 'ban', 'delete', 'purge' ), true ) ) {
+        if ( (int) $user_id === get_current_user_id() ) {
+            return array( 'ok' => false, 'message' => 'You cannot do that to your own account.' );
+        }
+        if ( kounselia_user_is_admin( $user_id ) && ! current_user_can( 'administrator' ) ) {
+            return array( 'ok' => false, 'message' => 'That is a team account. Only a Super Admin can do that.' );
+        }
+    }
+
     switch ( $action ) {
         case 'ban':
             update_user_meta( $user_id, 'kounselia_banned', 1 );
@@ -371,6 +385,7 @@ function kounselia_admin_apply_member_action( $user_id, $action ) {
                     update_option( 'kounselia_banned_ips', $banned_ips );
                 }
             }
+            kounselia_end_member_sessions( $user_id );
             kounselia_admin_log( 'banned_user', 'user', $user_id );
             return array( 'ok' => true, 'message' => 'User and their IP address have been banned.' );
 
@@ -411,6 +426,7 @@ function kounselia_admin_apply_member_action( $user_id, $action ) {
                 update_user_meta( $user_id, 'kounselia_banned', 1 );
                 update_user_meta( $user_id, 'kounselia_banned_by_delete', 1 );
             }
+            kounselia_end_member_sessions( $user_id );
             kounselia_admin_log( 'soft_deleted_user', 'user', $user_id );
             return array( 'ok' => true, 'message' => 'User moved to Trash. Restore any time, or purge to erase permanently.' );
 
@@ -460,7 +476,7 @@ function kounselia_admin_apply_member_action( $user_id, $action ) {
 
 function kounselia_ajax_admin_wipe_member_data() {
     check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
-    if ( ! kounselia_user_is_admin() ) kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
+    if ( ! kounselia_admin_can( 'members' ) ) kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
 
     $user_id = isset( $_POST['user_id'] ) ? (int) $_POST['user_id'] : 0;
     $target  = isset( $_POST['target'] ) ? sanitize_key( $_POST['target'] ) : '';
@@ -589,7 +605,7 @@ add_action( 'wp_ajax_kounselia_admin_revoke_session', 'kounselia_ajax_admin_revo
 
 function kounselia_ajax_admin_update_member() {
     check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
-    if ( ! kounselia_user_is_admin() ) kounselia_send_pure_json_error( array('message' => 'Unauthorized'), 403 );
+    if ( ! kounselia_admin_can( 'members' ) ) kounselia_send_pure_json_error( array('message' => 'Unauthorized'), 403 );
 
     $user_id = (int) $_POST['user_id'];
     $action  = sanitize_text_field( $_POST['do_action'] );
@@ -610,7 +626,7 @@ add_action( 'wp_ajax_kounselia_admin_update_member', 'kounselia_ajax_admin_updat
  */
 function kounselia_ajax_admin_bulk_update_members() {
     check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
-    if ( ! kounselia_user_is_admin() ) kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
+    if ( ! kounselia_admin_can( 'members' ) ) kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
 
     $action   = isset( $_POST['do_action'] ) ? sanitize_text_field( wp_unslash( $_POST['do_action'] ) ) : '';
     $ids_raw  = isset( $_POST['user_ids'] ) ? sanitize_text_field( wp_unslash( $_POST['user_ids'] ) ) : '';

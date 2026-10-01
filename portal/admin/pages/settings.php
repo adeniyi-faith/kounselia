@@ -18,6 +18,20 @@ require_once __DIR__ . '/../inc/admin-helpers.php';
 $kounselia_notice = '';
 $kounselia_error  = '';
 
+// API keys (Gemini, Paystack, 8x8 video), money settings (currency,
+// commission) and platform limits are for Super Admins only. Staff still
+// see and use the rest of this page (safety keywords and alerts,
+// maintenance, and their own sign-in security).
+$kounselia_is_super_admin    = current_user_can( 'administrator' );
+$kounselia_super_admin_only  = array(
+    'save_gemini_keys',
+    'test_gemini',
+    'save_paystack_key',
+    'save_jaas_settings',
+    'save_currency_settings',
+    'save_platform_settings',
+);
+
 // -------------------------------------------------------------------------
 // POST Action Handling & Nonce Verification
 // -------------------------------------------------------------------------
@@ -25,8 +39,11 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
 
     $kounselia_action = sanitize_key( $_POST['kounselia_action'] );
 
+    if ( ! $kounselia_is_super_admin && in_array( $kounselia_action, $kounselia_super_admin_only, true ) ) {
+        $kounselia_error = 'Only a Super Admin can change that setting.';
+
     // 1. Save Gemini API Keys
-    if ( 'save_gemini_keys' === $kounselia_action
+    } elseif ( 'save_gemini_keys' === $kounselia_action
         && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_gemini' ) ) {
 
         $raw  = isset( $_POST['gemini_keys'] ) ? (string) wp_unslash( $_POST['gemini_keys'] ) : '';
@@ -390,6 +407,7 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
     <div class="login-msg error" style="margin-bottom:20px;"><?php echo esc_html( $kounselia_error ); ?></div>
   <?php endif; ?>
 
+  <?php if ( $kounselia_is_super_admin ) : ?>
   <!-- ===============================================================
        1. AI PROVIDER & KEY MANAGEMENT
   ================================================---------------- -->
@@ -436,6 +454,7 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
       <span style="font-size:12px;color:var(--text3);">Fires a live request through the model cascade and benchmarks round-trip network latency.</span>
     </form>
   </div>
+  <?php endif; ?>
 
   <!-- ===============================================================
        2. SAFETY GUARDRAILS & MODERATION ENGINE
@@ -550,6 +569,7 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
   </div>
   <?php endif; ?>
 
+  <?php if ( $kounselia_is_super_admin ) : ?>
   <!-- ===============================================================
        2B-2. VIDEO CALLS (8x8 hosted Jitsi)
   ================================================---------------- -->
@@ -589,7 +609,9 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
       <button type="submit" class="login-submit" style="width:auto;padding:11px 22px;">Save video settings</button>
     </form>
   </div>
+  <?php endif; ?>
 
+  <?php if ( $kounselia_is_super_admin ) : ?>
   <!-- ===============================================================
        2C. PAYSTACK PAYMENTS
   ================================================---------------- -->
@@ -687,7 +709,9 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
       <?php endif; ?>
     </div>
   </div>
+  <?php endif; ?>
 
+  <?php if ( $kounselia_is_super_admin ) : ?>
   <!-- ===============================================================
        2D. CURRENCY & PRICING
   ================================================---------------- -->
@@ -744,7 +768,9 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
       </div>
     </form>
   </div>
+  <?php endif; ?>
 
+  <?php if ( $kounselia_is_super_admin ) : ?>
   <!-- ===============================================================
        3. PLATFORM CONFIGURATION & LIMITS
   ================================================---------------- -->
@@ -803,6 +829,7 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
       </div>
     </form>
   </div>
+  <?php endif; ?>
 
   <!-- ===============================================================
        4. SYSTEM MAINTENANCE & CACHE OPERATIONS
