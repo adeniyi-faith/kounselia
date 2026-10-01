@@ -40,7 +40,7 @@ function kounselia_ajax_forgot_password() {
             // Build the standard WordPress reset URL
             $reset_url = network_site_url( "wp-login.php?action=rp&key=$key&login=" . rawurlencode( $user->user_login ), 'login' );
             
-            $first_name = explode( ' ', trim( $user->display_name ?: $user->user_login ) )[0];
+            $first_name = esc_html( explode( ' ', trim( $user->display_name ?: $user->user_login ) )[0] );
             $headline   = "Reset your password";
             $content    = "<p style='margin-bottom: 18px;'>Hi {$first_name},</p>
                            <p style='margin-bottom: 18px;'>Someone requested a password reset for your Kounselia account. If this was you, you can set a new password by clicking the button below.</p>

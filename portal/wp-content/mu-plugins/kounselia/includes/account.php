@@ -43,7 +43,16 @@ function kounselia_ajax_upload_avatar() {
 
     $user_id = get_current_user_id();
 
-    $attachment_id = media_handle_upload( 'avatar', 0 );
+    // The type check above trusts what the browser says; this one looks at
+    // the file itself, and only allows pictures.
+    $attachment_id = media_handle_upload( 'avatar', 0, array(), array(
+        'test_form' => false,
+        'mimes'     => array(
+            'jpg|jpeg|jpe' => 'image/jpeg',
+            'png'          => 'image/png',
+            'webp'         => 'image/webp',
+        ),
+    ) );
 
     if ( is_wp_error( $attachment_id ) ) {
         wp_send_json_error( array( 'message' => 'Could not upload that image, please try again.' ), 500 );

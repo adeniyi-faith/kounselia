@@ -548,20 +548,42 @@ function kounselia_save_payout_account( $professional_id, $bank_code, $bank_name
  * BALANCE & PAYOUTS
  * ---------------------------------------------------------------------- */
 
+/**
+ * Only sessions whose time has passed can be paid out. Clients pay when
+ * they book, and an upcoming session can still be cancelled and refunded;
+ * once its earnings had been paid out, that refund needed a person.
+ * (A payment with no booking row left is treated as earned.)
+ */
+function kounselia_booking_payment_is_earned_sql() {
+    global $wpdb;
+    return $wpdb->prepare(
+        "NOT EXISTS (SELECT 1 FROM {$wpdb->prefix}kounselia_bookings b WHERE b.id = bp.booking_id AND b.scheduled_end > %s)",
+        current_time( 'mysql' )
+    );
+}
+
 function kounselia_get_unpaid_booking_payments( $professional_id ) {
     global $wpdb;
+    $earned = kounselia_booking_payment_is_earned_sql();
     return $wpdb->get_results( $wpdb->prepare(
-        "SELECT id, professional_amount FROM {$wpdb->prefix}kounselia_booking_payments
-         WHERE professional_id = %d AND status = 'success' AND payout_id IS NULL",
+        "SELECT bp.id, bp.professional_amount FROM {$wpdb->prefix}kounselia_booking_payments bp
+         WHERE bp.professional_id = %d AND bp.status = 'success' AND bp.payout_id IS NULL AND {$earned}",
         $professional_id
     ) );
 }
 
 function kounselia_get_professional_balance( $professional_id ) {
     global $wpdb;
+    $earned    = kounselia_booking_payment_is_earned_sql();
     $available = (float) $wpdb->get_var( $wpdb->prepare(
-        "SELECT COALESCE(SUM(professional_amount),0) FROM {$wpdb->prefix}kounselia_booking_payments
-         WHERE professional_id = %d AND status = 'success' AND payout_id IS NULL",
+        "SELECT COALESCE(SUM(bp.professional_amount),0) FROM {$wpdb->prefix}kounselia_booking_payments bp
+         WHERE bp.professional_id = %d AND bp.status = 'success' AND bp.payout_id IS NULL AND {$earned}",
+        $professional_id
+    ) );
+    // Paid for, but the session hasn't happened yet.
+    $upcoming = (float) $wpdb->get_var( $wpdb->prepare(
+        "SELECT COALESCE(SUM(bp.professional_amount),0) FROM {$wpdb->prefix}kounselia_booking_payments bp
+         WHERE bp.professional_id = %d AND bp.status = 'success' AND bp.payout_id IS NULL AND NOT ( {$earned} )",
         $professional_id
     ) );
     $total_earned = (float) $wpdb->get_var( $wpdb->prepare(
@@ -574,7 +596,7 @@ function kounselia_get_professional_balance( $professional_id ) {
          WHERE professional_id = %d AND status IN ('success','pending')",
         $professional_id
     ) );
-    return array( 'available' => $available, 'total_earned' => $total_earned, 'paid_out' => $paid_out );
+    return array( 'available' => $available, 'upcoming' => $upcoming, 'total_earned' => $total_earned, 'paid_out' => $paid_out );
 }
 
 function kounselia_get_payout_history( $professional_id ) {
@@ -625,6 +647,23 @@ function kounselia_request_payout( $professional_id ) {
         'updated_at'      => $now,
     ) );
     $payout_id = (int) $wpdb->insert_id;
+
+    // Claim the earnings for this payout before asking Paystack for the
+    // money. Before, they were only stamped after the transfer call came
+    // back, so two requests close together (a double tap, two tabs) could
+    // both send the same balance. Only rows still unclaimed are taken; if
+    // another request got any of them first, this one backs off.
+    $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+    $claimed      = (int) $wpdb->query( $wpdb->prepare(
+        "UPDATE {$wpdb->prefix}kounselia_booking_payments SET payout_id = %d WHERE id IN ({$placeholders}) AND payout_id IS NULL",
+        array_merge( array( $payout_id ), $ids )
+    ) );
+    if ( $claimed !== count( $ids ) ) {
+        $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->prefix}kounselia_booking_payments SET payout_id = NULL WHERE payout_id = %d", $payout_id ) );
+        $wpdb->delete( $wpdb->prefix . 'kounselia_payouts', array( 'id' => $payout_id ) );
+        return new WP_Error( 'payout_in_progress', 'A payout is already being sent. Please refresh the page to see it.' );
+    }
+
     $reference = 'KOUNSELIA-PAYOUT-' . $payout_id . '-' . time();
 
     $transfer = kounselia_paystack_request( 'POST', '/transfer', array(
@@ -642,6 +681,8 @@ function kounselia_request_payout( $professional_id ) {
             'gateway_response' => wp_json_encode( $transfer['data'] ),
             'updated_at'       => current_time( 'mysql' ),
         ), array( 'id' => $payout_id ) );
+        // Nothing was sent, so the earnings are available again.
+        $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->prefix}kounselia_booking_payments SET payout_id = NULL WHERE payout_id = %d", $payout_id ) );
         return new WP_Error( 'transfer_failed', $transfer['message'] ?: 'Could not start the payout. Please try again shortly.' );
     }
 
@@ -660,12 +701,6 @@ function kounselia_request_payout( $professional_id ) {
         'updated_at'             => current_time( 'mysql' ),
         'completed_at'           => ( 'success' === $transfer_status ) ? current_time( 'mysql' ) : null,
     ), array( 'id' => $payout_id ) );
-
-    $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
-    $wpdb->query( $wpdb->prepare(
-        "UPDATE {$wpdb->prefix}kounselia_booking_payments SET payout_id = %d WHERE id IN ({$placeholders})",
-        array_merge( array( $payout_id ), $ids )
-    ) );
 
     return $payout_id;
 }
