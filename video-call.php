@@ -7,9 +7,11 @@
  * booking (the client, or the professional whose slot it was) — anyone
  * else is bounced before anything about the booking is revealed.
  *
- * The call itself runs on Jitsi Meet's free public server (meet.jit.si)
- * via their embeddable iframe API — this app has no media/signaling
- * server of its own. The room name is a random per-booking token
+ * The call itself runs on Jitsi via their embeddable iframe API — this
+ * app has no media/signaling server of its own. When an admin has set up
+ * 8x8's hosted Jitsi (video-room.php), each person gets a signed pass
+ * that makes them a host, so nobody waits for a "moderator" or is asked
+ * to log in; otherwise it falls back to the free public meet.jit.si. The room name is a random per-booking token
  * (kounselia_bookings.room_token), never the booking id itself, so it
  * can't be guessed or enumerated by anyone who isn't sent this link. For
  * a two-person call, Jitsi connects the participants directly
@@ -53,8 +55,8 @@ $can_join     = kounselia_booking_is_joinable( $booking );
 $window       = kounselia_booking_join_window( $booking );
 
 $dashboard_url = $is_professional_side ? '/pro-dashboard.php' : '/dashboard.php';
-$room_name     = 'kounselia-' . $booking->room_token;
 $video         = function_exists( 'kounselia_booking_video' ) ? kounselia_booking_video( $booking ) : array( 'external' => false, 'provider' => 'Kounselia', 'url' => '' );
+$room          = ( $can_join && ! $video['external'] ) ? kounselia_booking_room( $booking, $user ) : null;
 
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_auth' );
@@ -106,10 +108,13 @@ body{font-family:'Outfit',sans-serif;color:#fff;margin:0;display:flex;flex-direc
   </div>
 <?php elseif ( $can_join ) : ?>
   <div id="jitsi-container"></div>
-  <script src="https://meet.jit.si/external_api.js"></script>
+  <script src="<?php echo esc_url( $room['script_url'] ); ?>"></script>
   <script>
-    new JitsiMeetExternalAPI('meet.jit.si', {
-      roomName: <?php echo wp_json_encode( $room_name ); ?>,
+    new JitsiMeetExternalAPI(<?php echo wp_json_encode( $room['domain'] ); ?>, {
+      roomName: <?php echo wp_json_encode( $room['room'] ); ?>,
+<?php if ( $room['jwt'] ) : ?>
+      jwt: <?php echo wp_json_encode( $room['jwt'] ); ?>,
+<?php endif; ?>
       parentNode: document.getElementById('jitsi-container'),
       userInfo: { displayName: <?php echo wp_json_encode( $display_name ); ?> },
       configOverwrite: { prejoinPageEnabled: true, disableDeepLinking: true },

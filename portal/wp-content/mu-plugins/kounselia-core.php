@@ -73,6 +73,7 @@ require_once KOUNSELIA_CORE_DIR . '/includes/check-ins.php';         // 18B. Sma
 require_once KOUNSELIA_CORE_DIR . '/includes/professionals.php';     // 18C. Professional marketplace: applications, verification, private docs
 require_once KOUNSELIA_CORE_DIR . '/includes/professionals-admin.php'; // 18C-2. Admin: edit, hide, suspend, reinstate a professional
 require_once KOUNSELIA_CORE_DIR . '/includes/video-links.php';       // 18C-3. A professional's own Zoom / Meet / Teams / Whereby link
+require_once KOUNSELIA_CORE_DIR . '/includes/video-room.php';        // 18C-4. Kounselia's own video room: 8x8 (no login, no waiting for a host) or meet.jit.si
 require_once KOUNSELIA_CORE_DIR . '/includes/bookings.php';          // 18E. Booking calendar: availability + confirmed sessions
 require_once KOUNSELIA_CORE_DIR . '/includes/currency.php';          // 18D-0. Naira vs dollar pricing by visitor location
 require_once KOUNSELIA_CORE_DIR . '/includes/payments.php';          // 18D. Paystack subscriptions: plans, checkout, cancellation

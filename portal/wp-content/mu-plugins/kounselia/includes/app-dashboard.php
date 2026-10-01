@@ -343,13 +343,11 @@ function kounselia_ajax_get_booking_room() {
         wp_send_json_success( array( 'url' => $video['url'], 'external' => true, 'provider' => $video['provider'] ) );
     }
 
-    $user = wp_get_current_user();
-    $name = $user->display_name ? $user->display_name : $user->user_login;
-    $url  = 'https://meet.jit.si/kounselia-' . rawurlencode( $booking->room_token )
-        . '#config.prejoinPageEnabled=true&config.disableDeepLinking=true'
-        . '&userInfo.displayName=' . rawurlencode( wp_json_encode( $name ) );
+    // 8x8's hosted Jitsi with a signed pass when it's set up, so nobody
+    // waits for a "moderator" or is asked to log in (video-room.php).
+    $room = kounselia_booking_room( $booking, wp_get_current_user() );
 
-    wp_send_json_success( array( 'url' => $url, 'external' => false, 'provider' => 'Kounselia' ) );
+    wp_send_json_success( array( 'url' => $room['url'], 'external' => false, 'provider' => 'Kounselia' ) );
 }
 add_action( 'wp_ajax_kounselia_get_booking_room', 'kounselia_ajax_get_booking_room' );
 add_action( 'wp_ajax_nopriv_kounselia_get_booking_room', 'kounselia_ajax_get_booking_room' );
