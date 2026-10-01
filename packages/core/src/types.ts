@@ -73,4 +73,10 @@ export interface AppUser {
   id: number;
   name: string;
   email: string;
+  // Set once they've applied as a professional; the app then opens their
+  // professional home. Older servers leave it out.
+  professional?: { id: number; status: ProfessionalStatus } | null;
 }
+
+// Where a professional's application stands.
+export type ProfessionalStatus = 'pending' | 'verified' | 'rejected' | 'suspended';

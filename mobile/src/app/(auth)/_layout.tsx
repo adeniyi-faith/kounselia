@@ -32,6 +32,7 @@ export default function AuthLayout() {
       <Stack.Screen name="sign-in" options={formTransition} />
       <Stack.Screen name="sign-up" options={formTransition} />
       <Stack.Screen name="forgot-password" />
+      <Stack.Screen name="apply" />
     </Stack>
   );
 }

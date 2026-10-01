@@ -13,7 +13,15 @@ const ICONS: Record<string, string> = { index: 'home', sessions: 'history', book
 const LABELS: Record<string, string> = { index: 'Home', sessions: 'Sessions', book: 'Book', settings: 'Settings' };
 const CENTRE = 'talk';
 
-export function TabBar({ state, navigation, descriptors }: BottomTabBarProps) {
+interface Options {
+  // Another set of tabs (the professional's) passes its own icons and
+  // labels, by route name, and any tabs to leave out for now.
+  icons?: Record<string, string>;
+  labels?: Record<string, string>;
+  hidden?: string[];
+}
+
+export function TabBar({ state, navigation, descriptors, icons = ICONS, labels = LABELS, hidden = [] }: BottomTabBarProps & Options) {
   const styles = useStyles();
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -21,6 +29,7 @@ export function TabBar({ state, navigation, descriptors }: BottomTabBarProps) {
   return (
     <View style={[styles.bar, { paddingBottom: insets.bottom, height: 64 + insets.bottom }]}>
       {state.routes.map((route, index) => {
+        if (hidden.includes(route.name)) return null;
         const focused = state.index === index;
         const onPress = () => {
           const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
@@ -58,8 +67,8 @@ export function TabBar({ state, navigation, descriptors }: BottomTabBarProps) {
             accessibilityLabel={label}
             style={styles.tab}
           >
-            <TablerIcon name={ICONS[route.name] ?? 'circle'} size={22} color={tint} />
-            <Text style={[styles.label, { color: tint }]}>{LABELS[route.name] ?? label}</Text>
+            <TablerIcon name={icons[route.name] ?? 'circle'} size={22} color={tint} />
+            <Text style={[styles.label, { color: tint }]}>{labels[route.name] ?? label}</Text>
           </Pressable>
         );
       })}
