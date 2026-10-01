@@ -27,6 +27,7 @@ import { Button } from '@/components/Button';
 import { Toast, useToast } from '@/components/chat/Toast';
 import { FormMessage } from '@/components/FormMessage';
 import { openSafetyResources } from '@/components/openSafety';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Sheet } from '@/components/Sheet';
 import { TablerIcon } from '@/components/TablerIcon';
 import { TextField } from '@/components/TextField';
@@ -41,10 +42,12 @@ const APPEARANCES: { key: Appearance; label: string; icon: string }[] = [
   { key: 'system', label: 'Device', icon: 'device-mobile' },
 ];
 
-export default function Settings() {
+// `inStack`: opened on top of a professional's own tabs (app/(app)/account.tsx)
+// rather than as the client side's Settings tab, so it gets a back button.
+export default function Settings({ inStack = false }: { inStack?: boolean }) {
   const styles = useStyles();
   const colors = useColors();
-  const { user, config, signOut, updateUser, deleteAccount } = useSession();
+  const { user, config, signOut, updateUser, deleteAccount, setViewMode } = useSession();
   const { appearance, setAppearance, scheme } = useTheme();
   const appearanceNote = appearance === 'system' ? `Matches your phone, which is using ${scheme} mode now.` : undefined;
   const { openInApp } = useBrowser();
@@ -187,14 +190,17 @@ export default function Settings() {
   const memory = account?.memory;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={inStack ? ['top', 'left', 'right', 'bottom'] : ['top', 'left', 'right']}>
+      {inStack && <ScreenHeader title="Account settings" />}
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
       >
-        <Text style={styles.title} accessibilityRole="header">
-          Settings
-        </Text>
+        {!inStack && (
+          <Text style={styles.title} accessibilityRole="header">
+            Settings
+          </Text>
+        )}
 
         {/* Profile */}
         <View style={styles.profile}>
@@ -294,6 +300,33 @@ export default function Settings() {
             })}
           </View>
         </Group>
+
+        {/* For professionals: back to their own home. For everyone else:
+            the website's "Join as a professional" (apply.php). Left out on
+            top of a professional's own tabs, which already are that home. */}
+        {!inStack && (
+          <Group title="For professionals">
+            {user?.professional ? (
+              <Row
+                icon="switch-horizontal"
+                tint="gold"
+                label="Switch to professional view"
+                sub="Your bookings, profile, articles and earnings"
+                onPress={() => setViewMode('professional')}
+                last
+              />
+            ) : (
+              <Row
+                icon="stethoscope"
+                tint="gold"
+                label="Join as a professional"
+                sub="Licensed therapist or counselor? See clients on Kounselia."
+                onPress={() => router.push('/apply')}
+                last
+              />
+            )}
+          </Group>
+        )}
 
         <Group title="Account">
           <Row icon="user" label="Name" value={name} onPress={() => setSheet('name')} />

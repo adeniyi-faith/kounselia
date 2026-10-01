@@ -120,7 +120,13 @@ function kounselia_store_professional_document( $professional_id, $file, $doc_ty
     $stored_filename = wp_generate_password( 32, false ) . '.' . $filetype['ext'];
     $dest            = trailingslashit( kounselia_professional_docs_dir() ) . $stored_filename;
 
-    if ( ! move_uploaded_file( $file['tmp_name'], $dest ) ) {
+    // The app sends files as base64, so they're written to a temporary
+    // file by kounselia_app_file_from_base64() rather than uploaded the
+    // usual way; move_uploaded_file() refuses anything PHP didn't receive
+    // as an upload itself. Only our own code can set this flag: PHP builds
+    // each $_FILES entry and never adds keys of its own choosing.
+    $moved = ! empty( $file['kounselia_app'] ) ? @rename( $file['tmp_name'], $dest ) : move_uploaded_file( $file['tmp_name'], $dest );
+    if ( ! $moved ) {
         return false;
     }
 
@@ -205,6 +211,16 @@ function kounselia_ajax_view_professional_document() {
         wp_die( 'You do not have access to this document.', 'Unauthorized', array( 'response' => 403 ) );
     }
 
+    kounselia_stream_professional_document( $doc );
+}
+add_action( 'wp_ajax_kounselia_view_professional_document', 'kounselia_ajax_view_professional_document' );
+
+/**
+ * Sends one stored document to the browser and ends the request. Only
+ * call it once the viewer has been checked (above, or the app's one-time
+ * link in app-professional.php).
+ */
+function kounselia_stream_professional_document( $doc ) {
     $path = trailingslashit( kounselia_professional_docs_dir() ) . $doc->stored_filename;
     if ( ! file_exists( $path ) ) {
         wp_die( 'That file is missing.', 'Not found', array( 'response' => 404 ) );
@@ -221,7 +237,6 @@ function kounselia_ajax_view_professional_document() {
     readfile( $path );
     exit;
 }
-add_action( 'wp_ajax_kounselia_view_professional_document', 'kounselia_ajax_view_professional_document' );
 
 /* -------------------------------------------------------------------------
  * APPLICATION
@@ -243,6 +258,103 @@ function kounselia_get_professional_documents( $professional_id ) {
     ) );
 }
 
+/**
+ * The professional details of an application as posted (the website's
+ * apply form and the app send the same field names), cleaned.
+ */
+function kounselia_professional_application_fields_from_post() {
+    return array(
+        'title'            => isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '',
+        'license_number'   => isset( $_POST['license_number'] ) ? sanitize_text_field( wp_unslash( $_POST['license_number'] ) ) : '',
+        'specialty'        => isset( $_POST['specialty'] ) ? sanitize_text_field( wp_unslash( $_POST['specialty'] ) ) : '',
+        'years_experience' => isset( $_POST['years_experience'] ) ? absint( $_POST['years_experience'] ) : 0,
+        'bio'              => isset( $_POST['bio'] ) ? sanitize_textarea_field( wp_unslash( $_POST['bio'] ) ) : '',
+        'rate_amount'      => isset( $_POST['rate_amount'] ) ? (float) $_POST['rate_amount'] : 0,
+    );
+}
+
+/**
+ * What's wrong with an application's details, in words for the person
+ * applying, or '' when they're fine.
+ */
+function kounselia_professional_application_problem( $fields ) {
+    if ( '' === $fields['title'] ) {
+        return 'Please enter your professional title.';
+    }
+    if ( kounselia_title_is_bare_honorific( $fields['title'] ) ) {
+        return 'Your professional title should say what you do, e.g. "Licensed Clinical Psychologist" — not just an honorific like "Dr".';
+    }
+    if ( $fields['rate_amount'] <= 0 ) {
+        return 'Please enter your rate per session.';
+    }
+    return '';
+}
+
+/**
+ * Files an application (or a fresh one after a rejection) for a user,
+ * stores its documents, and tells the applicant and the admins. Shared
+ * by the website's apply form and the app.
+ *
+ * @param int        $user_id
+ * @param array      $fields      From kounselia_professional_application_fields_from_post().
+ * @param array      $license_doc A $_FILES-style entry (required).
+ * @param array|null $id_doc      A $_FILES-style entry, or null.
+ * @return int|WP_Error The application's id.
+ */
+function kounselia_submit_professional_application( $user_id, $fields, $license_doc, $id_doc = null ) {
+    global $wpdb;
+    $table = $wpdb->prefix . 'kounselia_professionals';
+
+    $existing = kounselia_get_professional_application( $user_id );
+    if ( $existing && 'rejected' !== $existing->status ) {
+        return new WP_Error( 'kounselia_apply', 'You already have an application on file.' );
+    }
+
+    $now  = current_time( 'mysql' );
+    $data = array(
+        'user_id'           => $user_id,
+        'title'             => $fields['title'],
+        'license_number'    => $fields['license_number'],
+        'specialty'         => $fields['specialty'],
+        'years_experience'  => $fields['years_experience'] ?: null,
+        'bio'               => $fields['bio'],
+        'rate_amount'       => $fields['rate_amount'],
+        'rate_currency'     => 'NGN',
+        'status'            => 'pending',
+        'rejection_reason'  => null,
+        'submitted_at'      => $now,
+        'updated_at'        => $now,
+    );
+
+    if ( $existing ) {
+        $wpdb->update( $table, $data, array( 'id' => $existing->id ) );
+        $professional_id = (int) $existing->id;
+        kounselia_delete_professional_documents( $professional_id ); // Reapplying — old rejected-round files shouldn't linger.
+    } else {
+        $data['created_at'] = $now;
+        $wpdb->insert( $table, $data );
+        $professional_id = (int) $wpdb->insert_id;
+    }
+
+    kounselia_store_professional_document( $professional_id, $license_doc, 'license' );
+    if ( $id_doc ) {
+        kounselia_store_professional_document( $professional_id, $id_doc, 'id' );
+    }
+
+    $user = get_userdata( $user_id );
+    if ( $user && function_exists( 'kounselia_send_html_email' ) ) {
+        kounselia_send_html_email(
+            $user->user_email,
+            'Your professional application is under review',
+            'Application received',
+            '<p>Thanks for applying to join Kounselia as a professional. Our team will review your documents and get back to you, usually within a few business days.</p>'
+        );
+    }
+    kounselia_notify_admins_new_professional_application( $professional_id );
+
+    return $professional_id;
+}
+
 function kounselia_ajax_apply_professional() {
     kounselia_verify_nonce();
 
@@ -254,21 +366,10 @@ function kounselia_ajax_apply_professional() {
         wp_send_json_error( array( 'message' => 'Too many attempts. Please try again later.' ), 429 );
     }
 
-    $title     = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
-    $license   = isset( $_POST['license_number'] ) ? sanitize_text_field( wp_unslash( $_POST['license_number'] ) ) : '';
-    $specialty = isset( $_POST['specialty'] ) ? sanitize_text_field( wp_unslash( $_POST['specialty'] ) ) : '';
-    $years     = isset( $_POST['years_experience'] ) ? absint( $_POST['years_experience'] ) : 0;
-    $bio       = isset( $_POST['bio'] ) ? sanitize_textarea_field( wp_unslash( $_POST['bio'] ) ) : '';
-    $rate      = isset( $_POST['rate_amount'] ) ? (float) $_POST['rate_amount'] : 0;
-
-    if ( '' === $title ) {
-        wp_send_json_error( array( 'message' => 'Please enter your professional title.' ), 400 );
-    }
-    if ( kounselia_title_is_bare_honorific( $title ) ) {
-        wp_send_json_error( array( 'message' => 'Your professional title should say what you do, e.g. "Licensed Clinical Psychologist" — not just an honorific like "Dr".' ), 400 );
-    }
-    if ( $rate <= 0 ) {
-        wp_send_json_error( array( 'message' => 'Please enter your rate per session.' ), 400 );
+    $fields  = kounselia_professional_application_fields_from_post();
+    $problem = kounselia_professional_application_problem( $fields );
+    if ( '' !== $problem ) {
+        wp_send_json_error( array( 'message' => $problem ), 400 );
     }
 
     // Resolve the account: the signed-in user, or create one from the
@@ -299,9 +400,6 @@ function kounselia_ajax_apply_professional() {
         wp_set_auth_cookie( $user_id, true, is_ssl() );
     }
 
-    global $wpdb;
-    $table = $wpdb->prefix . 'kounselia_professionals';
-
     $existing = kounselia_get_professional_application( $user_id );
     if ( $existing && 'rejected' !== $existing->status ) {
         wp_send_json_error( array( 'message' => 'You already have an application on file.' ), 400 );
@@ -311,47 +409,11 @@ function kounselia_ajax_apply_professional() {
         wp_send_json_error( array( 'message' => 'Please upload a license or credential document.' ), 400 );
     }
 
-    $now  = current_time( 'mysql' );
-    $data = array(
-        'user_id'           => $user_id,
-        'title'             => $title,
-        'license_number'    => $license,
-        'specialty'         => $specialty,
-        'years_experience'  => $years ?: null,
-        'bio'               => $bio,
-        'rate_amount'       => $rate,
-        'rate_currency'     => 'NGN',
-        'status'            => 'pending',
-        'rejection_reason'  => null,
-        'submitted_at'      => $now,
-        'updated_at'        => $now,
-    );
-
-    if ( $existing ) {
-        $wpdb->update( $table, $data, array( 'id' => $existing->id ) );
-        $professional_id = (int) $existing->id;
-        kounselia_delete_professional_documents( $professional_id ); // Reapplying — old rejected-round files shouldn't linger.
-    } else {
-        $data['created_at'] = $now;
-        $wpdb->insert( $table, $data );
-        $professional_id = (int) $wpdb->insert_id;
+    $id_doc = ( ! empty( $_FILES['id_doc'] ) && isset( $_FILES['id_doc']['error'] ) && UPLOAD_ERR_NO_FILE !== $_FILES['id_doc']['error'] ) ? $_FILES['id_doc'] : null;
+    $result = kounselia_submit_professional_application( $user_id, $fields, $_FILES['license_doc'], $id_doc );
+    if ( is_wp_error( $result ) ) {
+        wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
     }
-
-    kounselia_store_professional_document( $professional_id, $_FILES['license_doc'], 'license' );
-    if ( ! empty( $_FILES['id_doc'] ) && isset( $_FILES['id_doc']['error'] ) && UPLOAD_ERR_NO_FILE !== $_FILES['id_doc']['error'] ) {
-        kounselia_store_professional_document( $professional_id, $_FILES['id_doc'], 'id' );
-    }
-
-    $user = get_userdata( $user_id );
-    if ( $user && function_exists( 'kounselia_send_html_email' ) ) {
-        kounselia_send_html_email(
-            $user->user_email,
-            'Your professional application is under review',
-            'Application received',
-            '<p>Thanks for applying to join Kounselia as a professional. Our team will review your documents and get back to you, usually within a few business days.</p>'
-        );
-    }
-    kounselia_notify_admins_new_professional_application( $professional_id );
 
     wp_send_json_success( array(
         'message'  => 'Application submitted. We will review it and email you.',

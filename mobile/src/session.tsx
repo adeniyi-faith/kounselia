@@ -8,11 +8,14 @@ import {
   appLogin,
   appLogout,
   appRegister,
+  applyAsProfessional,
   deleteAccount as deleteAccountOnServer,
   fetchAppUser,
   type AppAuthResult,
   type AppUser,
+  type ApplicationDetails,
   type KounseliaConfig,
+  type PickedDocument,
 } from '@kounselia/core';
 import * as Device from 'expo-device';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -24,8 +27,15 @@ import { deleteSecure, readSecure, writeSecure } from './secureStorage';
 
 const TOKEN_KEY = 'kounselia_app_token';
 const USER_KEY = 'kounselia_app_user';
+// 'client' once a professional has switched to the client side of the app.
+const VIEW_KEY = 'kounselia_app_view';
 
 type Status = 'loading' | 'signed-in' | 'signed-out';
+
+// Which side of the app a professional sees: their own professional home
+// (as the website's pro-dashboard.php), or the client side, which every
+// professional can use too ("Switch to client view" on the website).
+export type ViewMode = 'professional' | 'client';
 
 interface Session {
   status: Status;
@@ -40,6 +50,19 @@ interface Session {
   deleteAccount(password: string): Promise<string | null>;
   // After the member changes their details in Settings.
   updateUser(changes: Partial<AppUser>): void;
+  // 'professional' for anyone who has applied as one, unless they switched
+  // to the client side; always 'client' for everyone else.
+  viewMode: ViewMode;
+  setViewMode(mode: ViewMode): void;
+  // Applies as a professional (apply.php on the website). Signed out,
+  // `account` creates the account in the same step and signs in with it.
+  // Resolves to the server's reason if it refused, or null when done.
+  applyAsProfessional(
+    details: ApplicationDetails,
+    licenseDoc: PickedDocument,
+    idDoc: PickedDocument | null,
+    account?: { name: string; email: string; password: string },
+  ): Promise<string | null>;
 }
 
 const SessionContext = createContext<Session | null>(null);
@@ -60,16 +83,19 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<Status>('loading');
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AppUser | null>(null);
+  const [chosenView, setChosenView] = useState<ViewMode | null>(null);
 
   // On launch: use the saved sign-in straight away (so the app opens
   // instantly, even offline), then check with the server that it still
   // works — it won't if the member changed their password elsewhere.
   useEffect(() => {
     (async () => {
-      const [savedToken, savedUser] = await Promise.all([
+      const [savedToken, savedUser, savedView] = await Promise.all([
         readSecure(TOKEN_KEY),
         readSecure(USER_KEY),
+        readSecure(VIEW_KEY),
       ]);
+      setChosenView(savedView === 'client' ? 'client' : null);
       if (!savedToken) {
         setStatus('signed-out');
         return;
@@ -92,12 +118,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   async function forget() {
     setToken(null);
     setUser(null);
+    setChosenView(null);
     setStatus('signed-out');
     // The app lock and notification choice belong to whoever was signed
     // in; the next person starts fresh.
     await Promise.all([
       deleteSecure(TOKEN_KEY),
       deleteSecure(USER_KEY),
+      deleteSecure(VIEW_KEY),
       clearLockSetting(),
       forgetPush(),
     ]);
@@ -142,6 +170,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const config = useMemo(() => makeConfig(token, onSignedOut), [token, onSignedOut]);
+  const viewMode: ViewMode = user?.professional && chosenView !== 'client' ? 'professional' : 'client';
+  const setViewMode = useCallback((mode: ViewMode) => {
+    setChosenView(mode);
+    writeSecure(VIEW_KEY, mode);
+  }, []);
 
   const value = useMemo<Session>(
     () => ({
@@ -173,8 +206,31 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setUser(next);
         writeSecure(USER_KEY, JSON.stringify(next));
       },
+      viewMode,
+      setViewMode,
+      applyAsProfessional: async (details, licenseDoc, idDoc, account) => {
+        const signedIn = !!token;
+        const res = await applyAsProfessional(
+          signedIn ? config : makeConfig(null),
+          details,
+          licenseDoc,
+          idDoc,
+          signedIn || !account ? undefined : { ...account, deviceName: Device.deviceName ?? '' },
+        );
+        if (!res.success) return res.message;
+        // A fresh application opens their professional home.
+        setViewMode('professional');
+        if (res.token) {
+          await remember({ success: true, token: res.token, user: res.user });
+        } else if (user) {
+          const next = { ...user, ...res.user };
+          setUser(next);
+          writeSecure(USER_KEY, JSON.stringify(next));
+        }
+        return null;
+      },
     }),
-    [status, user, config, remember],
+    [status, user, config, remember, token, viewMode, setViewMode],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
