@@ -157,6 +157,23 @@ class Test_Payment_Reconciliation extends WP_UnitTestCase {
         $this->assertSame( 8500.0, kounselia_get_professional_balance( 22 )['available'] );
     }
 
+    function test_earnings_for_an_upcoming_session_wait_until_it_has_taken_place() {
+        global $wpdb;
+        $this->unpaid_earnings_with_account( 23 );
+        $now = current_time( 'timestamp' );
+        $wpdb->insert( $wpdb->prefix . 'kounselia_bookings', array(
+            'professional_id' => 23, 'client_user_id' => 1, 'scheduled_start' => date( 'Y-m-d H:i:s', $now + DAY_IN_SECONDS ),
+            'scheduled_end' => date( 'Y-m-d H:i:s', $now + DAY_IN_SECONDS + 3000 ), 'status' => 'confirmed',
+            'room_token' => 'tok23', 'created_at' => current_time( 'mysql' ), 'updated_at' => current_time( 'mysql' ),
+        ) );
+        $wpdb->update( $wpdb->prefix . 'kounselia_booking_payments', array( 'booking_id' => $wpdb->insert_id ), array( 'professional_id' => 23 ) );
+
+        $balance = kounselia_get_professional_balance( 23 );
+        $this->assertSame( 0.0, $balance['available'] );
+        $this->assertSame( 8500.0, $balance['upcoming'] );
+        $this->assertWPError( kounselia_request_payout( 23 ) );
+    }
+
     function test_follow_up_job_settles_a_pending_payout() {
         $payout_id = $this->pending_payout_with_items( 'PAYOUT-REF-2' );
         $this->paystack['/transfer/verify/PAYOUT-REF-2'] = array( 'status' => 'success' );
