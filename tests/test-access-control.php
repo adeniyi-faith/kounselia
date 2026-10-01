@@ -121,4 +121,21 @@ class Test_Access_Control extends WP_Ajax_UnitTestCase {
         // An admin can still step in afterwards (e.g. a no-show).
         $this->assertTrue( kounselia_admin_cancel_booking( $past, self::factory()->user->create( array( 'role' => 'administrator' ) ) ) );
     }
+
+    function test_a_late_client_cancellation_is_not_refunded_or_moved() {
+        $client = self::factory()->user->create();
+        $pro    = self::factory()->user->create();
+        $pro_id = $this->professional( $pro );
+
+        $soon = kounselia_get_booking_with_parties( $this->booking( $client, $pro_id, 3 * HOUR_IN_SECONDS ) );
+        $this->assertFalse( kounselia_booking_cancel_refunds( $soon, $client ) );
+        $this->assertTrue( kounselia_booking_cancel_refunds( $soon, $pro ), 'A professional cancelling always refunds the client.' );
+        $this->assertWPError( kounselia_reschedule_booking( $soon->id, $client, date( 'Y-m-d H:i:s', current_time( 'timestamp' ) + 5 * DAY_IN_SECONDS ) ) );
+
+        $later = kounselia_get_booking_with_parties( $this->booking( $client, $pro_id, 3 * DAY_IN_SECONDS ) );
+        $this->assertTrue( kounselia_booking_cancel_refunds( $later, $client ) );
+
+        update_option( 'kounselia_cancel_refund_hours', 0 );
+        $this->assertTrue( kounselia_booking_cancel_refunds( $soon, $client ) );
+    }
 }

@@ -38,6 +38,27 @@ function kounselia_session_length_minutes() {
  * from the admin Platform Configuration settings (in hours, fractions
  * allowed — 0.5 for 30 minutes); defaults to 2 hours.
  */
+/**
+ * How close to the start a client can cancel and still be refunded
+ * automatically (Admin → Settings → Platform). Inside this window the
+ * session can still be cancelled, but the professional keeps the fee.
+ * A professional cancelling always refunds the client.
+ */
+function kounselia_cancel_refund_hours() {
+    return max( 0, (float) get_option( 'kounselia_cancel_refund_hours', 24 ) );
+}
+
+/**
+ * Whether cancelling this booking now, by this person, refunds the client.
+ */
+function kounselia_booking_cancel_refunds( $booking, $acting_user_id ) {
+    if ( (int) $acting_user_id !== (int) $booking->client_user_id ) {
+        return true;
+    }
+    $seconds_left = strtotime( $booking->scheduled_start ) - current_time( 'timestamp' );
+    return $seconds_left >= kounselia_cancel_refund_hours() * HOUR_IN_SECONDS;
+}
+
 function kounselia_booking_lead_seconds() {
     $hours = (float) get_option( 'kounselia_booking_lead_hours', 2 );
     return max( 0, $hours ) * HOUR_IN_SECONDS;
@@ -419,7 +440,7 @@ function kounselia_cancel_booking( $booking_id, $acting_user_id, $reason = '' ) 
         return new WP_Error( 'too_late', 'This session has already started, so it can\'t be cancelled. Please contact support if something went wrong.' );
     }
 
-    return kounselia_do_cancel_booking( $booking, $acting_user_id, $reason );
+    return kounselia_do_cancel_booking( $booking, $acting_user_id, $reason, kounselia_booking_cancel_refunds( $booking, $acting_user_id ) );
 }
 
 /**
@@ -445,7 +466,7 @@ function kounselia_admin_cancel_booking( $booking_id, $admin_user_id, $reason = 
  * relies on that to keep it from touching a 'payment_conflict' booking,
  * which needs a manual refund decision, not an automatic one.
  */
-function kounselia_do_cancel_booking( $booking, $acting_user_id, $reason = '' ) {
+function kounselia_do_cancel_booking( $booking, $acting_user_id, $reason = '', $refund = true ) {
     global $wpdb;
 
     if ( 'confirmed' !== $booking->status ) {
@@ -463,7 +484,9 @@ function kounselia_do_cancel_booking( $booking, $acting_user_id, $reason = '' ) 
     // professional or "spent" for the client — if it was paid for,
     // refund it (unless that money has already been folded into a
     // payout, which needs a human, not an automatic reversal).
-    if ( function_exists( 'kounselia_refund_booking_payment' ) ) {
+    // A client's late cancellation (kounselia_booking_cancel_refunds) isn't
+    // refunded: the payment stays with the professional.
+    if ( $refund && function_exists( 'kounselia_refund_booking_payment' ) ) {
         kounselia_refund_booking_payment( $booking->id );
     }
 
@@ -494,6 +517,11 @@ function kounselia_reschedule_booking( $booking_id, $acting_user_id, $new_start_
     }
     if ( strtotime( $booking->scheduled_start ) <= current_time( 'timestamp' ) ) {
         return new WP_Error( 'too_late', 'This session has already started, so it can\'t be rescheduled.' );
+    }
+    // Otherwise a client could move a session they can no longer get a
+    // refund for to a later date, then cancel it for a full refund.
+    if ( ! kounselia_booking_cancel_refunds( $booking, $acting_user_id ) ) {
+        return new WP_Error( 'too_late', 'This session starts too soon to be moved. Please message your professional if you need to change it.' );
     }
 
     $start_ts = strtotime( $new_start_mysql );
@@ -883,12 +911,18 @@ function kounselia_ajax_cancel_booking() {
         wp_send_json_error( array( 'message' => 'Invalid request.' ), 400 );
     }
 
+    $booking = kounselia_get_booking_with_parties( $booking_id );
+    $refunds = $booking ? kounselia_booking_cancel_refunds( $booking, get_current_user_id() ) : true;
+
     $result = kounselia_cancel_booking( $booking_id, get_current_user_id(), $reason );
     if ( is_wp_error( $result ) ) {
         wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
     }
 
-    wp_send_json_success( array( 'message' => 'Booking cancelled.' ) );
+    wp_send_json_success( array(
+        'message'  => $refunds ? 'Booking cancelled.' : 'Booking cancelled. It was too close to the start time for a refund.',
+        'refunded' => $refunds,
+    ) );
 }
 add_action( 'wp_ajax_kounselia_cancel_booking', 'kounselia_ajax_cancel_booking' );
 

@@ -2179,7 +2179,7 @@ function submitReview(){
 }
 
 function cancelMyBooking(bookingId, linkEl){
-  if (!confirm("Cancel this session? You'll be refunded, and the professional will be notified.")) return;
+  if (!confirm("Cancel this session? You'll be refunded if it is more than <?php echo esc_js( kounselia_cancel_refund_hours() + 0 ); ?> hours away. The professional will be notified.")) return;
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2190,7 +2190,7 @@ function cancelMyBooking(bookingId, linkEl){
     if (res.success) {
       const row = document.querySelector('#my-booking-list [data-booking-id="' + bookingId + '"]');
       if (row) row.remove();
-      toast('Booking cancelled.', false);
+      toast(res.data.message || 'Booking cancelled.', false);
     } else {
       toast((res.data && res.data.message) || 'Could not cancel that booking.', true);
     }
