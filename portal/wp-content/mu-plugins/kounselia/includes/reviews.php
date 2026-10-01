@@ -150,7 +150,7 @@ add_action( 'wp_ajax_kounselia_submit_review', 'kounselia_ajax_submit_review' );
 function kounselia_ajax_admin_delete_review() {
     check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
 
-    if ( ! kounselia_user_is_admin() ) {
+    if ( ! kounselia_admin_can( 'professionals' ) && ! kounselia_admin_can( 'bookings' ) ) {
         kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
     }
 

@@ -808,6 +808,8 @@ function appendSandboxMessage(text, type) {
     
     // Basic formatting for AI responses
     if(type === 'ai') {
+        // Escaped first: the reply is AI-written text, never trusted HTML.
+        text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
         text = text.replace(/\n\n/g, '</p><p>');
         text = text.replace(/\n/g, '<br>');

@@ -410,6 +410,14 @@ function kounselia_cancel_booking( $booking_id, $acting_user_id, $reason = '' ) 
     if ( ! kounselia_user_is_booking_party( $booking, $acting_user_id ) ) {
         return new WP_Error( 'forbidden', 'You cannot cancel this booking.' );
     }
+    // Bookings stay 'confirmed' after they happen, and cancelling refunds
+    // the payment, so without this a session could be cancelled (and
+    // refunded) after it had already taken place. Same rule as
+    // rescheduling. An admin can still cancel from the Bookings page,
+    // e.g. when the professional never showed up.
+    if ( strtotime( $booking->scheduled_start ) <= current_time( 'timestamp' ) ) {
+        return new WP_Error( 'too_late', 'This session has already started, so it can\'t be cancelled. Please contact support if something went wrong.' );
+    }
 
     return kounselia_do_cancel_booking( $booking, $acting_user_id, $reason );
 }
@@ -947,7 +955,7 @@ function kounselia_count_all_bookings_admin( $status_filter = 'all' ) {
 function kounselia_ajax_admin_create_booking() {
     check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
 
-    if ( ! kounselia_user_is_admin() ) {
+    if ( ! kounselia_admin_can( 'bookings' ) ) {
         kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
     }
 
@@ -988,7 +996,7 @@ add_action( 'wp_ajax_kounselia_admin_create_booking', 'kounselia_ajax_admin_crea
 function kounselia_ajax_admin_cancel_booking() {
     check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
 
-    if ( ! kounselia_user_is_admin() ) {
+    if ( ! kounselia_admin_can( 'bookings' ) ) {
         kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
     }
 

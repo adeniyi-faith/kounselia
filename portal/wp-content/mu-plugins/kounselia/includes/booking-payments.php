@@ -625,6 +625,23 @@ function kounselia_request_payout( $professional_id ) {
         'updated_at'      => $now,
     ) );
     $payout_id = (int) $wpdb->insert_id;
+
+    // Claim the earnings for this payout before asking Paystack for the
+    // money. Before, they were only stamped after the transfer call came
+    // back, so two requests close together (a double tap, two tabs) could
+    // both send the same balance. Only rows still unclaimed are taken; if
+    // another request got any of them first, this one backs off.
+    $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
+    $claimed      = (int) $wpdb->query( $wpdb->prepare(
+        "UPDATE {$wpdb->prefix}kounselia_booking_payments SET payout_id = %d WHERE id IN ({$placeholders}) AND payout_id IS NULL",
+        array_merge( array( $payout_id ), $ids )
+    ) );
+    if ( $claimed !== count( $ids ) ) {
+        $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->prefix}kounselia_booking_payments SET payout_id = NULL WHERE payout_id = %d", $payout_id ) );
+        $wpdb->delete( $wpdb->prefix . 'kounselia_payouts', array( 'id' => $payout_id ) );
+        return new WP_Error( 'payout_in_progress', 'A payout is already being sent. Please refresh the page to see it.' );
+    }
+
     $reference = 'KOUNSELIA-PAYOUT-' . $payout_id . '-' . time();
 
     $transfer = kounselia_paystack_request( 'POST', '/transfer', array(
@@ -642,6 +659,8 @@ function kounselia_request_payout( $professional_id ) {
             'gateway_response' => wp_json_encode( $transfer['data'] ),
             'updated_at'       => current_time( 'mysql' ),
         ), array( 'id' => $payout_id ) );
+        // Nothing was sent, so the earnings are available again.
+        $wpdb->query( $wpdb->prepare( "UPDATE {$wpdb->prefix}kounselia_booking_payments SET payout_id = NULL WHERE payout_id = %d", $payout_id ) );
         return new WP_Error( 'transfer_failed', $transfer['message'] ?: 'Could not start the payout. Please try again shortly.' );
     }
 
@@ -660,12 +679,6 @@ function kounselia_request_payout( $professional_id ) {
         'updated_at'             => current_time( 'mysql' ),
         'completed_at'           => ( 'success' === $transfer_status ) ? current_time( 'mysql' ) : null,
     ), array( 'id' => $payout_id ) );
-
-    $placeholders = implode( ',', array_fill( 0, count( $ids ), '%d' ) );
-    $wpdb->query( $wpdb->prepare(
-        "UPDATE {$wpdb->prefix}kounselia_booking_payments SET payout_id = %d WHERE id IN ({$placeholders})",
-        array_merge( array( $payout_id ), $ids )
-    ) );
 
     return $payout_id;
 }

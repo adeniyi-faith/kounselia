@@ -192,6 +192,55 @@ function kounselia_2fa_clear_pending_login() {
 }
 
 /* -------------------------------------------------------------------------
+ * Admin sign-ins are marked as such.
+ *
+ * The admin panel only accepts a session that was started on the admin
+ * sign-in screen (portal/admin/index.php), which is the one place the
+ * 2FA code is asked for. Without this, an admin's password alone was
+ * enough: signing in through the member sign-in on the website, the
+ * mobile app (then its in-app browser hand-off, app-sso.php) or
+ * wp-login.php gave the same WordPress cookie, and the admin panel let
+ * that cookie straight in, skipping the code.
+ *
+ * The mark lives on the WordPress session itself (WP_Session_Tokens), so
+ * it ends with that session and can't be copied onto another one.
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Signs an admin in with a session the admin panel will accept. Use this
+ * instead of wp_set_auth_cookie() wherever the admin panel signs someone
+ * in (after the password and, when on, the 2FA code have both passed).
+ */
+function kounselia_admin_set_auth_cookie( $user_id ) {
+    $GLOBALS['kounselia_admin_signing_in'] = true;
+    wp_set_auth_cookie( $user_id, false, is_ssl() );
+    unset( $GLOBALS['kounselia_admin_signing_in'] );
+    wp_set_current_user( $user_id );
+}
+
+function kounselia_admin_mark_session( $session ) {
+    if ( ! empty( $GLOBALS['kounselia_admin_signing_in'] ) ) {
+        $session['kounselia_admin'] = 1;
+    }
+    return $session;
+}
+add_filter( 'attach_session_information', 'kounselia_admin_mark_session' );
+
+/**
+ * True when the current request's session was started on the admin
+ * sign-in screen.
+ */
+function kounselia_admin_session_is_verified() {
+    $user_id = get_current_user_id();
+    $token   = wp_get_session_token();
+    if ( ! $user_id || '' === $token ) {
+        return false;
+    }
+    $session = WP_Session_Tokens::get_instance( $user_id )->get( $token );
+    return is_array( $session ) && ! empty( $session['kounselia_admin'] );
+}
+
+/* -------------------------------------------------------------------------
  * AJAX: setup flow (used by the Settings > Security panel)
  * ---------------------------------------------------------------------- */
 

@@ -14,11 +14,6 @@ define( 'COOKIEPATH', '/' );
 define( 'SITECOOKIEPATH', '/' );
 require_once __DIR__ . '/portal/wp-load.php';
 
-if ( ! is_user_logged_in() ) {
-    wp_safe_redirect( '/index.php' );
-    exit;
-}
-
 $reference = isset( $_GET['reference'] ) ? sanitize_text_field( wp_unslash( $_GET['reference'] ) ) : '';
 
 // Paid from the mobile app: the app's browser isn't signed in to the
