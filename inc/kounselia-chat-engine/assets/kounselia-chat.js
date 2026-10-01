@@ -268,7 +268,7 @@ async function rateAiMsg(btn, msgId, type) {
 async function startChat(id){
   cur=C[id];curSlug=id;curSessionId=0;msgCount=0;typing=false;userMessagesSinceSync=0;
   stopVoiceActivity(true); // Force abort any active recording
-  if(typeof liveCallActive!=='undefined'&&liveCallActive) endVoiceCall();
+  if(typeof liveCallActive!=='undefined'&&(liveCallActive||liveCallConnecting)) endVoiceCall();
   
   document.getElementById('chat-name').textContent=cur.name;
   document.getElementById('chat-spec').textContent=cur.spec;
@@ -313,7 +313,7 @@ function showScreen(id){
 }
 
 function goBack(){
-  if(typeof liveCallActive!=='undefined'&&liveCallActive) endVoiceCall();
+  if(typeof liveCallActive!=='undefined'&&(liveCallActive||liveCallConnecting)) endVoiceCall();
   stopVoiceActivity(true);
   if(location.hash) history.replaceState(null,'',location.pathname+location.search);
   if(document.getElementById('landing')){
@@ -1002,17 +1002,27 @@ function fmtTimer(s){
   return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
 }
 
+// Must run straight from the member's tap: browsers (Safari on iPhone
+// and iPad especially) only let sound play, and the microphone feed flow,
+// for audio set up during a tap. Setting the audio up later, after waiting
+// on the network, left those calls silent both ways.
 async function startVoiceCall(){
   if(!cur||!(cur.voice||parseInt(cur.voice_enabled)===1||cur.voice_enabled===true)){return;}
   if(!loggedIn){openModal('login');return;}
   if(liveCallActive||liveCallConnecting) return;
-  liveCallConnecting=true;
-  if(!('mediaDevices' in navigator)||!window.AudioWorklet||!window.WebSocket){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.AudioWorklet||!window.WebSocket){
     alert("Voice calls need a modern browser (Chrome, Edge, or Safari) with microphone support.");
-    liveCallConnecting=false;
     return;
   }
+  liveCallConnecting=true;
   stopVoiceActivity(true);
+
+  liveAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  livePlaybackCtx=new (window.AudioContext||window.webkitAudioContext)();
+  liveAudioCtx.resume().catch(()=>{});
+  livePlaybackCtx.resume().catch(()=>{});
+  liveNextStartTime=livePlaybackCtx.currentTime;
+  liveUserUtterance='';liveBotUtterance='';liveUserFlushed=true;
 
   const overlay=document.getElementById('call-overlay');
   overlay.classList.add('active');
@@ -1026,14 +1036,32 @@ async function startVoiceCall(){
   liveMuted=false;
   updateMuteUI();
 
+  // The member hung up while we were waiting on something.
+  const hungUp=()=>!liveCallConnecting;
+  // Shows why the call couldn't go ahead, then closes the call screen.
+  const giveUp=(text,delay)=>{
+    releaseVoiceCall();
+    document.getElementById('call-status').textContent=text;
+    setTimeout(endVoiceCall,delay||2200);
+  };
+
+  let stream;
   try{
-    liveMicStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
+    stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
   }catch(err){
-    document.getElementById('call-status').textContent='Microphone access was denied.';
-    liveCallConnecting=false;
-    setTimeout(endVoiceCall,1800);
+    if(!hungUp()) giveUp('Microphone access is blocked. Allow it in your browser’s site settings, then try again.',3000);
     return;
   }
+  if(hungUp()){ stream.getTracks().forEach(t=>t.stop()); return; }
+  liveMicStream=stream;
+
+  try{
+    await startMicCapture();
+  }catch(err){
+    if(!hungUp()) giveUp("Couldn't use your microphone, please try again.");
+    return;
+  }
+  if(hungUp()) return;
 
   const params=new URLSearchParams({action:'kounselia_voice_token',nonce:KOUNSELIA.nonce,counselor:curSlug,session_id:curSessionId||0});
   let tokenRes;
@@ -1041,15 +1069,12 @@ async function startVoiceCall(){
     const r=await fetch(KOUNSELIA.ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:params});
     tokenRes=await r.json();
   }catch(err){
-    document.getElementById('call-status').textContent="Couldn't connect, please try again.";
-    liveCallConnecting=false;
-    setTimeout(endVoiceCall,1800);
+    if(!hungUp()) giveUp("Couldn't connect, please try again.",1800);
     return;
   }
+  if(hungUp()) return;
   if(!tokenRes.success){
-    document.getElementById('call-status').textContent=(tokenRes.data&&tokenRes.data.message)||"Voice isn't available right now.";
-    liveCallConnecting=false;
-    setTimeout(endVoiceCall,2200);
+    giveUp((tokenRes.data&&tokenRes.data.message)||"Voice isn't available right now.");
     return;
   }
 
@@ -1067,22 +1092,22 @@ async function startVoiceCall(){
     await connectLiveSession(data.token,data.model);
     liveCallConnecting=false;
   }catch(err){
-    document.getElementById('call-status').textContent="Couldn't start the call, please try again.";
-    liveCallConnecting=false;
-    setTimeout(endVoiceCall,1800);
+    if(!hungUp()) giveUp("Couldn't start the call, please try again.",1800);
   }
 }
 
 function connectLiveSession(token,model){
   return new Promise((resolve,reject)=>{
     const url='wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token='+encodeURIComponent(token);
-    liveWs=new WebSocket(url);
+    const ws=new WebSocket(url);
+    liveWs=ws;
 
-    liveWs.onopen=function(){
-      liveWs.send(JSON.stringify({setup:{model:'models/'+model}}));
+    ws.onopen=function(){
+      ws.send(JSON.stringify({setup:{model:'models/'+model}}));
     };
 
-    liveWs.onmessage=async function(evt){
+    ws.onmessage=async function(evt){
+      if(liveWs!==ws) return; // From a call that already ended.
       let msg;
       try{
         const raw=(evt.data instanceof Blob)?await evt.data.text():evt.data;
@@ -1093,7 +1118,6 @@ function connectLiveSession(token,model){
         liveCallActive=true;
         document.getElementById('call-status').textContent='Listening…';
         startVoiceTimer();
-        startMicCapture();
         resolve();
         return;
       }
@@ -1105,13 +1129,17 @@ function connectLiveSession(token,model){
           flushBotTranscript();
         }
 
+        // Each message carries the next chunk of speech, not the whole
+        // thing said so far, so the chunks must be joined. Otherwise only
+        // the last few words are kept, the caption flickers word by word,
+        // and the chat history gets fragments instead of what was said.
         if(sc.inputTranscription&&typeof sc.inputTranscription.text==='string'){
-          liveUserUtterance=sc.inputTranscription.text;
+          liveUserUtterance+=sc.inputTranscription.text;
           liveUserFlushed=false;
         }
         if(sc.outputTranscription&&typeof sc.outputTranscription.text==='string'){
           if(!liveUserFlushed){flushUserTranscript();}
-          liveBotUtterance=sc.outputTranscription.text;
+          liveBotUtterance+=sc.outputTranscription.text;
           document.getElementById('call-status').textContent='Speaking…';
           document.getElementById('call-ring').classList.add('speaking');
           document.getElementById('call-caption').textContent=liveBotUtterance;
@@ -1135,42 +1163,54 @@ function connectLiveSession(token,model){
 
       if(msg.goAway){
         document.getElementById('call-status').textContent='Call ending…';
-        setTimeout(endVoiceCall,1200);
+        setTimeout(()=>{ if(liveWs===ws) endVoiceCall(); },1200);
       }
     };
 
-    liveWs.onerror=function(){reject(new Error('ws error'));};
-    liveWs.onclose=function(){
+    ws.onerror=function(){reject(new Error('ws error'));};
+    ws.onclose=function(){
+      if(liveWs!==ws) return; // We closed it ourselves.
       if(liveCallActive){endVoiceCall();}
+      // Closed before the call started (e.g. the pass was refused):
+      // give up rather than stay on "Connecting…" forever.
+      else reject(new Error('closed'));
     };
   });
 }
 
+// Wires the microphone into a converter that turns its sound (usually
+// 44.1 or 48 kHz) into the 16 kHz pieces the service expects. Each output
+// sample is the average of the input samples it covers rather than just
+// one of them, which keeps speech clearer for the speech recognition.
+// Pieces are only sent once the call is live (and not muted).
 async function startMicCapture(){
-  liveAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
-  const src=liveAudioCtx.createMediaStreamSource(liveMicStream);
-
+  const ctx=liveAudioCtx;
   const workletCode=`
     class PCMCaptureProcessor extends AudioWorkletProcessor {
       constructor(){
         super();
-        this.targetRate=16000;
-        this.ratio=sampleRate/this.targetRate;
+        this.ratio=sampleRate/16000;
         this.buf=[];
+        this.out=[];
       }
       process(inputs){
         const ch=inputs[0]&&inputs[0][0];
         if(ch){
           for(let i=0;i<ch.length;i++) this.buf.push(ch[i]);
           const outLen=Math.floor(this.buf.length/this.ratio);
-          if(outLen>0){
-            const out=new Int16Array(outLen);
-            for(let i=0;i<outLen;i++){
-              let s=this.buf[Math.floor(i*this.ratio)];
-              s=Math.max(-1,Math.min(1,s));
-              out[i]=s<0?s*0x8000:s*0x7FFF;
-            }
-            this.buf=this.buf.slice(Math.floor(outLen*this.ratio));
+          for(let i=0;i<outLen;i++){
+            const from=Math.floor(i*this.ratio);
+            const to=Math.max(from+1,Math.floor((i+1)*this.ratio));
+            let s=0;
+            for(let j=from;j<to;j++) s+=this.buf[j];
+            s=Math.max(-1,Math.min(1,s/(to-from)));
+            this.out.push(s<0?s*0x8000:s*0x7FFF);
+          }
+          this.buf=this.buf.slice(Math.floor(outLen*this.ratio));
+          // Send in 0.1 s pieces rather than hundreds of tiny ones a second.
+          if(this.out.length>=1600){
+            const out=Int16Array.from(this.out);
+            this.out=[];
             this.port.postMessage(out.buffer,[out.buffer]);
           }
         }
@@ -1180,11 +1220,14 @@ async function startMicCapture(){
     registerProcessor('pcm-capture-processor',PCMCaptureProcessor);
   `;
   const blobUrl=URL.createObjectURL(new Blob([workletCode],{type:'application/javascript'}));
-  await liveAudioCtx.audioWorklet.addModule(blobUrl);
+  try{ await ctx.audioWorklet.addModule(blobUrl); }
+  finally{ URL.revokeObjectURL(blobUrl); }
+  if(liveAudioCtx!==ctx) return; // Call ended meanwhile.
 
-  liveWorkletNode=new AudioWorkletNode(liveAudioCtx,'pcm-capture-processor');
+  const src=ctx.createMediaStreamSource(liveMicStream);
+  liveWorkletNode=new AudioWorkletNode(ctx,'pcm-capture-processor');
   liveWorkletNode.port.onmessage=function(e){
-    if(liveMuted||!liveWs||liveWs.readyState!==WebSocket.OPEN)return;
+    if(!liveCallActive||liveMuted||!liveWs||liveWs.readyState!==WebSocket.OPEN)return;
     const b64=arrayBufferToBase64(e.data);
     liveWs.send(JSON.stringify({realtimeInput:{audio:{data:b64,mimeType:'audio/pcm;rate=16000'}}}));
   };
@@ -1199,25 +1242,26 @@ function arrayBufferToBase64(buf){
 }
 
 function schedulePlayback(base64Pcm){
-  if(!livePlaybackCtx){
-    livePlaybackCtx=new (window.AudioContext||window.webkitAudioContext)();
-    liveNextStartTime=livePlaybackCtx.currentTime;
-  }
+  const ctx=livePlaybackCtx;
+  if(!ctx) return; // Call ended meanwhile.
+  if(ctx.state==='suspended') ctx.resume().catch(()=>{});
   const binary=atob(base64Pcm);
   const bytes=new Uint8Array(binary.length);
   for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
-  const int16=new Int16Array(bytes.buffer);
+  const int16=new Int16Array(bytes.buffer,0,bytes.length>>1);
   const float32=new Float32Array(int16.length);
   for(let i=0;i<int16.length;i++) float32[i]=int16[i]/(int16[i]<0?0x8000:0x7FFF);
+  if(!float32.length) return;
 
-  const buffer=livePlaybackCtx.createBuffer(1,float32.length,24000);
-  buffer.copyToChannel(float32,0);
+  const buffer=ctx.createBuffer(1,float32.length,24000);
+  buffer.getChannelData(0).set(float32);
 
-  const source=livePlaybackCtx.createBufferSource();
+  const source=ctx.createBufferSource();
   source.buffer=buffer;
-  source.connect(livePlaybackCtx.destination);
+  source.connect(ctx.destination);
 
-  const startAt=Math.max(livePlaybackCtx.currentTime,liveNextStartTime);
+  // Queue each piece right after the previous one so speech is smooth.
+  const startAt=Math.max(ctx.currentTime,liveNextStartTime);
   source.start(startAt);
   liveNextStartTime=startAt+buffer.duration;
   livePlaybackQueue.push(source);
@@ -1260,7 +1304,8 @@ function startVoiceTimer(){
     document.getElementById('call-timer').textContent=fmtTimer(liveSecondsLeft);
     if(liveSecondsLeft<=0){
       document.getElementById('call-status').textContent="Time's up";
-      endVoiceCall();
+      releaseVoiceCall();
+      setTimeout(endVoiceCall,900);
     }
   },1000);
 }
@@ -1277,7 +1322,9 @@ function updateMuteUI(){
   btn.innerHTML=liveMuted?'<i class="ti ti-microphone-off"></i>':'<i class="ti ti-microphone"></i>';
 }
 
-function endVoiceCall(){
+// Stops everything the call holds (connection, microphone, sound) but
+// leaves the call screen up. Safe to call more than once.
+function releaseVoiceCall(){
   liveCallActive=false;
   liveCallConnecting=false;
   clearInterval(liveTimerHandle);
@@ -1285,13 +1332,17 @@ function endVoiceCall(){
   flushBotTranscript();
   stopAllPlayback();
 
-  if(liveWs){ try{liveWs.close();}catch(e){} liveWs=null; }
-  if(liveWorkletNode){ try{liveWorkletNode.disconnect();}catch(e){} liveWorkletNode=null; }
-  if(liveAudioCtx){ try{liveAudioCtx.close();}catch(e){} liveAudioCtx=null; }
-  if(livePlaybackCtx){ try{livePlaybackCtx.close();}catch(e){} livePlaybackCtx=null; }
+  // Cleared before closing so the socket's onclose knows it's stale.
+  if(liveWs){ const ws=liveWs; liveWs=null; try{ws.close();}catch(e){} }
+  if(liveWorkletNode){ try{liveWorkletNode.port.onmessage=null;liveWorkletNode.disconnect();}catch(e){} liveWorkletNode=null; }
+  if(liveAudioCtx){ liveAudioCtx.close().catch(()=>{}); liveAudioCtx=null; }
+  if(livePlaybackCtx){ livePlaybackCtx.close().catch(()=>{}); livePlaybackCtx=null; }
   if(liveMicStream){ liveMicStream.getTracks().forEach(t=>t.stop()); liveMicStream=null; }
   liveNextStartTime=0;
+}
 
+function endVoiceCall(){
+  releaseVoiceCall();
   document.getElementById('call-overlay').classList.remove('active');
   document.getElementById('call-ring').classList.remove('speaking');
-}
+}

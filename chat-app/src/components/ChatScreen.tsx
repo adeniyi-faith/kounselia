@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useChat } from '../hooks/useChat';
 import { useVoiceCall } from '../hooks/useVoiceCall';
 import type { Counselor, KounseliaConfig } from '@kounselia/core';
@@ -62,8 +62,22 @@ export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequest
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [counselorSlug]);
 
+  // When a call finishes, close the call screen (after a moment, so a
+  // last message like "Time's up" can be read) and, if the call got going,
+  // reload the conversation so what was said on it appears in the chat.
+  const callWasLive = useRef(false);
   useEffect(() => {
-    if (call.status === 'ended') setCallOpen(false);
+    if (call.status === 'listening' || call.status === 'speaking') callWasLive.current = true;
+    if (call.status !== 'ended') return;
+    const t = setTimeout(() => {
+      setCallOpen(false);
+      if (callWasLive.current) {
+        callWasLive.current = false;
+        loadHistory();
+      }
+    }, 900);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [call.status]);
 
   const handleHistory = async () => {
