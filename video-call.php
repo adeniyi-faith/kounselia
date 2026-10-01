@@ -11,7 +11,8 @@
  * app has no media/signaling server of its own. When an admin has set up
  * 8x8's hosted Jitsi (video-room.php), each person gets a signed pass
  * that makes them a host, so nobody waits for a "moderator" or is asked
- * to log in; otherwise it falls back to the free public meet.jit.si. The room name is a random per-booking token
+ * to log in; otherwise it falls back to the free public meet.jit.si.
+ * The room name is a random per-booking token
  * (kounselia_bookings.room_token), never the booking id itself, so it
  * can't be guessed or enumerated by anyone who isn't sent this link. For
  * a two-person call, Jitsi connects the participants directly
