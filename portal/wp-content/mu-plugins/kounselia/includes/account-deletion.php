@@ -83,13 +83,15 @@ function kounselia_erase_member_data( $user_id ) {
     // Safety alerts point at those (now deleted) messages.
     $wpdb->delete( "{$p}kounselia_safety_escalations", array( 'user_id' => $user_id ) );
 
-    // Mood, journal, memory and the check-ins drawn from it.
+    // Mood, journal, memory, the check-ins drawn from it, and growth plans.
     $wpdb->delete( "{$p}kounselia_mood_logs", array( 'user_id' => $user_id ) );
     $wpdb->delete( "{$p}kounselia_journal_entries", array( 'user_id' => $user_id ) );
     if ( function_exists( 'kounselia_memory_delete_profile' ) ) {
         kounselia_memory_delete_profile( $user_id );
     }
     $wpdb->delete( "{$p}kounselia_memory_upcoming_events", array( 'user_id' => $user_id ) );
+    $wpdb->delete( "{$p}kounselia_growth_plans", array( 'user_id' => $user_id ) );
+    $wpdb->delete( "{$p}kounselia_growth_plan_progress", array( 'user_id' => $user_id ) );
 
     // Notifications, and every phone signed in or registered for push.
     $wpdb->delete( "{$p}kounselia_notifications", array( 'user_id' => $user_id ) );

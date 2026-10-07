@@ -70,6 +70,7 @@ require_once KOUNSELIA_CORE_DIR . '/includes/journal.php';           // 16. Priv
 require_once KOUNSELIA_CORE_DIR . '/includes/password-reset.php';    // 17. Forgot password
 require_once KOUNSELIA_CORE_DIR . '/includes/memory.php';            // 18. Structured memory engine (import + delta synth)
 require_once KOUNSELIA_CORE_DIR . '/includes/check-ins.php';         // 18B. Smart Check-ins: dated events extracted from memory synthesis
+require_once KOUNSELIA_CORE_DIR . '/includes/growth-plans.php';      // 18B-2. Growth plans: 30 day Personal Development plans with daily tasks
 require_once KOUNSELIA_CORE_DIR . '/includes/professionals.php';     // 18C. Professional marketplace: applications, verification, private docs
 require_once KOUNSELIA_CORE_DIR . '/includes/professionals-admin.php'; // 18C-2. Admin: edit, hide, suspend, reinstate a professional
 require_once KOUNSELIA_CORE_DIR . '/includes/video-links.php';       // 18C-3. A professional's own Zoom / Meet / Teams / Whereby link

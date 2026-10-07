@@ -98,6 +98,9 @@ function kounselia_ajax_chat() {
     if ( $user_id ) {
         $system_prompt .= kounselia_user_context_clause( $user_id );
         $system_prompt .= kounselia_imported_memory_clause( $user_id );
+        if ( function_exists( 'kounselia_growth_chat_clause' ) ) {
+            $system_prompt .= kounselia_growth_chat_clause( $user_id, $counselor_slug );
+        }
     }
 
     // How much of this conversation the counselor re-reads is a plan benefit.
@@ -132,7 +135,8 @@ function kounselia_ajax_chat() {
         "- eli: Marriage, breakups, relationships, profound loneliness\n" .
         "- theo: Grief, death, mourning, profound loss\n" .
         "- priya: Burnout, extreme exhaustion, overwhelm, life balance\n" .
-        "- james: Men's mental health, toxic stoicism, male pressures\n\n" .
+        "- james: Men's mental health, toxic stoicism, male pressures\n" .
+        "- noa: Personal development, discipline, procrastination, habits, confidence, goal setting\n\n" .
         "If it does NOT need a specialist, output exactly: {\"specialists\": []}\n" .
         "If it does, output JSON like: {\"specialists\": [{\"slug\": \"specialist_slug\", \"confidence\": 0.0-1.0}]}\n" .
         "You may include up to 2 specialists if the message genuinely spans two areas. Order by confidence, highest first.\n" .

@@ -155,6 +155,8 @@ function kounselia_ajax_app_home() {
 
     wp_send_json_success( array(
         'checkin'     => $checkin,
+        // Their running growth plan (today's task and progress), or null.
+        'growth'      => function_exists( 'kounselia_growth_home_summary' ) ? kounselia_growth_home_summary( $user_id ) : null,
         'care'        => kounselia_app_care_team( $user_id ),
         'mood'        => array(
             'options' => $options,

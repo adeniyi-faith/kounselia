@@ -200,7 +200,7 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
           <div class="card-top">
             <div class="card-av ic-sage"><i class="ti ti-leaf"></i></div>
             <div class="card-meta">
-              <div class="card-spec spec-sage">Personal growth</div>
+              <div class="card-spec spec-sage">Personal development</div>
               <div class="card-name">Noa</div>
             </div>
           </div>
