@@ -3,18 +3,20 @@
 import { router } from 'expo-router';
 import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from './TablerIcon';
 
 export function ScreenHeader({ title, right, onBack }: { title: string; right?: ReactNode; onBack?: () => void }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   return (
     <View style={styles.nav}>
       <Pressable
         onPress={onBack ?? (() => (router.canGoBack() ? router.back() : router.replace('/')))}
         accessibilityRole="button"
-        accessibilityLabel="Back"
+        accessibilityLabel={t('m.b.common.back')}
         style={styles.back}
         hitSlop={6}
       >

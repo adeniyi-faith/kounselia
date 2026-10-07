@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { CallStatus } from '@/audio/useVoiceCall';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 
@@ -44,13 +45,14 @@ function Ring({ active }: { active: boolean }) {
 export function CallOverlay(props: Props) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const { visible, counselor, status, statusText, timerText, caption, muted, freeCallMinutes, onEnd, onToggleMute } = props;
   const insets = useSafeAreaInsets();
 
   return (
     <Modal visible={visible} animationType="slide" presentationStyle="fullScreen" onRequestClose={onEnd} statusBarTranslucent>
       <LinearGradient colors={[colors.navyFill, colors.accent]} style={[styles.screen, { paddingTop: insets.top + 40, paddingBottom: insets.bottom + 40 }]}>
-        <Pressable onPress={onEnd} accessibilityRole="button" accessibilityLabel="End call" style={[styles.close, { top: insets.top + 16 }]}>
+        <Pressable onPress={onEnd} accessibilityRole="button" accessibilityLabel={t('m.b.call.end')} style={[styles.close, { top: insets.top + 16 }]}>
           <TablerIcon name="x" size={20} color="#fff" />
         </Pressable>
         <Text style={styles.status} accessibilityLiveRegion="polite">
@@ -63,7 +65,7 @@ export function CallOverlay(props: Props) {
           </View>
         </View>
         <Text style={styles.name}>{counselor.name}</Text>
-        <Text style={styles.timer} accessibilityLabel={`Time left ${timerText}`}>
+        <Text style={styles.timer} accessibilityLabel={t('m.b.call.time_left', { time: timerText })}>
           {timerText}
         </Text>
         <Text style={styles.caption} numberOfLines={4}>
@@ -73,18 +75,18 @@ export function CallOverlay(props: Props) {
           <Pressable
             onPress={onToggleMute}
             accessibilityRole="button"
-            accessibilityLabel={muted ? 'Unmute' : 'Mute'}
+            accessibilityLabel={muted ? t('m.b.call.unmute') : t('m.b.call.mute')}
             accessibilityState={{ selected: muted }}
             style={[styles.ctrl, muted && styles.ctrlMuted]}
           >
             <TablerIcon name={muted ? 'microphone-off' : 'microphone'} size={22} color={muted ? colors.navyFill : '#fff'} />
           </Pressable>
-          <Pressable onPress={onEnd} accessibilityRole="button" accessibilityLabel="Hang up" style={[styles.ctrl, styles.end]}>
+          <Pressable onPress={onEnd} accessibilityRole="button" accessibilityLabel={t('m.b.call.hang_up')} style={[styles.ctrl, styles.end]}>
             <TablerIcon name="phone-x" size={26} color="#fff" />
           </Pressable>
         </View>
         {freeCallMinutes !== null && (
-          <Text style={styles.note}>Free members get {freeCallMinutes} minutes per call. Upgrade to Pro for longer sessions.</Text>
+          <Text style={styles.note}>{t('m.b.call.free_note', { minutes: freeCallMinutes })}</Text>
         )}
       </LinearGradient>
     </Modal>

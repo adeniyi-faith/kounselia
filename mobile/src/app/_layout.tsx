@@ -13,10 +13,11 @@ import { Outfit_400Regular } from '@expo-google-fonts/outfit/400Regular';
 import { Outfit_500Medium } from '@expo-google-fonts/outfit/500Medium';
 import { Outfit_600SemiBold } from '@expo-google-fonts/outfit/600SemiBold';
 import { useFonts } from 'expo-font';
+import { deviceLanguage, makeT } from '@kounselia/core';
 import { SplashScreen, Stack, type ErrorBoundaryProps } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SystemUI from 'expo-system-ui';
-import { useEffect } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Text, View } from 'react-native';
 import { BrowserProvider } from '@/browser/BrowserProvider';
 import { VideoCallProvider } from '@/browser/VideoCallProvider';
@@ -24,6 +25,7 @@ import { AppLockProvider } from '@/components/AppLock';
 import { Button } from '@/components/Button';
 import { DialogHost } from '@/components/Dialog';
 import { tablerFont } from '@/components/TablerIcon';
+import { LanguageProvider, useLanguage } from '@/language';
 import { SessionProvider, useSession } from '@/session';
 import { fonts, ThemeProvider, useColors, useTheme } from '@/theme';
 
@@ -46,20 +48,30 @@ function RootLayout() {
 
   return (
     <ThemeProvider>
-      <SessionProvider>
-        <BrowserProvider>
-          <VideoCallProvider>
-            <AppLockProvider>
-              <SystemColors />
-              {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
-              {fontsLoaded || fontError ? <RootNavigator /> : null}
-              <DialogHost />
-            </AppLockProvider>
-          </VideoCallProvider>
-        </BrowserProvider>
-      </SessionProvider>
+      <LanguageProvider>
+        <SessionProvider>
+          <BrowserProvider>
+            <VideoCallProvider>
+              <AppLockProvider>
+                <SystemColors />
+                {/* Arabic reads right to left, so the whole app flips its layout. */}
+                <Direction>
+                  {/* If a font fails to load, carry on with the system font rather than hang on the splash. */}
+                  {fontsLoaded || fontError ? <RootNavigator /> : null}
+                </Direction>
+                <DialogHost />
+              </AppLockProvider>
+            </VideoCallProvider>
+          </BrowserProvider>
+        </SessionProvider>
+      </LanguageProvider>
     </ThemeProvider>
   );
+}
+
+function Direction({ children }: { children: ReactNode }) {
+  const { rtl } = useLanguage();
+  return <View style={{ flex: 1, direction: rtl ? 'rtl' : 'ltr' }}>{children}</View>;
 }
 
 // The clock and battery icons, and the colour behind the app (seen for a
@@ -104,17 +116,19 @@ function RootNavigator() {
 // and send the details to crash reporting (src/monitoring.ts).
 export function ErrorBoundary({ error, retry }: ErrorBoundaryProps) {
   const colors = useColors();
+  // This can show outside the language provider, so it reads the phone's language itself.
+  const t = makeT(deviceLanguage());
   useEffect(() => {
     report(error);
     SplashScreen.hide();
   }, [error]);
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: 32 }}>
-      <Text style={{ fontFamily: fonts.serifMedium, fontSize: 26, color: colors.text, textAlign: 'center' }}>Something went wrong</Text>
+      <Text style={{ fontFamily: fonts.serifMedium, fontSize: 26, color: colors.text, textAlign: 'center' }}>{t('m.common.error_title')}</Text>
       <Text style={{ fontFamily: fonts.regular, fontSize: 15, lineHeight: 22, color: colors.text2, textAlign: 'center', marginTop: 10 }}>
-        Sorry about that. Please try again.
+        {t('m.common.error_body')}
       </Text>
-      <Button title="Try again" onPress={retry} style={{ alignSelf: 'stretch', marginTop: 24 }} />
+      <Button title={t('growth.try_again')} onPress={retry} style={{ alignSelf: 'stretch', marginTop: 24 }} />
     </View>
   );
 }

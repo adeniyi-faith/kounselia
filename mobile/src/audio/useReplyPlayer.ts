@@ -4,6 +4,7 @@
 import { fetchVoiceAudio, type KounseliaConfig } from '@kounselia/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioContext, type AudioBufferSourceNode } from 'react-native-audio-api';
+import { useT } from '@/language';
 import { base64ToBytes } from './bytes';
 import { releaseSound, setSoundMode } from './session';
 
@@ -11,6 +12,11 @@ export type PlayState = { messageId: number; phase: 'loading' | 'playing' } | nu
 
 export function useReplyPlayer(config: KounseliaConfig, onError: (message: string) => void) {
   const [state, setState] = useState<PlayState>(null);
+  const t = useT();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  });
   const context = useRef<AudioContext | null>(null);
   const source = useRef<AudioBufferSourceNode | null>(null);
   const request = useRef(0);
@@ -42,7 +48,7 @@ export function useReplyPlayer(config: KounseliaConfig, onError: (message: strin
       if (mine !== request.current) return; // Tapped something else meanwhile.
       if (!dataUri) {
         setState(null);
-        latest.current.onError("Couldn't play this message. Please check your connection and try again.");
+        latest.current.onError(tRef.current('m.b.voice.play_failed_conn'));
         return;
       }
       try {
@@ -67,7 +73,7 @@ export function useReplyPlayer(config: KounseliaConfig, onError: (message: strin
         setState({ messageId, phase: 'playing' });
       } catch {
         setState(null);
-        latest.current.onError("Couldn't play this message.");
+        latest.current.onError(tRef.current('m.b.voice.play_failed'));
       }
     },
     [state, stop],

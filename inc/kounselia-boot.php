@@ -63,7 +63,7 @@ function kounselia_public_context() {
 function kounselia_public_head( $meta ) {
     $meta = wp_parse_args( $meta, array(
         'title'       => 'Kounselia',
-        'description' => 'Kounselia gives you a private space to talk through what you\'re carrying.',
+        'description' => kounselia_t( 's.boot.meta_desc' ),
         'url'         => kounselia_site_url( '/' ),
         'image'       => 'https://kounselia.com/img/Kounselia_Banner_02_16_9.png',
         'type'        => 'website',
@@ -73,7 +73,7 @@ function kounselia_public_head( $meta ) {
     $root = dirname( __DIR__ );
     ?>
 <!DOCTYPE html>
-<html lang="en">
+<html <?php echo function_exists( 'kounselia_html_attrs' ) ? kounselia_html_attrs() : 'lang="en"'; ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -111,12 +111,14 @@ function kounselia_public_head( $meta ) {
 function kounselia_public_not_found( $what = 'page' ) {
     status_header( 404 );
     nocache_headers();
-    kounselia_public_head( array( 'title' => 'Not found — Kounselia', 'noindex' => true ) );
+    $kl   = kounselia_current_language();
+    $kind = in_array( $what, array( 'page', 'story', 'topic', 'professional' ), true ) ? $what : 'page';
+    kounselia_public_head( array( 'title' => kounselia_t( 's.notfound.title', array(), $kl ), 'noindex' => true ) );
     echo '<body class="k-site">';
     require dirname( __DIR__ ) . '/inc/kounselia-site-nav.php';
-    echo '<main class="k-notfound"><div class="k-eyebrow">404</div><h1>We couldn\'t find that ' . esc_html( $what ) . '</h1>'
-        . '<p>It may have moved, or the link might be mistyped. Here are some places to start instead.</p>'
-        . '<div class="k-notfound-links"><a class="k-btn" href="/">Go to the homepage</a><a class="k-btn outline" href="/blog/">Read the journal</a></div></main>';
+    echo '<main class="k-notfound"><div class="k-eyebrow">404</div><h1>' . esc_html( kounselia_t( 's.notfound.h1_' . $kind, array(), $kl ) ) . '</h1>'
+        . '<p>' . esc_html( kounselia_t( 's.notfound.p', array(), $kl ) ) . '</p>'
+        . '<div class="k-notfound-links"><a class="k-btn" href="/">' . esc_html( kounselia_t( 's.notfound.home', array(), $kl ) ) . '</a><a class="k-btn outline" href="/blog/">' . esc_html( kounselia_t( 's.notfound.journal', array(), $kl ) ) . '</a></div></main>';
     require dirname( __DIR__ ) . '/inc/kounselia-footer.php';
     echo '</body></html>';
     exit;

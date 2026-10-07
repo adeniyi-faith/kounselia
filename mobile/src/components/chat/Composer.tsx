@@ -7,6 +7,7 @@ import * as Haptics from 'expo-haptics';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, TextInput, View } from 'react-native';
 import { useDictation } from '@/audio/useDictation';
+import { useT } from '@/language';
 import { fonts, makeStyles, shadows, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 
@@ -22,6 +23,7 @@ interface Props {
 export function Composer({ config, busy, onSend, onNotify }: Props) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const [value, setValue] = useState('');
   const [focused, setFocused] = useState(false);
 
@@ -48,7 +50,7 @@ export function Composer({ config, busy, onSend, onNotify }: Props) {
 
   const disabled = transcribing || (hasText && busy);
   const background = recording ? colors.roseFill : hasText ? colors.accent : GREEN;
-  const label = recording ? 'Stop recording' : hasText ? 'Send' : 'Speak your message';
+  const label = recording ? t('m.b.composer.stop') : hasText ? t('m.b.booking.send') : t('m.b.composer.speak');
 
   return (
     <View style={styles.area}>
@@ -58,13 +60,13 @@ export function Composer({ config, busy, onSend, onNotify }: Props) {
           onChangeText={setValue}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          placeholder={recording ? 'Listening… tap the red button when you’re done' : transcribing ? 'Writing down what you said…' : 'Message'}
+          placeholder={recording ? t('m.b.composer.listening') : transcribing ? t('m.b.composer.writing') : t('m.b.booking.message')}
           placeholderTextColor="#94A3B8"
           multiline
           maxLength={4000}
           editable={!recording}
           style={styles.input}
-          accessibilityLabel="Message"
+          accessibilityLabel={t('m.b.booking.message')}
         />
       </View>
       <Pressable

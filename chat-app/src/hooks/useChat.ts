@@ -7,6 +7,7 @@ import {
   sendChatMessage,
   synthesizeMemory,
 } from '@kounselia/core';
+import { useT } from '../i18n';
 import { getGuestToken } from '../guestToken';
 import type { ChatMessage, Counselor, KounseliaConfig } from '@kounselia/core';
 
@@ -26,6 +27,7 @@ interface UseChatOptions {
 }
 
 export function useChat({ config, counselorSlug, counselor }: UseChatOptions) {
+  const t = useT();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [typing, setTyping] = useState(false);
   const [limitBanner, setLimitBanner] = useState<'soft' | 'hard' | null>(null);
@@ -37,9 +39,9 @@ export function useChat({ config, counselorSlug, counselor }: UseChatOptions) {
   const loggedIn = config.loggedIn;
 
   const appendGreeting = useCallback(() => {
-    const greeting = counselor.greeting || `Hello. I am ${counselor.name}. Where would you like to start today?`;
+    const greeting = counselor.greeting || t('c.chat.greeting_default', { name: counselor.name });
     setMessages([{ id: nextId(), sender: 'ai', text: greeting, createdAt: Date.now() }]);
-  }, [counselor]);
+  }, [counselor, t]);
 
   const sendMessage = useCallback(
     async (text: string) => {
@@ -112,13 +114,13 @@ export function useChat({ config, counselorSlug, counselor }: UseChatOptions) {
           {
             id: nextId(),
             sender: 'ai',
-            text: result.errorMessage || "I'm having trouble connecting right now. Please try again in a moment.",
+            text: result.errorMessage || t('c.chat.trouble'),
             createdAt: Date.now(),
           },
         ]);
       }
     },
-    [config, counselorSlug, loggedIn, typing],
+    [config, counselorSlug, loggedIn, typing, t],
   );
 
   const loadHistory = useCallback(async (): Promise<'ok' | 'empty' | 'error'> => {

@@ -5,6 +5,7 @@ import type { Comment } from '@kounselia/core';
 import { Image } from 'expo-image';
 import { Pressable, Text, View } from 'react-native';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors, type Palette } from '@/theme';
 
 // A soft colour per name, so a thread is easy to follow at a glance.
@@ -32,16 +33,17 @@ interface Props {
 export function CommentItem({ comment: c, reply = false, canReply, onLove, onReply, onMore }: Props) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const removed = c.status === 'removed';
-  const t = c.author.is_author ? { fg: colors.accentText, bg: colors.accentLight } : tone(c.author.name, colors);
+  const look = c.author.is_author ? { fg: colors.accentText, bg: colors.accentLight } : tone(c.author.name, colors);
 
   return (
     <View style={[styles.row, reply && styles.replyRow, c.held && styles.held]}>
-      <View style={[styles.av, reply && styles.avSmall, { backgroundColor: t.bg }]}>
+      <View style={[styles.av, reply && styles.avSmall, { backgroundColor: look.bg }]}>
         {c.author.avatar ? (
           <Image source={{ uri: c.author.avatar }} style={styles.avImg} contentFit="cover" />
         ) : (
-          <Text style={[styles.avText, { color: t.fg }]}>{c.author.initial}</Text>
+          <Text style={[styles.avText, { color: look.fg }]}>{c.author.initial}</Text>
         )}
       </View>
       <View style={styles.main}>
@@ -50,21 +52,21 @@ export function CommentItem({ comment: c, reply = false, canReply, onLove, onRep
           {c.author.is_author && (
             <View style={styles.badge}>
               <TablerIcon name="discount-check-filled" size={12} color={colors.sage} />
-              <Text style={styles.badgeText}>Author</Text>
+              <Text style={styles.badgeText}>{t('m.b.item.author')}</Text>
             </View>
           )}
           <Text style={styles.time}>· {c.time_label}</Text>
           {c.pinned && (
             <View style={styles.pinned}>
               <TablerIcon name="pin" size={12} color={colors.gold} />
-              <Text style={[styles.time, { color: colors.gold }]}>Pinned</Text>
+              <Text style={[styles.time, { color: colors.gold }]}>{t('m.b.item.pinned')}</Text>
             </View>
           )}
         </View>
         <Text style={[styles.text, removed && styles.removed]} selectable={!removed}>
           {c.content}
         </Text>
-        {c.held && <Text style={styles.heldNote}>Only you can see this until it has been reviewed.</Text>}
+        {c.held && <Text style={styles.heldNote}>{t('m.b.item.held')}</Text>}
 
         {!removed && (
           <View style={styles.actions}>
@@ -73,7 +75,7 @@ export function CommentItem({ comment: c, reply = false, canReply, onLove, onRep
                 onPress={() => onLove(c)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: c.loved }}
-                accessibilityLabel={`${c.loved ? 'Loved' : 'Love'}, ${c.love_count}`}
+                accessibilityLabel={`${c.loved ? t('m.b.item.loved') : t('m.b.item.love')}, ${c.love_count}`}
                 hitSlop={6}
                 style={styles.action}
               >
@@ -82,12 +84,12 @@ export function CommentItem({ comment: c, reply = false, canReply, onLove, onRep
               </Pressable>
             )}
             {!c.held && canReply && (
-              <Pressable onPress={() => onReply(c)} accessibilityRole="button" accessibilityLabel={`Reply to ${c.author.name}`} hitSlop={6} style={styles.action}>
+              <Pressable onPress={() => onReply(c)} accessibilityRole="button" accessibilityLabel={t('m.b.item.reply_to', { name: c.author.name })} hitSlop={6} style={styles.action}>
                 <TablerIcon name="message-circle" size={16} color={colors.text3} />
-                <Text style={styles.actionText}>Reply</Text>
+                <Text style={styles.actionText}>{t('m.b.item.reply')}</Text>
               </Pressable>
             )}
-            <Pressable onPress={() => onMore(c, reply)} accessibilityRole="button" accessibilityLabel="More options" hitSlop={6} style={styles.action}>
+            <Pressable onPress={() => onMore(c, reply)} accessibilityRole="button" accessibilityLabel={t('m.b.chath.more')} hitSlop={6} style={styles.action}>
               <TablerIcon name="dots-vertical" size={16} color={colors.text3} />
             </Pressable>
           </View>

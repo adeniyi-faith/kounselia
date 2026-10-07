@@ -6,6 +6,7 @@ import { transcribeAudio, type KounseliaConfig } from '@kounselia/core';
 import { File } from 'expo-file-system';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AudioRecorder, FileFormat, FilePreset } from 'react-native-audio-api';
+import { useT } from '@/language';
 import { micAllowed, releaseSound, setSoundMode } from './session';
 
 export type DictationState = 'idle' | 'recording' | 'transcribing';
@@ -16,6 +17,11 @@ const MAX_SECONDS = 180;
 
 export function useDictation(config: KounseliaConfig, onText: (text: string) => void, onError: (message: string) => void) {
   const [state, setState] = useState<DictationState>('idle');
+  const t = useT();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  });
   const recorder = useRef<AudioRecorder | null>(null);
   const starting = useRef(false);
   const closed = useRef(false);
@@ -38,7 +44,7 @@ export function useDictation(config: KounseliaConfig, onText: (text: string) => 
       const path = result.status === 'success' ? result.paths[0] : undefined;
       if (!path) {
         setState('idle');
-        if (send) latest.current.onError("Couldn't record that. Please try again.");
+        if (send) latest.current.onError(tRef.current('m.b.voice.record_failed'));
         return;
       }
       const file = new File(path.startsWith('file://') ? path : `file://${path}`);
@@ -52,9 +58,9 @@ export function useDictation(config: KounseliaConfig, onText: (text: string) => 
         const audio = await file.base64();
         const res = await transcribeAudio(latest.current.config, audio, 'audio/mp4');
         if (res.text) latest.current.onText(res.text);
-        else latest.current.onError(res.error || "Couldn't make out the words. Please try again.");
+        else latest.current.onError(res.error || tRef.current('m.b.voice.no_words'));
       } catch {
-        latest.current.onError("Couldn't send the recording. Please check your connection.");
+        latest.current.onError(tRef.current('m.b.voice.send_failed'));
       } finally {
         try {
           file.delete();
@@ -69,7 +75,7 @@ export function useDictation(config: KounseliaConfig, onText: (text: string) => 
 
   const begin = useCallback(async () => {
     if (!(await micAllowed())) {
-      latest.current.onError('Kounselia needs microphone access to hear you. You can allow it in your phone’s Settings.');
+      latest.current.onError(tRef.current('m.b.voice.mic_needed'));
       return;
     }
     await setSoundMode('record');
@@ -78,7 +84,7 @@ export function useDictation(config: KounseliaConfig, onText: (text: string) => 
     const started = await rec.start();
     if (started.status !== 'success') {
       await releaseSound();
-      latest.current.onError("Couldn't start recording. Please try again.");
+      latest.current.onError(tRef.current('m.b.voice.start_failed'));
       return;
     }
     if (closed.current) {
