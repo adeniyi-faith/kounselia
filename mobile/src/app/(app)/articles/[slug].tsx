@@ -15,6 +15,7 @@ import { Toast, useToast } from '@/components/chat/Toast';
 import { Button } from '@/components/Button';
 import { HeaderButton, ScreenHeader } from '@/components/ScreenHeader';
 import { SITE_URL } from '@/config';
+import { useLanguage } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors, useTheme } from '@/theme';
 import { ArticleSkeleton } from '@/components/Skeleton';
@@ -22,6 +23,7 @@ import { ArticleSkeleton } from '@/components/Skeleton';
 export default function Article() {
   const styles = useStyles();
   const colors = useColors();
+  const { language, t } = useLanguage();
   const { scheme } = useTheme();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { config } = useSession();
@@ -39,9 +41,9 @@ export default function Article() {
       setPost(res.data);
       setFailed(null);
     } else {
-      setFailed(res.offline ? "We couldn't load this article. Please check your internet connection." : res.message);
+      setFailed(res.offline ? t('m.b.articles.load_one_failed') : res.message);
     }
-  }, [config, slug]);
+  }, [config, slug, t]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -49,7 +51,7 @@ export default function Article() {
   }, [load]);
 
   const baseUrl = `${SITE_URL}/blog/${slug}`;
-  const html = useMemo(() => (post ? articleHtml(post, colors, scheme === 'dark') : ''), [post, colors, scheme]);
+  const html = useMemo(() => (post ? articleHtml(post, colors, scheme === 'dark', t, language) : ''), [post, colors, scheme, t, language]);
 
   function shouldLoad(url: string, isTopFrame: boolean) {
     // The article itself, jumps within it, and videos embedded in it.
@@ -68,7 +70,7 @@ export default function Article() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScreenHeader title={post?.tags[0]?.name ?? 'Article'} right={post ? <HeaderButton icon="share" label="Share article" onPress={share} /> : null} />
+      <ScreenHeader title={post?.tags[0]?.name ?? t('m.b.articles.article')} right={post ? <HeaderButton icon="share" label={t('m.b.articles.share')} onPress={share} /> : null} />
       {post ? (
         <>
           <WebFrame source={{ html, baseUrl }} style={styles.web} shouldLoad={shouldLoad} />
@@ -77,7 +79,7 @@ export default function Article() {
       ) : failed ? (
         <View style={styles.center}>
           <Text style={styles.notice}>{failed}</Text>
-          <Button title="Try again" variant="ghost" onPress={load} busy={busy} />
+          <Button title={t('m.b.common.try_again')} variant="ghost" onPress={load} busy={busy} />
         </View>
       ) : (
         <ArticleSkeleton />

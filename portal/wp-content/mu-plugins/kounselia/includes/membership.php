@@ -21,6 +21,8 @@
  *   reflections_per_month  on-demand Milestone Reflections (0 = unlimited)
  *   auto_reflection_days   how often the reflection refreshes itself
  *   booking_discount       % off sessions with human professionals
+ *   growth_plans           how many 30 day growth plans a member can
+ *                          start (0 = unlimited; see growth-plans.php)
  *
  * Part of the kounselia-core mu-plugin. Loaded by ../../kounselia-core.php,
  * never included directly.
@@ -38,6 +40,7 @@ function kounselia_plan_benefit_defaults() {
             'reflections_per_month' => 1,
             'auto_reflection_days'  => 30,
             'booking_discount'      => 0,
+            'growth_plans'          => 3,
         ),
         'pro'  => array(
             'memory_messages'       => 40,
@@ -45,6 +48,7 @@ function kounselia_plan_benefit_defaults() {
             'reflections_per_month' => 0,
             'auto_reflection_days'  => 7,
             'booking_discount'      => 10,
+            'growth_plans'          => 0,
         ),
     );
 }
@@ -76,6 +80,7 @@ function kounselia_save_plan_benefits( $input ) {
             'reflections_per_month' => max( 0, min( 100, (int) ( $t['reflections_per_month'] ?? 0 ) ) ),
             'auto_reflection_days'  => max( 0, min( 365, (int) ( $t['auto_reflection_days'] ?? 30 ) ) ),
             'booking_discount'      => max( 0, min( 50, (float) ( $t['booking_discount'] ?? 0 ) ) ),
+            'growth_plans'          => max( 0, min( 100, (int) ( $t['growth_plans'] ?? 3 ) ) ),
         );
         if ( isset( $t['voice_minutes'] ) ) {
             update_option( 'kounselia_voice_' . $tier . '_minutes', max( 1, min( 120, (int) $t['voice_minutes'] ) ) );
@@ -124,6 +129,7 @@ function kounselia_plan_benefit_lines( $tier ) {
     if ( $b['booking_discount'] > 0 ) {
         $lines[] = rtrim( rtrim( number_format( (float) $b['booking_discount'], 1 ), '0' ), '.' ) . '% off sessions with licensed professionals';
     }
+    $lines[] = $b['growth_plans'] ? (int) $b['growth_plans'] . ' growth plan' . ( 1 === (int) $b['growth_plans'] ? '' : 's' ) . ' (30 days of daily steps)' : 'Unlimited growth plans (30 days of daily steps)';
     $lines[] = 'Mood check-ins and a private journal';
     return $lines;
 }

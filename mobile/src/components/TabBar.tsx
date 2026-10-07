@@ -6,17 +6,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from './TablerIcon';
 
 const ICONS: Record<string, string> = { index: 'home', sessions: 'history', book: 'calendar-event', settings: 'settings' };
-const LABELS: Record<string, string> = { index: 'Home', sessions: 'Sessions', book: 'Book', settings: 'Settings' };
+const LABELS: Record<string, string> = { index: 'm.tabs.home', sessions: 'm.tabs.sessions', book: 'm.tabs.book', settings: 'm.tabs.settings' };
 const CENTRE = 'talk';
 
 export function TabBar({ state, navigation, descriptors }: BottomTabBarProps) {
   const styles = useStyles();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   return (
     <View style={[styles.bar, { paddingBottom: insets.bottom, height: 64 + insets.bottom }]}>
@@ -59,7 +61,7 @@ export function TabBar({ state, navigation, descriptors }: BottomTabBarProps) {
             style={styles.tab}
           >
             <TablerIcon name={ICONS[route.name] ?? 'circle'} size={22} color={tint} />
-            <Text style={[styles.label, { color: tint }]}>{LABELS[route.name] ?? label}</Text>
+            <Text style={[styles.label, { color: tint }]}>{LABELS[route.name] ? t(LABELS[route.name]) : label}</Text>
           </Pressable>
         );
       })}

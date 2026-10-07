@@ -16,8 +16,9 @@ $kounselia_social_icons = array(
     'instagram' => array( 'ti-brand-instagram', 'Instagram' ),
     'facebook'  => array( 'ti-brand-facebook', 'Facebook' ),
     'youtube'   => array( 'ti-brand-youtube', 'YouTube' ),
-    'email'     => array( 'ti-mail', 'Email us' ),
+    'email'     => array( 'ti-mail', kounselia_t( 's.footer.email_us' ) ),
 );
+$kounselia_fl = kounselia_current_language();
 ?>
 <footer class="footer">
   <div class="container">
@@ -72,23 +73,45 @@ $kounselia_social_icons = array(
 
     <div class="footer-divider"></div>
 
+    <?php if ( function_exists( 'kounselia_languages' ) ) :
+        $kounselia_footer_lang = kounselia_current_language(); ?>
+    <div class="footer-lang" style="margin-bottom:18px;">
+      <label for="k-lang-select" style="font-size:13px;opacity:.8;margin-right:8px;"><i class="ti ti-language"></i> <?php echo esc_html( kounselia_t( 'lang.setting', array(), $kounselia_footer_lang ) ); ?></label>
+      <select id="k-lang-select" style="padding:6px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.25);background:transparent;color:inherit;font:inherit;">
+        <?php foreach ( kounselia_languages() as $code => $info ) : ?>
+          <option value="<?php echo esc_attr( $code ); ?>" style="color:#111;"<?php selected( $kounselia_footer_lang, $code ); ?>><?php echo esc_html( $info['name'] ); ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <?php endif; ?>
+
     <div class="footer-badges">
-      <div class="footer-badge"><i class="ti ti-shield-check"></i> GDPR aligned</div>
-      <div class="footer-badge"><i class="ti ti-lock"></i> Encrypted</div>
-      <div class="footer-badge"><i class="ti ti-accessible"></i> Accessible</div>
-      <div class="footer-badge"><i class="ti ti-certificate"></i> Evidence informed</div>
-      <div class="footer-badge"><i class="ti ti-heart-handshake"></i> Crisis safe</div>
+      <div class="footer-badge"><i class="ti ti-shield-check"></i> <?php echo esc_html( kounselia_t( 's.footer.badge_gdpr', array(), $kounselia_fl ) ); ?></div>
+      <div class="footer-badge"><i class="ti ti-lock"></i> <?php echo esc_html( kounselia_t( 's.footer.badge_encrypted', array(), $kounselia_fl ) ); ?></div>
+      <div class="footer-badge"><i class="ti ti-accessible"></i> <?php echo esc_html( kounselia_t( 's.footer.badge_accessible', array(), $kounselia_fl ) ); ?></div>
+      <div class="footer-badge"><i class="ti ti-certificate"></i> <?php echo esc_html( kounselia_t( 's.footer.badge_evidence', array(), $kounselia_fl ) ); ?></div>
+      <div class="footer-badge"><i class="ti ti-heart-handshake"></i> <?php echo esc_html( kounselia_t( 's.footer.badge_crisis', array(), $kounselia_fl ) ); ?></div>
     </div>
 
     <div class="footer-bottom">
-      &copy; <?php echo esc_html( date( 'Y' ) ); ?> Kounselia. All rights reserved.<br><br>
-      Kounselia is a supportive wellness platform. It is not a substitute for clinical therapy or medical advice. If you are in crisis please contact your local emergency services or a licensed mental health professional.
+      <?php echo esc_html( kounselia_t( 's.footer.copyright', array( 'year' => date( 'Y' ) ), $kounselia_fl ) ); ?><br><br>
+      <?php echo esc_html( kounselia_t( 's.footer.disclaimer', array(), $kounselia_fl ) ); ?>
     </div>
   </div>
 </footer>
 <script>
 (function(){
   var AJAX = <?php echo wp_json_encode( set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' ) ); ?>;
+  var NLT = <?php echo wp_json_encode( kounselia_i18n_subset( $kounselia_fl, 's.footer.nl_' ) ); ?>;
+  var langSelect = document.getElementById('k-lang-select');
+  if (langSelect) {
+    langSelect.addEventListener('change', function(){
+      langSelect.disabled = true;
+      fetch(AJAX, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ action: 'kounselia_set_language', language: langSelect.value }) })
+        .then(function(){ location.reload(); })
+        .catch(function(){ langSelect.disabled = false; });
+    });
+  }
   document.querySelectorAll('.k-nl-form').forEach(function(form){
     if (form.dataset.bound) return;
     form.dataset.bound = '1';
@@ -98,9 +121,9 @@ $kounselia_social_icons = array(
       var btn = form.querySelector('button');
       var email = form.querySelector('[name=email]').value.trim();
       if (!/^\S+@\S+\.\S+$/.test(email)) {
-        msg.className = 'k-nl-msg error'; msg.textContent = 'Please enter a valid email address.'; return;
+        msg.className = 'k-nl-msg error'; msg.textContent = NLT['s.footer.nl_bad_email']; return;
       }
-      btn.disabled = true; msg.className = 'k-nl-msg'; msg.textContent = 'Subscribing…';
+      btn.disabled = true; msg.className = 'k-nl-msg'; msg.textContent = NLT['s.footer.nl_subscribing'];
       var body = new URLSearchParams({
         action: 'kounselia_newsletter_subscribe',
         email: email,
@@ -112,12 +135,12 @@ $kounselia_social_icons = array(
         .then(function(r){ return r.json(); })
         .then(function(res){
           btn.disabled = false;
-          var text = (res && res.data && res.data.message) || (res && res.success ? 'Subscribed.' : 'Something went wrong. Please try again.');
+          var text = (res && res.data && res.data.message) || (res && res.success ? NLT['s.footer.nl_done'] : NLT['s.footer.nl_error']);
           msg.className = 'k-nl-msg ' + (res && res.success ? 'ok' : 'error');
           msg.textContent = text;
           if (res && res.success) { form.classList.add('done'); form.querySelector('[name=email]').value = ''; }
         })
-        .catch(function(){ btn.disabled = false; msg.className = 'k-nl-msg error'; msg.textContent = 'Network error. Please try again.'; });
+        .catch(function(){ btn.disabled = false; msg.className = 'k-nl-msg error'; msg.textContent = NLT['s.footer.nl_network']; });
     });
   });
 })();

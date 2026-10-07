@@ -26,12 +26,12 @@ if ( ! is_user_logged_in() ) {
     status_header( 200 );
     nocache_headers();
     ?><!DOCTYPE html>
-<html lang="en">
+<html <?php echo function_exists( 'kounselia_html_attrs' ) ? kounselia_html_attrs() : 'lang="en"'; ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex, nofollow">
-<title><?php echo $paid ? 'Payment received' : 'Payment not completed'; ?> | Kounselia</title>
+<title><?php echo esc_html( kounselia_t( $paid ? 's.pay.received' : 's.pay.not_completed' ) ); ?> | Kounselia</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400&family=Outfit:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
 body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#F8F6F2;font-family:'Outfit',sans-serif;color:#18160F;padding:24px;box-sizing:border-box;text-align:center}
@@ -45,11 +45,11 @@ p{font-weight:300;font-size:16px;line-height:1.6;color:#5B574D;margin:0}
 <main>
   <div class="mark"><?php echo $paid ? '&#10003;' : '!'; ?></div>
   <?php if ( $paid ) : ?>
-    <h1>Payment received</h1>
-    <p>Your plan is active. You can close this page and go back to the Kounselia app.</p>
+    <h1><?php echo esc_html( kounselia_t( 's.pay.received' ) ); ?></h1>
+    <p><?php echo esc_html( kounselia_t( 's.pay.sub_ok' ) ); ?></p>
   <?php else : ?>
-    <h1>Payment not completed</h1>
-    <p>No money was taken. Close this page to go back to the Kounselia app and try again.</p>
+    <h1><?php echo esc_html( kounselia_t( 's.pay.not_completed' ) ); ?></h1>
+    <p><?php echo esc_html( kounselia_t( 's.pay.sub_fail' ) ); ?></p>
   <?php endif; ?>
 </main>
 </body>

@@ -9,6 +9,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { showDialog } from '@/components/Dialog';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useT } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, useColors } from '@/theme';
 
@@ -22,6 +23,7 @@ export function reportCommentCount(postId: number, count: number) {
 export function ArticleActions({ post, onNotify }: { post: BlogPost; onNotify: (text: string) => void }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const insets = useSafeAreaInsets();
   const { config } = useSession();
   const [c, setC] = useState<PostCommunity>(post.community);
@@ -56,7 +58,7 @@ export function ArticleActions({ post, onNotify }: { post: BlogPost; onNotify: (
       return;
     }
     setC((prev) => ({ ...prev, following: res.data.following, followers: res.data.followers }));
-    if (res.data.following) onNotify(`You'll hear when ${post.author.name} publishes something new.`);
+    if (res.data.following) onNotify(t('m.b.actions.followed', { name: post.author.name }));
   }
 
   function follow() {
@@ -65,10 +67,10 @@ export function ArticleActions({ post, onNotify }: { post: BlogPost; onNotify: (
       return;
     }
     showDialog({
-      title: `Unfollow ${post.author.name}?`,
-      message: "You won't hear about their new articles any more.",
+      title: t('m.b.actions.unfollow_title', { name: post.author.name }),
+      message: t('m.b.actions.unfollow_body'),
       icon: 'user-minus',
-      buttons: [{ text: 'Keep following', style: 'cancel' }, { text: 'Unfollow', style: 'destructive', onPress: () => changeFollow(false) }],
+      buttons: [{ text: t('m.b.actions.keep'), style: 'cancel' }, { text: t('m.b.actions.unfollow'), style: 'destructive', onPress: () => changeFollow(false) }],
     });
   }
 
@@ -80,7 +82,7 @@ export function ArticleActions({ post, onNotify }: { post: BlogPost; onNotify: (
             onPress={love}
             accessibilityRole="button"
             accessibilityState={{ selected: c.loved }}
-            accessibilityLabel={`${c.loved ? 'Loved' : 'Love this article'}, ${c.love_count} ${c.love_count === 1 ? 'love' : 'loves'}`}
+            accessibilityLabel={`${c.loved ? t('m.b.actions.loved') : t('m.b.actions.love')}, ${c.love_count === 1 ? t('m.b.actions.loves_one') : t('m.b.actions.loves_other', { n: c.love_count })}`}
             style={({ pressed }) => [styles.pill, c.loved && styles.loved, pressed && styles.pressed]}
           >
             <TablerIcon name={c.loved ? 'heart-filled' : 'heart'} size={19} color={c.loved ? colors.rose : colors.text2} />
@@ -91,7 +93,7 @@ export function ArticleActions({ post, onNotify }: { post: BlogPost; onNotify: (
           <Pressable
             onPress={() => router.push({ pathname: '/comments/[postId]', params: { postId: String(post.id), title: post.title, count: String(c.comment_count) } })}
             accessibilityRole="button"
-            accessibilityLabel={`Conversation, ${c.comment_count} ${c.comment_count === 1 ? 'comment' : 'comments'}`}
+            accessibilityLabel={`${t('m.b.comments.title')}, ${c.comment_count === 1 ? t('m.b.actions.comments_one') : t('m.b.actions.comments_other', { n: c.comment_count })}`}
             style={({ pressed }) => [styles.pill, pressed && styles.pressed]}
           >
             <TablerIcon name="message-circle" size={19} color={colors.text2} />
@@ -104,12 +106,12 @@ export function ArticleActions({ post, onNotify }: { post: BlogPost; onNotify: (
             onPress={follow}
             accessibilityRole="button"
             accessibilityState={{ selected: c.following }}
-            accessibilityLabel={c.following ? `Following ${post.author.name}` : `Follow ${post.author.name}`}
+            accessibilityLabel={c.following ? t('m.b.actions.following_name', { name: post.author.name }) : t('m.b.actions.follow_name', { name: post.author.name })}
             style={({ pressed }) => [styles.pill, c.following ? null : styles.follow, pressed && styles.pressed]}
           >
             <TablerIcon name={c.following ? 'check' : 'user-plus'} size={17} color={c.following ? colors.accentText : '#fff'} />
             <Text style={[styles.label, !c.following && { color: '#fff' }]} numberOfLines={1}>
-              {c.following ? 'Following' : 'Follow'}
+              {c.following ? t('m.b.articles.following') : t('m.b.actions.follow')}
             </Text>
           </Pressable>
         )}
@@ -117,12 +119,12 @@ export function ArticleActions({ post, onNotify }: { post: BlogPost; onNotify: (
           <Pressable
             onPress={() => router.push({ pathname: '/book/[proId]', params: { proId: String(c.book_pro_id) } })}
             accessibilityRole="button"
-            accessibilityLabel={`Book a session with ${post.author.name}`}
+            accessibilityLabel={t('m.b.actions.book_with', { name: post.author.name })}
             style={({ pressed }) => [styles.pill, styles.book, pressed && styles.pressed]}
           >
             <TablerIcon name="video" size={17} color={colors.gold} />
             <Text style={[styles.label, { color: colors.gold }]} numberOfLines={1}>
-              Book
+              {t('m.b.actions.book')}
             </Text>
           </Pressable>
         ) : null}

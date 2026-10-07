@@ -83,13 +83,15 @@ function kounselia_erase_member_data( $user_id ) {
     // Safety alerts point at those (now deleted) messages.
     $wpdb->delete( "{$p}kounselia_safety_escalations", array( 'user_id' => $user_id ) );
 
-    // Mood, journal, memory and the check-ins drawn from it.
+    // Mood, journal, memory, the check-ins drawn from it, and growth plans.
     $wpdb->delete( "{$p}kounselia_mood_logs", array( 'user_id' => $user_id ) );
     $wpdb->delete( "{$p}kounselia_journal_entries", array( 'user_id' => $user_id ) );
     if ( function_exists( 'kounselia_memory_delete_profile' ) ) {
         kounselia_memory_delete_profile( $user_id );
     }
     $wpdb->delete( "{$p}kounselia_memory_upcoming_events", array( 'user_id' => $user_id ) );
+    $wpdb->delete( "{$p}kounselia_growth_plans", array( 'user_id' => $user_id ) );
+    $wpdb->delete( "{$p}kounselia_growth_plan_progress", array( 'user_id' => $user_id ) );
 
     // Notifications, and every phone signed in or registered for push.
     $wpdb->delete( "{$p}kounselia_notifications", array( 'user_id' => $user_id ) );
@@ -135,6 +137,7 @@ function kounselia_ajax_delete_account() {
     // Kept before the account is gone, for the goodbye email.
     $email = $user->user_email;
     $name  = $user->display_name ? $user->display_name : '';
+    $lang  = kounselia_mail_lang( $user->ID, true );
 
     require_once ABSPATH . 'wp-admin/includes/user.php';
     if ( function_exists( 'kounselia_admin_log' ) ) {
@@ -148,12 +151,15 @@ function kounselia_ajax_delete_account() {
     if ( function_exists( 'kounselia_send_html_email' ) ) {
         kounselia_send_html_email(
             $email,
-            'Your Kounselia account has been deleted',
-            'Your account has been deleted',
-            '<p>' . ( $name ? 'Hi ' . esc_html( $name ) . ',' : 'Hi,' ) . '</p>'
-            . '<p>As you asked, we’ve deleted your Kounselia account, along with your conversations, mood check-ins, journal and everything your counselors remembered about you. This can’t be undone.</p>'
-            . '<p>If you didn’t ask for this, please reply to this email straight away.</p>'
-            . '<p>We’re glad we could be part of your journey, and you’re always welcome back.</p>'
+            kounselia_t( 'mail.delete.subject', array(), $lang ),
+            kounselia_t( 'mail.delete.headline', array(), $lang ),
+            '<p>' . esc_html( $name ? kounselia_t( 'mail.delete.hi_name', array( 'name' => $name ), $lang ) : kounselia_t( 'mail.delete.hi', array(), $lang ) ) . '</p>'
+            . '<p>' . esc_html( kounselia_t( 'mail.delete.body1', array(), $lang ) ) . '</p>'
+            . '<p>' . esc_html( kounselia_t( 'mail.delete.body2', array(), $lang ) ) . '</p>'
+            . '<p>' . esc_html( kounselia_t( 'mail.delete.body3', array(), $lang ) ) . '</p>',
+            null,
+            null,
+            array( 'lang' => $lang )
         );
     }
 

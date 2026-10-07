@@ -12,7 +12,8 @@ import {
   type CounselorSummary,
   type KounseliaConfig,
 } from '@kounselia/core';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useT } from '@/language';
 
 // Every 5 counselor replies, ask the server to update what it remembers
 // about the member (their "memory"), as the website does.
@@ -29,16 +30,21 @@ function nextId(): string {
   return `m${idCounter}`;
 }
 
-function greetingFor(counselor: CounselorSummary): AppMessage {
+function greetingFor(counselor: CounselorSummary, text: string): AppMessage {
   return {
     id: nextId(),
     sender: 'ai',
-    text: `Hello. I am ${counselor.name}. Where would you like to start today?`,
+    text,
     createdAt: Date.now(),
   };
 }
 
 export function useChat(config: KounseliaConfig, counselor: CounselorSummary) {
+  const t = useT();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  });
   const [messages, setMessages] = useState<AppMessage[]>([]);
   const [phase, setPhase] = useState<'loading' | 'ready'>('loading');
   const [typing, setTyping] = useState(false);
@@ -63,7 +69,7 @@ export function useChat(config: KounseliaConfig, counselor: CounselorSummary) {
         })),
       );
     } else {
-      setMessages([greetingFor(counselor)]);
+      setMessages([greetingFor(counselor, tRef.current('m.b.chat.greeting', { name: counselor.name }))]);
     }
     setPhase('ready');
     return history.status !== 'error';
@@ -90,7 +96,7 @@ export function useChat(config: KounseliaConfig, counselor: CounselorSummary) {
         : {
             id: nextId(),
             sender: 'ai',
-            text: result.errorMessage || "I'm having trouble connecting right now. Please try again in a moment.",
+            text: result.errorMessage || tRef.current('m.b.chat.trouble'),
             createdAt: Date.now(),
           };
       setMessages((prev) => [...prev, reply]);
@@ -149,7 +155,7 @@ export function useChat(config: KounseliaConfig, counselor: CounselorSummary) {
     if (!ok) return false;
     sessionId.current = 0;
     sinceMemorySync.current = 0;
-    setMessages([greetingFor(counselor)]);
+    setMessages([greetingFor(counselor, tRef.current('m.b.chat.greeting', { name: counselor.name }))]);
     return true;
   }, [config, counselor]);
 

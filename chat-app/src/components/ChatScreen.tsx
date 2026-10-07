@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useT } from '../i18n';
 import { useChat } from '../hooks/useChat';
 import { useVoiceCall } from '../hooks/useVoiceCall';
 import type { Counselor, KounseliaConfig } from '@kounselia/core';
@@ -24,6 +25,7 @@ function canVoiceCall(counselor: Counselor): boolean {
 }
 
 export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequestSignUp, onRequestSignIn }: Props) {
+  const t = useT();
   const {
     messages,
     typing,
@@ -62,8 +64,22 @@ export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequest
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [counselorSlug]);
 
+  // When a call finishes, close the call screen (after a moment, so a
+  // last message like "Time's up" can be read) and, if the call got going,
+  // reload the conversation so what was said on it appears in the chat.
+  const callWasLive = useRef(false);
   useEffect(() => {
-    if (call.status === 'ended') setCallOpen(false);
+    if (call.status === 'listening' || call.status === 'speaking') callWasLive.current = true;
+    if (call.status !== 'ended') return;
+    const t = setTimeout(() => {
+      setCallOpen(false);
+      if (callWasLive.current) {
+        callWasLive.current = false;
+        loadHistory();
+      }
+    }, 900);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [call.status]);
 
   const handleHistory = async () => {
@@ -75,13 +91,13 @@ export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequest
     setHistoryLoading(true);
     const result = await loadHistory();
     setHistoryLoading(false);
-    if (result === 'empty') showToast('No previous history found.');
-    if (result === 'error') showToast("Couldn't load your history. Please check your connection and try again.");
+    if (result === 'empty') showToast(t('c.chat.history_empty'));
+    if (result === 'error') showToast(t('c.chat.history_error'));
   };
 
   const handleExport = () => {
     setMenuOpen(false);
-    if (!exportChatAsFile(messages, counselor)) showToast('No messages to export.');
+    if (!exportChatAsFile(messages, counselor, t)) showToast(t('c.chat.no_export'));
   };
 
   const [clearing, setClearing] = useState(false);
@@ -89,13 +105,13 @@ export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequest
   const handleClear = async () => {
     setMenuOpen(false);
     if (clearing) return;
-    if (!window.confirm('Clear this conversation? It will be removed from your chat history and cannot be brought back.')) {
+    if (!window.confirm(t('c.chat.confirm_clear'))) {
       return;
     }
     setClearing(true);
     const ok = await clearChat();
     setClearing(false);
-    showToast(ok ? 'Conversation cleared.' : "Couldn't clear the chat. Please check your connection and try again.");
+    showToast(ok ? t('c.chat.cleared') : t('c.chat.clear_failed'));
   };
 
   const handleUpgrade = () => {
@@ -125,7 +141,7 @@ export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequest
   return (
     <div className="screen active" id="chat" onClick={() => menuOpen && setMenuOpen(false)}>
       <div className="chat-nav">
-        <button className="back-btn" onClick={onBack} aria-label="Go back">
+        <button className="back-btn" onClick={onBack} aria-label={t('c.chat.go_back')}>
           <i className="ti ti-arrow-left" />
         </button>
         <div className={`chat-av-sm ${counselor.av}`}>
@@ -134,7 +150,7 @@ export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequest
         <div className="chat-info">
           <h3>
             <span>{counselor.name}</span>
-            <span className="trust-badge" title="Verified Counselor">
+            <span className="trust-badge" title={t('c.chat.verified')}>
               <i className="ti ti-check" />
             </span>
           </h3>
@@ -149,14 +165,14 @@ export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequest
                 e.stopPropagation();
                 handleStartCall();
               }}
-              title="Start voice conversation"
+              title={t('c.chat.start_voice')}
             >
               <i className="ti ti-phone" />
             </button>
           )}
           <button
             className="icon-btn"
-            title="Load Chat History"
+            title={t('c.chat.load_history')}
             onClick={(e) => {
               e.stopPropagation();
               handleHistory();
@@ -166,7 +182,7 @@ export function ChatScreen({ config, counselorSlug, counselor, onBack, onRequest
           </button>
           <button
             className="icon-btn"
-            title="More options"
+            title={t('c.chat.more_options')}
             onClick={(e) => {
               e.stopPropagation();
               setMenuOpen((o) => !o);

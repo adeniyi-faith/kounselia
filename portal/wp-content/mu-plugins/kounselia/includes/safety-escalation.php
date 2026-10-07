@@ -290,7 +290,8 @@ function kounselia_notify_safety_escalation( $escalation_id ) {
             'Immediate review needed',
             $content,
             'View the conversation',
-            $context['transcript_url']
+            $context['transcript_url'],
+            array( 'lang' => 'en' ) // Staff alert: always English.
         );
     }
 

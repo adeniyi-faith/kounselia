@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { useT } from '../i18n';
 import { useDictation } from '../hooks/useDictation';
 import type { KounseliaConfig } from '@kounselia/core';
 
@@ -12,6 +13,7 @@ interface Props {
 // microphone when the box is empty, a send arrow once you start typing,
 // and switches into recording / transcribing state when you tap the mic.
 export function Composer({ config, disabled, onSend }: Props) {
+  const t = useT();
   const [value, setValue] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -65,14 +67,14 @@ export function Composer({ config, disabled, onSend }: Props) {
   return (
     <div className="upgraded-input-area">
       <div className="input-pill">
-        <button className="pill-icon" title="Expressions" type="button">
+        <button className="pill-icon" title={t('c.composer.expressions')} type="button">
           <i className="ti ti-mood-smile" />
         </button>
         <textarea
           ref={textareaRef}
           className="chat-input"
           rows={1}
-          placeholder="Message"
+          placeholder={t('c.composer.placeholder')}
           disabled={disabled}
           value={value}
           onChange={(e) => {
@@ -91,7 +93,7 @@ export function Composer({ config, disabled, onSend }: Props) {
         className={`dynamic-fab${hasText ? ' is-typing' : ''}`}
         onClick={handleFabClick}
         disabled={disabled}
-        aria-label="Voice or Send"
+        aria-label={t('c.composer.voice_or_send')}
         style={{
           background: fabBackground,
           animation: dictation.state === 'recording' ? 'micPulse 1.2s ease-in-out infinite' : undefined,

@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { Counselor } from '@kounselia/core';
+import { useT } from '../i18n';
 
 // After 3.5s of waiting, we tell the user their message may be
 // getting reviewed by more than one counselor, instead of just
 // leaving three dots bouncing with no explanation.
 export function TypingIndicator({ counselor }: { counselor: Counselor }) {
+  const t = useT();
   const [consulting, setConsulting] = useState(false);
 
   useEffect(() => {
@@ -34,8 +36,8 @@ export function TypingIndicator({ counselor }: { counselor: Counselor }) {
               letterSpacing: 0.5,
             }}
           >
-            <i className="ti ti-users" /> Consulting Team
-            <span className="dot" style={{ marginLeft: 2, background: 'var(--gold)' }} />
+            <i className="ti ti-users" /> {t('c.typing.consulting')}
+            <span className="dot" style={{ marginInlineStart: 2, background: 'var(--gold)' }} />
             <span className="dot" style={{ background: 'var(--gold)' }} />
             <span className="dot" style={{ background: 'var(--gold)' }} />
           </div>

@@ -15,6 +15,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
 import { TablerIcon } from '@/components/TablerIcon';
 import { showDialog } from '@/components/Dialog';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 
 interface VideoCall {
@@ -85,17 +86,18 @@ export function useVideoCall() {
 function VideoCallRoom({ url, onClose }: { url: string; onClose: () => void }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
 
   const confirmLeave = useCallback(() => {
     showDialog({
-      title: 'Leave this session?',
-      message: 'You can rejoin from your dashboard while the session window is still open.',
+      title: t('m.b.video.leave_title'),
+      message: t('m.b.video.leave_body'),
       icon: 'phone-off',
-      buttons: [{ text: 'Stay', style: 'cancel' }, { text: 'Leave', style: 'destructive', onPress: onClose }],
+      buttons: [{ text: t('m.b.video.stay'), style: 'cancel' }, { text: t('m.b.video.leave'), style: 'destructive', onPress: onClose }],
     });
-  }, [onClose]);
+  }, [onClose, t]);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -132,19 +134,19 @@ function VideoCallRoom({ url, onClose }: { url: string; onClose: () => void }) {
       {failed && (
         <View style={styles.cover}>
           <TablerIcon name="wifi-off" size={32} color={colors.text3} />
-          <Text style={styles.failTitle}>This session didn’t load</Text>
-          <Text style={styles.failText}>Please check your internet connection and try again.</Text>
+          <Text style={styles.failTitle}>{t('m.b.video.failed')}</Text>
+          <Text style={styles.failText}>{t('m.b.browser.page_failed_body')}</Text>
           <Pressable
             onPress={onClose}
             accessibilityRole="button"
             style={({ pressed }) => [styles.retry, pressed && { opacity: 0.85 }]}
           >
-            <Text style={styles.retryText}>Close</Text>
+            <Text style={styles.retryText}>{t('m.b.common.close')}</Text>
           </Pressable>
         </View>
       )}
       <SafeAreaView edges={['top']} style={styles.topBar} pointerEvents="box-none">
-        <Pressable onPress={confirmLeave} accessibilityRole="button" accessibilityLabel="Leave session" hitSlop={10} style={styles.closeCircle}>
+        <Pressable onPress={confirmLeave} accessibilityRole="button" accessibilityLabel={t('m.b.video.leave_session')} hitSlop={10} style={styles.closeCircle}>
           <TablerIcon name="x" size={20} color="#fff" />
         </Pressable>
       </SafeAreaView>

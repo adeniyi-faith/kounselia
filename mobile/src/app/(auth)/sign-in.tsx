@@ -6,11 +6,13 @@ import { Button } from '@/components/Button';
 import { FormMessage } from '@/components/FormMessage';
 import { FormScreen } from '@/components/FormScreen';
 import { TextField } from '@/components/TextField';
+import { useT } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles } from '@/theme';
 
 export default function SignIn() {
   const styles = useStyles();
+  const t = useT();
   const { signIn } = useSession();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,7 +22,7 @@ export default function SignIn() {
 
   async function submit() {
     if (!email.trim() || !password) {
-      setError('Please enter both email and password.');
+      setError(t('m.auth.enter_both'));
       return;
     }
     setBusy(true);
@@ -35,9 +37,9 @@ export default function SignIn() {
   }
 
   return (
-    <FormScreen title="Welcome back" subtitle="Sign in to pick up where you left off.">
+    <FormScreen title={t('m.auth.welcome_back')} subtitle={t('m.auth.sign_in_sub')}>
       <TextField
-        label="Email"
+        label={t('m.auth.email')}
         value={email}
         onChangeText={setEmail}
         placeholder="you@example.com"
@@ -51,7 +53,7 @@ export default function SignIn() {
       />
       <TextField
         ref={passwordRef}
-        label="Password"
+        label={t('m.auth.password')}
         password
         value={password}
         onChangeText={setPassword}
@@ -62,12 +64,12 @@ export default function SignIn() {
         onSubmitEditing={submit}
       />
       <Link href="/forgot-password" style={styles.forgot}>
-        Forgot your password?
+        {t('m.auth.forgot')}
       </Link>
       {error ? <FormMessage tone="error" text={error} /> : null}
-      <Button title="Sign in" onPress={submit} busy={busy} />
+      <Button title={t('m.auth.sign_in')} onPress={submit} busy={busy} />
       <Text style={styles.switch}>
-        New to Kounselia?{' '}
+        {t('m.auth.new_to')}{' '}
         <Text
           accessibilityRole="link"
           style={styles.link}
@@ -78,7 +80,7 @@ export default function SignIn() {
             router.replace({ pathname: '/sign-up', params: { switched: '1' } });
           }}
         >
-          Create an account
+          {t('m.auth.create_an_account')}
         </Text>
       </Text>
     </FormScreen>
