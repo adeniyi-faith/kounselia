@@ -1,4 +1,4 @@
-import type { GrowthPlanSummary } from '@kounselia/core';
+import { isRtl, makeT, type GrowthPlanSummary } from '@kounselia/core';
 import { Pressable, Text, View } from 'react-native';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
@@ -6,29 +6,30 @@ import { Card } from './Card';
 
 // "Grow with a 30 day plan" on Home: today's step when a plan is running,
 // otherwise an invitation to start one. Opens the Growth plan screen.
-export function GrowthCard({ plan, onOpen }: { plan: GrowthPlanSummary | null; onOpen: () => void }) {
+export function GrowthCard({ plan, language, onOpen }: { plan: GrowthPlanSummary | null; language: string; onOpen: () => void }) {
   const styles = useStyles();
   const colors = useColors();
   const today = plan?.today;
+  const t = makeT(language);
   return (
-    <Card style={styles.card}>
+    <Card style={isRtl(language) ? { ...styles.card, direction: 'rtl' } : styles.card}>
       <View style={styles.top}>
         <View style={styles.icon}>
           <TablerIcon name="plant-2" size={24} color={colors.sage} />
         </View>
         <View style={styles.meta}>
-          <Text style={styles.title}>{plan ? `Day ${plan.current_day} of ${plan.total_days}: ${plan.title}` : 'Grow with a 30 day plan'}</Text>
+          <Text style={styles.title}>{plan ? t('growth.card_title_day', { day: plan.current_day, total: plan.total_days, title: plan.title }) : t('growth.card_title_start')}</Text>
           <Text style={styles.reason} numberOfLines={3}>
             {plan
               ? today?.done
-                ? 'Today’s step is done. Nice work.'
+                ? t('growth.card_done')
                 : (today?.task ?? '')
-              : 'Pick something to work on, like discipline, habits or confidence, and get one small step a day.'}
+              : t('growth.card_body_start')}
           </Text>
         </View>
       </View>
       <Pressable onPress={onOpen} accessibilityRole="button" style={({ pressed }) => [styles.btn, pressed && { backgroundColor: colors.accent2 }]}>
-        <Text style={styles.btnText}>{plan ? 'Open plan' : 'Start a plan'}</Text>
+        <Text style={styles.btnText}>{plan ? t('growth.card_open') : t('growth.card_start')}</Text>
       </Pressable>
     </Card>
   );

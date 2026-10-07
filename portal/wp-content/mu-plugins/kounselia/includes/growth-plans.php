@@ -45,87 +45,61 @@ if ( ! defined( 'ABSPATH' ) ) {
 define( 'KOUNSELIA_GROWTH_PLAN_DAYS', 30 );
 
 /**
- * What a member can choose to work on. 'goal' is the first question,
- * written for that area; 'obstacle_hint' is the example under the second.
+ * What a member can choose to work on. Words come from the shared
+ * translation files (packages/core/src/locales), keys growth.area.<key>.*.
+ * 'goal' is the first question, written for that area; 'obstacle_hint' is
+ * the example under the second.
  */
-function kounselia_growth_areas() {
-    return array(
-        'discipline'      => array(
-            'label'         => 'Discipline',
-            'icon'          => 'ti-target',
-            'blurb'         => 'Follow through on what you say you will do.',
-            'goal'          => 'What would being more disciplined look like for you? Name one thing you would be doing differently.',
-            'obstacle_hint' => 'For example: I start strong, then stop after a few days.',
-        ),
-        'procrastination' => array(
-            'label'         => 'Beating procrastination',
-            'icon'          => 'ti-hourglass',
-            'blurb'         => 'Stop putting off the things that matter.',
-            'goal'          => 'What are you putting off right now that you most want to get moving on?',
-            'obstacle_hint' => 'For example: I scroll on my phone, or the task feels too big to start.',
-        ),
-        'habits'          => array(
-            'label'         => 'Building better habits',
-            'icon'          => 'ti-repeat',
-            'blurb'         => 'Start a good habit, or let go of one that holds you back.',
-            'goal'          => 'Which habit do you want to build, or which one do you want to break?',
-            'obstacle_hint' => 'For example: I forget, or I am too tired in the evening.',
-        ),
-        'time'            => array(
-            'label'         => 'Time management and productivity',
-            'icon'          => 'ti-clock',
-            'blurb'         => 'Get the important things done without burning out.',
-            'goal'          => 'Where does your time go that you wish it did not? What would a good day look like?',
-            'obstacle_hint' => 'For example: meetings, too many tasks at once, no plan for the day.',
-        ),
-        'goals'           => array(
-            'label'         => 'Goal setting',
-            'icon'          => 'ti-flag',
-            'blurb'         => 'Turn something you want into steps you can take.',
-            'goal'          => 'What is one goal you want to make real progress on in the next 30 days?',
-            'obstacle_hint' => 'For example: I do not know where to start, or I lose motivation.',
-        ),
-        'confidence'      => array(
-            'label'         => 'Becoming more confident',
-            'icon'          => 'ti-star',
-            'blurb'         => 'Trust yourself more and speak up for yourself.',
-            'goal'          => 'Where in your life do you most want to feel more confident?',
-            'obstacle_hint' => 'For example: I worry what people think, or I talk myself down.',
-        ),
-        'growth'          => array(
-            'label'         => 'Personal growth',
-            'icon'          => 'ti-plant-2',
-            'blurb'         => 'Become more of the person you want to be.',
-            'goal'          => 'What part of yourself do you most want to grow or improve right now?',
-            'obstacle_hint' => 'For example: old patterns, busy life, not sure what to change first.',
-        ),
+function kounselia_growth_areas( $lang = null ) {
+    $icons = array(
+        'discipline'      => 'ti-target',
+        'procrastination' => 'ti-hourglass',
+        'habits'          => 'ti-repeat',
+        'time'            => 'ti-clock',
+        'goals'           => 'ti-flag',
+        'confidence'      => 'ti-star',
+        'growth'          => 'ti-plant-2',
     );
+    $areas = array();
+    foreach ( $icons as $key => $icon ) {
+        $areas[ $key ] = array(
+            'label'         => kounselia_t( "growth.area.$key.label", array(), $lang ),
+            'icon'          => $icon,
+            'blurb'         => kounselia_t( "growth.area.$key.blurb", array(), $lang ),
+            'goal'          => kounselia_t( "growth.area.$key.goal", array(), $lang ),
+            'obstacle_hint' => kounselia_t( "growth.area.$key.hint", array(), $lang ),
+        );
+    }
+    return $areas;
 }
 
 /**
  * The short questions asked before a plan is written. The first is
  * written for the chosen area; the rest are the same for every area.
  */
-function kounselia_growth_questions( $area_key ) {
-    $areas = kounselia_growth_areas();
+function kounselia_growth_questions( $area_key, $lang = null ) {
+    $areas = kounselia_growth_areas( $lang );
     $area  = isset( $areas[ $area_key ] ) ? $areas[ $area_key ] : reset( $areas );
+    $t     = function ( $key ) use ( $lang ) {
+        return kounselia_t( $key, array(), $lang );
+    };
     return array(
         array( 'key' => 'goal', 'type' => 'text', 'required' => true, 'label' => $area['goal'], 'hint' => '' ),
-        array( 'key' => 'obstacle', 'type' => 'text', 'required' => false, 'label' => 'What usually gets in the way?', 'hint' => $area['obstacle_hint'] ),
+        array( 'key' => 'obstacle', 'type' => 'text', 'required' => false, 'label' => $t( 'growth.q.obstacle' ), 'hint' => $area['obstacle_hint'] ),
         array(
             'key'      => 'time',
             'type'     => 'choice',
             'required' => true,
-            'label'    => 'How much time can you give this on most days?',
+            'label'    => $t( 'growth.q.time' ),
             'hint'     => '',
             'choices'  => array(
-                array( 'key' => '5', 'label' => 'About 5 minutes' ),
-                array( 'key' => '15', 'label' => 'About 15 minutes' ),
-                array( 'key' => '30', 'label' => '30 minutes or more' ),
+                array( 'key' => '5', 'label' => $t( 'growth.q.time_5' ) ),
+                array( 'key' => '15', 'label' => $t( 'growth.q.time_15' ) ),
+                array( 'key' => '30', 'label' => $t( 'growth.q.time_30' ) ),
             ),
         ),
-        array( 'key' => 'life', 'type' => 'text', 'required' => false, 'label' => 'Is anything going on in your life that the plan should work around?', 'hint' => 'For example: exams, a new job, young children, night shifts.' ),
-        array( 'key' => 'success', 'type' => 'text', 'required' => false, 'label' => 'Thirty days from now, how will you know it worked?', 'hint' => '' ),
+        array( 'key' => 'life', 'type' => 'text', 'required' => false, 'label' => $t( 'growth.q.life' ), 'hint' => $t( 'growth.q.life_hint' ) ),
+        array( 'key' => 'success', 'type' => 'text', 'required' => false, 'label' => $t( 'growth.q.success' ), 'hint' => '' ),
     );
 }
 
@@ -175,6 +149,15 @@ function kounselia_growth_active_plan( $user_id ) {
         return null;
     }
     return $row;
+}
+
+/**
+ * The language a plan was written in (and its reminders are sent in,
+ * unless the member has since picked another in Settings).
+ */
+function kounselia_growth_plan_language( $row ) {
+    $lang = kounselia_language_normalize( $row->language ?? 'en' );
+    return kounselia_user_language_preference( (int) $row->user_id ) ?: $lang;
 }
 
 /**
@@ -267,7 +250,7 @@ function kounselia_growth_streak( $current_day, $done ) {
  * A plan row as the apps see it.
  */
 function kounselia_growth_format_plan( $row, $with_days = true ) {
-    $areas   = kounselia_growth_areas();
+    $areas   = kounselia_growth_areas( kounselia_growth_plan_language( $row ) );
     $area    = isset( $areas[ $row->area ] ) ? $areas[ $row->area ] : array( 'label' => $row->area, 'icon' => 'ti-plant-2' );
     $total   = (int) $row->total_days;
     $current = max( 1, min( $total, kounselia_growth_day_number( $row ) ) );
@@ -310,6 +293,7 @@ function kounselia_growth_format_plan( $row, $with_days = true ) {
         'today'          => $today,
         'counselor_slug' => kounselia_growth_counselor_slug(),
         'timezone'       => (string) $row->timezone,
+        'language'       => kounselia_growth_plan_language( $row ),
         'remind_hour'    => (int) $row->remind_hour, // 0-23 on the member's clock, -1 = off
         'reviews'        => array_values( kounselia_growth_reviews( $row ) ),
         'review_ready'   => kounselia_growth_next_review( $row ),
@@ -372,14 +356,15 @@ function kounselia_growth_allowance( $user_id ) {
  * Everything the "Growth plan" screen needs.
  */
 function kounselia_growth_overview( $user_id ) {
+    $lang  = kounselia_current_language( $user_id );
     $areas = array();
-    foreach ( kounselia_growth_areas() as $key => $a ) {
+    foreach ( kounselia_growth_areas( $lang ) as $key => $a ) {
         $areas[] = array(
             'key'       => $key,
             'label'     => $a['label'],
             'icon'      => preg_replace( '/^ti-/', '', $a['icon'] ),
             'blurb'     => $a['blurb'],
-            'questions' => kounselia_growth_questions( $key ),
+            'questions' => kounselia_growth_questions( $key, $lang ),
         );
     }
     $active = kounselia_growth_active_plan( $user_id );
@@ -389,6 +374,8 @@ function kounselia_growth_overview( $user_id ) {
         'areas'     => $areas,
         'allowance' => kounselia_growth_allowance( $user_id ),
         'is_pro'    => function_exists( 'kounselia_member_is_pro' ) && kounselia_member_is_pro( $user_id ),
+        'language'  => $lang,
+        'rtl'       => kounselia_language_is_rtl( $lang ),
     );
 }
 
@@ -408,26 +395,27 @@ function kounselia_growth_home_summary( $user_id ) {
  * Cleans the member's answers: only known questions, trimmed, at most
  * 600 characters each. Returns WP_Error when a required one is missing.
  */
-function kounselia_growth_clean_answers( $area_key, $answers ) {
+function kounselia_growth_clean_answers( $area_key, $answers, $lang = null ) {
     $clean = array();
-    foreach ( kounselia_growth_questions( $area_key ) as $q ) {
+    foreach ( kounselia_growth_questions( $area_key, $lang ) as $q ) {
         $value = isset( $answers[ $q['key'] ] ) ? trim( sanitize_textarea_field( (string) $answers[ $q['key'] ] ) ) : '';
         if ( 'choice' === $q['type'] && '' !== $value && ! in_array( $value, wp_list_pluck( $q['choices'], 'key' ), true ) ) {
             $value = '';
         }
         if ( $q['required'] && '' === $value ) {
-            return new WP_Error( 'missing_answer', 'Please answer: ' . $q['label'] );
+            return new WP_Error( 'missing_answer', kounselia_t( 'growth.answer_required', array( 'question' => $q['label'] ), $lang ) );
         }
         $clean[ $q['key'] ] = mb_substr( $value, 0, 600 );
     }
     return $clean;
 }
 
-function kounselia_growth_build_prompt( $area_key, $answers, $first_name ) {
-    $areas = kounselia_growth_areas();
+function kounselia_growth_build_prompt( $area_key, $answers, $first_name, $lang = 'en' ) {
+    // The instructions to the AI stay in English; the member's answers are in their own words.
+    $areas = kounselia_growth_areas( 'en' );
     $area  = $areas[ $area_key ];
     $lines = array();
-    foreach ( kounselia_growth_questions( $area_key ) as $q ) {
+    foreach ( kounselia_growth_questions( $area_key, 'en' ) as $q ) {
         $answer = $answers[ $q['key'] ] ?? '';
         if ( 'choice' === $q['type'] ) {
             foreach ( $q['choices'] as $c ) {
@@ -449,7 +437,8 @@ function kounselia_growth_build_prompt( $area_key, $answers, $first_name ) {
         . "- Make it about THEIR goal and THEIR obstacles, not generic advice. Work around what is going on in their life.\n"
         . "- Every 7th day (days 7, 14, 21, 28) is a short reflection on how the week went. Day 30 looks back on the whole month and picks what to keep doing.\n"
         . "- Plain, warm, everyday English, speaking to them as 'you'. No jargon, no markdown, no emojis.\n"
-        . "- No medical, medication or diagnosis advice.\n\n"
+        . "- No medical, medication or diagnosis advice.\n"
+        . '- ' . kounselia_language_instruction( $lang ) . "\n\n"
         . "Return ONLY JSON in this shape:\n"
         . '{"title": "a short name for the plan, at most 6 words", "summary": "two sentences on what this month is about", "days": [{"day": 1, "title": "at most 6 words", "task": "one or two sentences saying exactly what to do", "minutes": 5}]}';
 }
@@ -504,8 +493,8 @@ function kounselia_growth_parse_plan( $raw ) {
  *
  * @return array|WP_Error
  */
-function kounselia_growth_generate( $area_key, $answers, $first_name ) {
-    $prompt = kounselia_growth_build_prompt( $area_key, $answers, $first_name );
+function kounselia_growth_generate( $area_key, $answers, $first_name, $lang = 'en' ) {
+    $prompt = kounselia_growth_build_prompt( $area_key, $answers, $first_name, $lang );
     $system = 'You are a warm, practical personal development coach at Kounselia. You design realistic 30 day plans made of small daily steps. You output only valid JSON. Escape all quotes inside strings.';
 
     for ( $attempt = 0; $attempt < 2; $attempt++ ) {
@@ -547,14 +536,15 @@ function kounselia_growth_create_plan( $user_id, $area_key, $answers, $timezone 
         return new WP_Error( 'limit', sprintf( 'You have used all %d free growth plans. Upgrade to Pro for unlimited plans.', $allowance['limit'] ) );
     }
 
-    $answers = kounselia_growth_clean_answers( $area_key, $answers );
+    $lang    = kounselia_current_language( $user_id );
+    $answers = kounselia_growth_clean_answers( $area_key, $answers, $lang );
     if ( is_wp_error( $answers ) ) {
         return $answers;
     }
 
     $user  = get_userdata( $user_id );
     $first = $user ? explode( ' ', trim( $user->display_name ) )[0] : '';
-    $plan  = kounselia_growth_generate( $area_key, $answers, $first );
+    $plan  = kounselia_growth_generate( $area_key, $answers, $first, $lang );
     if ( is_wp_error( $plan ) ) {
         return $plan;
     }
@@ -575,6 +565,7 @@ function kounselia_growth_create_plan( $user_id, $area_key, $answers, $timezone 
         'total_days' => count( $plan['days'] ),
         'start_date' => $today,
         'timezone'   => $timezone,
+        'language'   => $lang,
         // Day 1's task is on screen right now, so the first reminder is tomorrow's.
         'last_reminded' => $today,
         'status'     => 'active',
@@ -687,14 +678,15 @@ function kounselia_growth_send_reminders() {
             continue;
         }
 
+        $lang = kounselia_growth_plan_language( $active );
         $body = wp_html_excerpt( $plan['today']['task'], 140, '…' );
         if ( $plan['review_ready'] ) {
-            $body .= ' Your week ' . (int) $plan['review_ready'] . ' review is ready too.';
+            $body .= ' ' . kounselia_t( 'growth.notify_review', array( 'week' => (int) $plan['review_ready'] ), $lang );
         }
         kounselia_notify_user(
             $row->user_id,
             'growth_reminder',
-            'Day ' . $plan['current_day'] . ': ' . ( $plan['today']['title'] ? $plan['today']['title'] : 'today\'s step' ),
+            kounselia_t( 'growth.notify_title', array( 'day' => $plan['current_day'], 'title' => $plan['today']['title'] ? $plan['today']['title'] : kounselia_t( 'growth.today_fallback', array(), $lang ) ), $lang ),
             $body,
             '/dashboard.php?tab=growth'
         );
@@ -762,7 +754,7 @@ function kounselia_growth_build_review_prompt( $row, $week, $first_name ) {
     if ( $next ) {
         $out .= "Then decide if the next days should be 'easier' (they struggled), 'same', or 'harder' (they found it easy), and rewrite exactly those next days to match, keeping each day's purpose. Keep any reflection days a reflection.\n";
     }
-    $out .= "Plain everyday English, speaking to them as 'you'. No markdown, no emojis, no medical advice.\n\n"
+    $out .= "Plain everyday language, speaking to them as 'you'. No markdown, no emojis, no medical advice.\n" . kounselia_language_instruction( $row->language ?? 'en' ) . "\n\n"
         . 'Return ONLY JSON: {"note": "3 to 5 sentences", "level": "easier|same|harder", "upcoming": [{"day": 8, "title": "at most 6 words", "task": "one or two sentences", "minutes": 10}]}'
         . ( $next ? '' : ' (use an empty "upcoming" list)' );
     return $out;
