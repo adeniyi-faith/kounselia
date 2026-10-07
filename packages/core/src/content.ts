@@ -4,6 +4,7 @@
 // Server side: includes/app-content.php plus the website's own account,
 // newsletter and memory actions.
 import { callAction } from './dashboard';
+import { deviceLanguage } from './i18n';
 import type { AppUser, KounseliaConfig } from './types';
 
 // ---- Blog -----------------------------------------------------------------
@@ -213,11 +214,17 @@ export interface Account {
   plan: { is_pro: boolean; state: string; title: string; detail: string };
   emails: { newsletter: boolean; blog: boolean };
   memory: MemoryProfile | null;
+  language: string; // 'en', 'fr', … the language the member chose (their phone's until they do)
   // Website pages; only the ones that exist are included.
   links: { privacy?: string; terms?: string; mission?: string; safety?: string; email: string };
 }
 
-export const fetchAccount = (config: KounseliaConfig) => callAction<Account>(config, 'kounselia_app_account');
+export const fetchAccount = (config: KounseliaConfig) => callAction<Account>(config, 'kounselia_app_account', { language: deviceLanguage() });
+
+// Saves the member's language. Their counselors, growth plans and reminders
+// then write in it; screens follow as they are translated.
+export const setLanguage = (config: KounseliaConfig, language: string) =>
+  callAction<{ language: string; rtl: boolean; message: string }>(config, 'kounselia_set_language', { language });
 
 // ---- Plan (upgrade / manage subscription) ----------------------------------
 

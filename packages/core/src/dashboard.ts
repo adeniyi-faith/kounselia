@@ -4,6 +4,7 @@
 // Server side: includes/app-dashboard.php plus the existing mood,
 // journal, bookings, booking-series and reviews actions.
 import { failureMessage } from './appAuth';
+import { deviceLanguage } from './i18n';
 import { postAction } from './http';
 import type { KounseliaConfig } from './types';
 
@@ -63,6 +64,8 @@ export interface CareTeam {
 
 export interface HomeData {
   checkin: CheckIn | null;
+  growth: GrowthPlanSummary | null; // their running growth plan, if any
+  language: string; // the member's language (their phone's until they choose)
   care: CareTeam;
   mood: { options: MoodOption[]; today: string | null; week: { date: string; mood: string | null }[] };
   stats: { conversations: number; messages_this_week: number; counselors_met: number };
@@ -70,7 +73,7 @@ export interface HomeData {
   journal: string;
 }
 
-export const fetchHome = (config: KounseliaConfig) => call<HomeData>(config, 'kounselia_app_home');
+export const fetchHome = (config: KounseliaConfig) => call<HomeData>(config, 'kounselia_app_home', { language: deviceLanguage() });
 export const saveMood = (config: KounseliaConfig, mood: string) => call<{ mood: string }>(config, 'kounselia_save_mood', { mood });
 export const saveJournal = (config: KounseliaConfig, content: string) => call<unknown>(config, 'kounselia_save_journal', { content });
 
@@ -81,6 +84,108 @@ export const fetchCheckinQuestion = (config: KounseliaConfig, checkinId: number)
 
 export const dismissCheckin = (config: KounseliaConfig, checkinId: number) =>
   call<unknown>(config, 'kounselia_dismiss_checkin', { checkin_id: checkinId });
+
+// ---- Growth plans (Personal Development) -----------------------------------
+// A 30 day plan of one small task a day. Server side: includes/growth-plans.php.
+
+export interface GrowthDay {
+  day: number;
+  title: string;
+  task: string;
+  minutes: number;
+  done: boolean;
+  state: 'past' | 'today' | 'upcoming';
+}
+
+export interface GrowthPlanSummary {
+  id: number;
+  area: string;
+  area_label: string;
+  icon: string; // Tabler icon name, no "ti-"
+  title: string;
+  summary: string;
+  status: string;
+  start_date: string;
+  current_day: number;
+  total_days: number;
+  done_count: number;
+  streak: number;
+  today: GrowthDay | null;
+  counselor_slug: string; // who to talk to about the plan
+  timezone: string; // the member's own time zone, '' until we know it
+  language: string; // the language the plan is written in
+  remind_hour: number; // 0-23 on the member's clock, -1 = off
+  reviews: GrowthReview[];
+  review_ready: number | null; // the week that can be reviewed now (5 = the final days)
+}
+
+export interface GrowthReview {
+  week: number;
+  note: string;
+  level: 'easier' | 'same' | 'harder';
+  changed: number; // how many upcoming days were rewritten
+  at: string;
+}
+
+export interface GrowthPlan extends GrowthPlanSummary {
+  days: GrowthDay[];
+}
+
+export interface GrowthQuestion {
+  key: string;
+  type: 'text' | 'choice';
+  required: boolean;
+  label: string;
+  hint: string;
+  choices?: { key: string; label: string }[];
+}
+
+export interface GrowthArea {
+  key: string;
+  label: string;
+  icon: string;
+  blurb: string;
+  questions: GrowthQuestion[];
+}
+
+export interface GrowthOverview {
+  plan: GrowthPlan | null;
+  previous: { id: number; title: string; area_label: string; status: string; start_date: string; done_count: number; total_days: number }[];
+  areas: GrowthArea[];
+  // limit 0 = unlimited (remaining is then null)
+  allowance: { limit: number; used: number; remaining: number | null };
+  is_pro: boolean;
+  language: string; // the language this screen's questions are written in
+  rtl: boolean; // written right to left (Arabic)
+}
+
+// Where the member is (like "Africa/Lagos"), so a plan's days and reminders
+// follow their own clock wherever they live. The phone or browser knows it.
+function deviceTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export const fetchGrowth = (config: KounseliaConfig) => call<GrowthOverview>(config, 'kounselia_growth_get', { timezone: deviceTimeZone(), language: deviceLanguage() });
+
+// The AI takes a little while to write the plan; the default timeout already allows for it.
+export const createGrowthPlan = (config: KounseliaConfig, area: string, answers: Record<string, string>) =>
+  call<GrowthOverview>(config, 'kounselia_growth_create', { area, answers: JSON.stringify(answers), timezone: deviceTimeZone(), language: deviceLanguage() });
+
+export const markGrowthDay = (config: KounseliaConfig, planId: number, day: number, done: boolean) =>
+  call<{ plan: GrowthPlan | null }>(config, 'kounselia_growth_mark_day', { plan_id: planId, day, done: done ? 1 : 0 });
+
+export const setGrowthReminder = (config: KounseliaConfig, planId: number, hour: number) =>
+  call<{ plan: GrowthPlan | null }>(config, 'kounselia_growth_set_reminder', { plan_id: planId, hour });
+
+export const reviewGrowthWeek = (config: KounseliaConfig, planId: number, week: number) =>
+  call<{ plan: GrowthPlan | null }>(config, 'kounselia_growth_review', { plan_id: planId, week });
+
+export const endGrowthPlan = (config: KounseliaConfig, planId: number) =>
+  call<GrowthOverview>(config, 'kounselia_growth_end', { plan_id: planId });
 
 // ---- Conversations ----------------------------------------------------------
 
