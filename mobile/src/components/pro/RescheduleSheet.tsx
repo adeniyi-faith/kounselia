@@ -8,6 +8,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-nati
 import { Button } from '@/components/Button';
 import { FormMessage } from '@/components/FormMessage';
 import { Sheet } from '@/components/Sheet';
+import { useLanguage } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 
 interface Slot {
@@ -29,6 +30,7 @@ export function RescheduleSheet({
 }) {
   const styles = useStyles();
   const colors = useColors();
+  const { language, t } = useLanguage();
   const [slots, setSlots] = useState<Slot[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [day, setDay] = useState<string | null>(null);
@@ -71,11 +73,11 @@ export function RescheduleSheet({
     const groups = new Map<string, { label: string; slots: Slot[] }>();
     for (const s of slots ?? []) {
       const key = s.at.toDateString();
-      if (!groups.has(key)) groups.set(key, { label: s.at.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }), slots: [] });
+      if (!groups.has(key)) groups.set(key, { label: s.at.toLocaleDateString(language, { weekday: 'short', day: 'numeric', month: 'short' }), slots: [] });
       groups.get(key)!.slots.push(s);
     }
     return [...groups.entries()].map(([key, g]) => ({ key, ...g }));
-  }, [slots]);
+  }, [slots, language]);
   const current = days.find((d) => d.key === day) ?? days[0];
 
   async function confirm() {
@@ -89,16 +91,16 @@ export function RescheduleSheet({
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-    onClose(res.data.message || 'Session rescheduled.');
+    onClose(res.data.message || t('m.pro.rescheduled'));
   }
 
   return (
-    <Sheet visible={!!booking} title="Reschedule" onClose={() => onClose()}>
-      {booking ? <Text style={styles.sub}>Pick a new time for your session with {booking.client_name}. They’ll be told straight away.</Text> : null}
+    <Sheet visible={!!booking} title={t('m.pro.reschedule')} onClose={() => onClose()}>
+      {booking ? <Text style={styles.sub}>{t('m.pro.reschedule_body', { name: booking.client_name })}</Text> : null}
       {slots === null ? (
         <ActivityIndicator color={colors.accentText} style={{ marginVertical: 24 }} />
       ) : days.length === 0 ? (
-        <Text style={styles.empty}>{error ? '' : 'No open times in your availability right now. Add more hours in your weekly availability first.'}</Text>
+        <Text style={styles.empty}>{error ? '' : t('m.pro.reschedule_none')}</Text>
       ) : (
         <>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
@@ -116,7 +118,7 @@ export function RescheduleSheet({
               const on = picked?.value === s.value;
               return (
                 <Pressable key={s.value} onPress={() => setPicked(s)} accessibilityRole="button" accessibilityState={{ selected: on }} style={[styles.chip, on && styles.chipOn]}>
-                  <Text style={[styles.chipText, on && styles.chipTextOn]}>{s.at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
+                  <Text style={[styles.chipText, on && styles.chipTextOn]}>{s.at.toLocaleTimeString(language, { hour: 'numeric', minute: '2-digit' })}</Text>
                 </Pressable>
               );
             })}
@@ -124,7 +126,7 @@ export function RescheduleSheet({
         </>
       )}
       {error ? <FormMessage tone="error" text={error} /> : null}
-      <Button title="Confirm new time" onPress={confirm} busy={busy} disabled={!picked} style={{ marginBottom: 8 }} />
+      <Button title={t('m.pro.reschedule_confirm')} onPress={confirm} busy={busy} disabled={!picked} style={{ marginBottom: 8 }} />
     </Sheet>
   );
 }

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, AppState, Pressable, Text, View } from 'react-native';
 import { Sheet } from '@/components/Sheet';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useLanguage, useT } from '@/language';
 import { routeForLink } from '@/notifications';
 import { fonts, makeStyles, useColors } from '@/theme';
 
@@ -14,6 +15,7 @@ import { fonts, makeStyles, useColors } from '@/theme';
 export function NotificationBell({ config }: { config: KounseliaConfig }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
 
@@ -41,7 +43,7 @@ export function NotificationBell({ config }: { config: KounseliaConfig }) {
       <Pressable
         onPress={() => setOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={unread ? `Notifications, ${unread} unread` : 'Notifications'}
+        accessibilityLabel={unread ? t('m.pro.notifications_unread', { n: unread }) : t('m.pro.notifications')}
         style={styles.bell}
         hitSlop={6}
       >
@@ -63,6 +65,7 @@ export function NotificationBell({ config }: { config: KounseliaConfig }) {
 function NotificationsSheet({ config, visible, onClose }: { config: KounseliaConfig; visible: boolean; onClose: () => void }) {
   const styles = useStyles();
   const colors = useColors();
+  const { language, t } = useLanguage();
   const [items, setItems] = useState<AppNotification[] | null>(null);
   const [failed, setFailed] = useState(false);
 
@@ -84,15 +87,15 @@ function NotificationsSheet({ config, visible, onClose }: { config: KounseliaCon
   }, [visible, config]);
 
   return (
-    <Sheet visible={visible} title="Notifications" onClose={onClose}>
+    <Sheet visible={visible} title={t('m.pro.notifications')} onClose={onClose}>
       {items === null ? (
         failed ? (
-          <Text style={styles.empty}>We couldn’t load your notifications. Please check your internet connection.</Text>
+          <Text style={styles.empty}>{t('m.pro.notifications_load_failed')}</Text>
         ) : (
           <ActivityIndicator color={colors.accentText} style={{ marginVertical: 24 }} />
         )
       ) : items.length === 0 ? (
-        <Text style={styles.empty}>Nothing new yet. Bookings, messages and article reviews will show up here.</Text>
+        <Text style={styles.empty}>{t('m.pro.notifications_empty')}</Text>
       ) : (
         items.map((n) => (
           <Pressable
@@ -106,7 +109,7 @@ function NotificationsSheet({ config, visible, onClose }: { config: KounseliaCon
           >
             <Text style={styles.title}>{n.title}</Text>
             {n.body ? <Text style={styles.body}>{n.body}</Text> : null}
-            <Text style={styles.time}>{when(n.created_at)}</Text>
+            <Text style={styles.time}>{when(n.created_at, language)}</Text>
           </Pressable>
         ))
       )}
@@ -116,10 +119,10 @@ function NotificationsSheet({ config, visible, onClose }: { config: KounseliaCon
 }
 
 // The server sends the site's own time ("2026-10-01 14:05:00").
-function when(siteTime: string): string {
+function when(siteTime: string, language: string): string {
   const d = new Date(siteTime.replace(' ', 'T'));
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  return d.toLocaleString(language, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 }
 
 const useStyles = makeStyles((colors) => ({

@@ -15,6 +15,7 @@ import { TablerIcon } from '@/components/TablerIcon';
 import { Pill, SmallButton, StatGrid } from '@/components/pro/ui';
 import { SITE_URL } from '@/config';
 import { usePro } from '@/professional/ProDashboard';
+import { useLanguage } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 
@@ -39,6 +40,7 @@ export default function ProArticles() {
   const { config } = useSession();
   const { data, failed, reload } = usePro();
   const { openInApp } = useBrowser();
+  const { language, t } = useLanguage();
   const [refreshing, setRefreshing] = useState(false);
   const toast = useToast();
 
@@ -50,7 +52,7 @@ export default function ProArticles() {
 
   async function write(id?: number) {
     await openInApp(`${SITE_URL}/pro-write.php${id ? `?id=${id}` : ''}`, {
-      title: id ? 'Edit article' : 'Write an article',
+      title: id ? t('m.pro.edit_article') : t('m.pro.write_article'),
       // Sending (or deleting) takes the writer back to the dashboard page;
       // here that means back to this screen.
       closeWhen: (url) => url.includes('/pro-dashboard.php'),
@@ -61,28 +63,28 @@ export default function ProArticles() {
   function view(a: ProArticle) {
     if (a.live) router.push({ pathname: '/articles/[slug]', params: { slug: a.slug } });
     // Not on the Journal yet: the website shows its author a preview.
-    else openInApp(a.url, { title: 'Preview', web: true });
+    else openInApp(a.url, { title: t('m.pro.preview'), web: true });
   }
 
   function act(kind: 'withdraw' | 'delete', a: ProArticle) {
     const question =
       kind === 'delete'
-        ? 'Delete this article for good? Its comments and loves are deleted too. This cannot be undone.'
+        ? t('m.pro.article_delete_body')
         : a.in_review
-          ? 'Take this back from the review queue? You can send it again any time.'
-          : 'Unpublish this article? It will leave the Journal and go back to your drafts. Loves and comments are kept.';
+          ? t('m.pro.article_withdraw_body')
+          : t('m.pro.article_unpublish_body');
     showDialog({
-      title: kind === 'delete' ? 'Delete article?' : a.in_review ? 'Withdraw from review?' : 'Unpublish?',
+      title: kind === 'delete' ? t('m.pro.article_delete_q') : a.in_review ? t('m.pro.article_withdraw_q') : t('m.pro.article_unpublish_q'),
       message: question,
       icon: kind === 'delete' ? 'trash' : 'arrow-back-up',
       buttons: [
-        { text: 'Keep it', style: 'cancel' },
+        { text: t('m.pro.keep_it'), style: 'cancel' },
         {
-          text: kind === 'delete' ? 'Delete' : a.in_review ? 'Withdraw' : 'Unpublish',
+          text: kind === 'delete' ? t('m.pro.delete') : a.in_review ? t('m.pro.withdraw') : t('m.pro.unpublish'),
           style: 'destructive',
           onPress: async () => {
             const res = kind === 'delete' ? await deleteArticle(config, a.id) : await withdrawArticle(config, a.id);
-            toast.show(res.ok ? res.data.message || 'Done.' : res.message);
+            toast.show(res.ok ? res.data.message || t('m.pro.done') : res.message);
             reload();
           },
         },
@@ -98,13 +100,13 @@ export default function ProArticles() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
       >
         <Text style={styles.title} accessibilityRole="header">
-          Your articles
+          {t('m.pro.your_articles')}
         </Text>
         {!articles ? (
           failed ? (
             <View style={styles.center}>
-              <Text style={styles.notice}>We couldn’t load your articles. Please check your internet connection.</Text>
-              <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+              <Text style={styles.notice}>{t('m.pro.articles_load_failed')}</Text>
+              <Button title={t('m.pro.try_again')} variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
             <View style={{ marginTop: 16 }}>
@@ -113,7 +115,7 @@ export default function ProArticles() {
           )
         ) : (
           <>
-            {articles.access.allowed && <Button title="Write an article" onPress={() => write()} style={{ marginTop: 16 }} />}
+            {articles.access.allowed && <Button title={t('m.pro.write_article')} onPress={() => write()} style={{ marginTop: 16 }} />}
             <View style={styles.mode}>
               <TablerIcon
                 name={!articles.access.allowed ? 'info-circle' : articles.access.mode === 'trusted' ? 'discount-check' : 'eye-check'}
@@ -124,17 +126,17 @@ export default function ProArticles() {
                 {!articles.access.allowed
                   ? articles.access.message
                   : articles.access.mode === 'trusted'
-                    ? 'You’re a trusted writer. Your articles go live on the Journal as soon as you publish them.'
-                    : 'An editor reads every article before it goes live, usually within two working days. You’ll get a notification and an email either way.'}
+                    ? t('m.pro.articles_trusted')
+                    : t('m.pro.articles_reviewed')}
               </Text>
             </View>
 
             <StatGrid
               items={[
-                { icon: 'users', color: 'blue', num: articles.followers.toLocaleString(), label: articles.followers === 1 ? 'Follower' : 'Followers' },
-                { icon: 'eye', color: 'sage', num: articles.totals.views.toLocaleString(), label: 'Reads' },
-                { icon: 'heart', color: 'rose', num: articles.totals.loves.toLocaleString(), label: 'Loves' },
-                { icon: 'message-circle', color: 'gold', num: articles.totals.comments.toLocaleString(), label: 'Comments' },
+                { icon: 'users', color: 'blue', num: articles.followers.toLocaleString(), label: articles.followers === 1 ? t('m.pro.follower') : t('m.pro.followers') },
+                { icon: 'eye', color: 'sage', num: articles.totals.views.toLocaleString(), label: t('m.pro.reads') },
+                { icon: 'heart', color: 'rose', num: articles.totals.loves.toLocaleString(), label: t('m.pro.loves') },
+                { icon: 'message-circle', color: 'gold', num: articles.totals.comments.toLocaleString(), label: t('m.pro.comments') },
               ]}
             />
 
@@ -142,10 +144,8 @@ export default function ProArticles() {
               <View style={{ marginTop: 20 }}>
                 <EmptyState>
                   <TablerIcon name="feather" size={28} color={colors.accentText} />
-                  <Text style={styles.emptyTitle}>Share what you know</Text>
-                  <Text style={styles.notice}>
-                    Articles help people understand what they’re going through, and help them find you. Readers can follow you and hear whenever you publish.
-                  </Text>
+                  <Text style={styles.emptyTitle}>{t('m.pro.articles_empty_title')}</Text>
+                  <Text style={styles.notice}>{t('m.pro.articles_empty_body')}</Text>
                 </EmptyState>
               </View>
             ) : (
@@ -155,35 +155,35 @@ export default function ProArticles() {
                     {a.cover ? (
                       <Image source={{ uri: a.cover }} style={styles.cover} contentFit="cover" transition={200} />
                     ) : null}
-                    <Text style={styles.cardTitle}>{a.title || 'Untitled'}</Text>
+                    <Text style={styles.cardTitle}>{a.title || t('m.pro.untitled')}</Text>
                     <View style={styles.meta}>
                       <Pill label={a.state_label} tone={STATE_TONES[a.state] ?? 'navy'} />
-                      <Text style={styles.metaText}>{sessionWhen(a.date_utc, true)}</Text>
+                      <Text style={styles.metaText}>{sessionWhen(a.date_utc, true, language)}</Text>
                     </View>
                     {a.live && (
                       <View style={styles.meta}>
-                        <Stat icon="eye" num={a.views} label="Reads" />
-                        <Stat icon="heart" num={a.loves} label="Loves" />
-                        <Stat icon="message-circle" num={a.comments} label="Comments" />
+                        <Stat icon="eye" num={a.views} label={t('m.pro.reads')} />
+                        <Stat icon="heart" num={a.loves} label={t('m.pro.loves')} />
+                        <Stat icon="message-circle" num={a.comments} label={t('m.pro.comments')} />
                       </View>
                     )}
                     {a.review_note ? (
                       <View style={styles.editorNote}>
                         <Text style={styles.editorNoteText}>
-                          <Text style={{ fontFamily: fonts.semibold, color: colors.text }}>Note from the editor: </Text>
+                          <Text style={{ fontFamily: fonts.semibold, color: colors.text }}>{t('m.pro.editor_note')} </Text>
                           {a.review_note}
                         </Text>
                       </View>
                     ) : null}
                     <View style={styles.actions}>
-                      {articles.access.allowed && <SmallButton icon="pencil" label="Edit" onPress={() => write(a.id)} />}
-                      <SmallButton icon="eye" label={a.live ? 'View' : 'Preview'} onPress={() => view(a)} />
+                      {articles.access.allowed && <SmallButton icon="pencil" label={t('m.pro.edit')} onPress={() => write(a.id)} />}
+                      <SmallButton icon="eye" label={a.live ? t('m.pro.view') : t('m.pro.preview')} onPress={() => view(a)} />
                       {a.in_review ? (
-                        <SmallButton icon="arrow-back-up" label="Withdraw" onPress={() => act('withdraw', a)} />
+                        <SmallButton icon="arrow-back-up" label={t('m.pro.withdraw')} onPress={() => act('withdraw', a)} />
                       ) : a.live ? (
-                        <SmallButton icon="eye-off" label="Unpublish" onPress={() => act('withdraw', a)} />
+                        <SmallButton icon="eye-off" label={t('m.pro.unpublish')} onPress={() => act('withdraw', a)} />
                       ) : null}
-                      <SmallButton icon="trash" label="Delete" tone="danger" onPress={() => act('delete', a)} />
+                      <SmallButton icon="trash" label={t('m.pro.delete')} tone="danger" onPress={() => act('delete', a)} />
                     </View>
                   </View>
                 ))}

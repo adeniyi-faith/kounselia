@@ -9,6 +9,7 @@ import {
   uploadProDocument,
   type DocumentType,
   type ProDashboard,
+  type Translate,
 } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
@@ -32,14 +33,15 @@ import { TextField } from '@/components/TextField';
 import { ChoiceSheet, Panel, SelectField } from '@/components/pro/ui';
 import { pickDocumentFile, pickDocumentPhoto, type PickResult } from '@/professional/documents';
 import { usePro } from '@/professional/ProDashboard';
+import { useLanguage } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 
-const DOC_TYPES: { value: DocumentType; label: string }[] = [
-  { value: 'certificate', label: 'Certificate' },
-  { value: 'id', label: 'Government ID' },
-  { value: 'license', label: 'License / credential' },
-  { value: 'other', label: 'Other' },
+const DOC_TYPES: { value: DocumentType; label: string }[] = [ // label: a translation key
+  { value: 'certificate', label: 'm.pro.doc_certificate' },
+  { value: 'id', label: 'm.pro.doc_id' },
+  { value: 'license', label: 'm.pro.doc_license' },
+  { value: 'other', label: 'm.pro.doc_other' },
 ];
 
 // Profile and rate (the website's pro dashboard "Profile & Rate"): photo,
@@ -47,6 +49,7 @@ const DOC_TYPES: { value: DocumentType; label: string }[] = [
 // happen, documents, reviews, being listed publicly, and the account.
 export default function ProProfile() {
   const styles = useStyles();
+  const { t } = useLanguage();
   const colors = useColors();
   const { data, failed, reload } = usePro();
   const { setViewMode, signOut } = useSession();
@@ -61,12 +64,12 @@ export default function ProProfile() {
 
   function confirmSignOut() {
     showDialog({
-      title: 'Sign out?',
-      message: 'You can sign back in any time with your email and password.',
+      title: t('m.pro.sign_out_q'),
+      message: t('m.pro.sign_out_body'),
       icon: 'logout',
       buttons: [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+        { text: t('m.pro.cancel'), style: 'cancel' },
+        { text: t('m.pro.sign_out'), style: 'destructive', onPress: () => signOut() },
       ],
     });
   }
@@ -81,14 +84,14 @@ export default function ProProfile() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
         >
           <Text style={styles.title} accessibilityRole="header">
-            Profile and rate
+            {t('m.pro.profile_title')}
           </Text>
-          <Text style={styles.sub}>This is what clients see once you’re verified</Text>
+          <Text style={styles.sub}>{t('m.pro.profile_sub')}</Text>
           {!data ? (
             failed ? (
               <View style={styles.center}>
-                <Text style={styles.notice}>We couldn’t load your profile. Please check your internet connection.</Text>
-                <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+                <Text style={styles.notice}>{t('m.pro.profile_load_failed')}</Text>
+                <Button title={t('m.pro.try_again')} variant="ghost" onPress={refresh} busy={refreshing} />
               </View>
             ) : (
               <View style={{ marginTop: 16 }}>
@@ -103,10 +106,10 @@ export default function ProProfile() {
               <Documents data={data} toast={toast.show} reload={reload} />
               <Reviews data={data} />
               {data.public_profile.available && <PublicToggle key={String(data.public_profile.on)} data={data} />}
-              <Panel title="Account">
-                <AccountRow icon="settings" label="Account settings" sub="Password, app lock, notifications, appearance" onPress={() => router.push('/account')} />
-                <AccountRow icon="switch-horizontal" label="Switch to client view" sub="Use Kounselia for your own wellbeing" onPress={() => setViewMode('client')} />
-                <AccountRow icon="logout" label="Sign out" onPress={confirmSignOut} last />
+              <Panel title={t('m.settings.g_account')}>
+                <AccountRow icon="settings" label={t('m.settings.account_settings')} sub={t('m.pro.account_settings_sub')} onPress={() => router.push('/account')} />
+                <AccountRow icon="switch-horizontal" label={t('m.pro.switch_client')} sub={t('m.pro.switch_client_sub')} onPress={() => setViewMode('client')} />
+                <AccountRow icon="logout" label={t('m.pro.sign_out')} onPress={confirmSignOut} last />
               </Panel>
             </>
           )}
@@ -136,6 +139,7 @@ function AccountRow({ icon, label, sub, onPress, last }: { icon: string; label: 
 
 function Photo({ data, toast }: { data: ProDashboard; toast: (t: string) => void }) {
   const styles = useStyles();
+  const { t } = useLanguage();
   const { config } = useSession();
   const [avatar, setAvatar] = useState(data.user.avatar);
   const [busy, setBusy] = useState(false);
@@ -154,9 +158,9 @@ function Photo({ data, toast }: { data: ProDashboard; toast: (t: string) => void
       }
       setAvatar(res.data.avatar);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-      toast('Photo updated');
+      toast(t('m.pro.photo_updated'));
     } catch {
-      toast("Couldn't use that photo. Please try another one.");
+      toast(t('m.pro.doc_photo_unusable'));
     } finally {
       setBusy(false);
     }
@@ -164,7 +168,7 @@ function Photo({ data, toast }: { data: ProDashboard; toast: (t: string) => void
 
   return (
     <View style={styles.photoCard}>
-      <Pressable onPress={change} disabled={busy} accessibilityRole="button" accessibilityLabel="Change profile photo" style={styles.avatarWrap}>
+      <Pressable onPress={change} disabled={busy} accessibilityRole="button" accessibilityLabel={t('m.pro.change_photo')} style={styles.avatarWrap}>
         <View style={styles.avatar}>
           {avatar ? (
             <Image source={{ uri: avatar }} style={styles.avatarImg} contentFit="cover" transition={200} />
@@ -182,7 +186,7 @@ function Photo({ data, toast }: { data: ProDashboard; toast: (t: string) => void
         </View>
       </Pressable>
       <Text style={styles.photoName}>{data.user.name}</Text>
-      <Text style={styles.photoNote}>Clients see this photo on your public profile and everywhere else you appear on Kounselia.</Text>
+      <Text style={styles.photoNote}>{t('m.pro.photo_note')}</Text>
     </View>
   );
 }
@@ -191,6 +195,7 @@ function Photo({ data, toast }: { data: ProDashboard; toast: (t: string) => void
 
 function ProfileForm({ data, toast, reload }: { data: ProDashboard; toast: (t: string) => void; reload: () => Promise<void> }) {
   const styles = useStyles();
+  const { t } = useLanguage();
   const { config, user, updateUser } = useSession();
   const app = data.application;
   const [name, setName] = useState(data.user.name);
@@ -232,8 +237,8 @@ function ProfileForm({ data, toast, reload }: { data: ProDashboard; toast: (t: s
     }
     setBusy(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-    setMessage({ tone: 'success', text: res.data.message || 'Profile updated.' });
-    toast('Profile updated');
+    setMessage({ tone: 'success', text: res.data.message || t('m.pro.profile_updated') });
+    toast(t('m.pro.profile_updated'));
     reload();
   }
 
@@ -243,29 +248,25 @@ function ProfileForm({ data, toast, reload }: { data: ProDashboard; toast: (t: s
       {app.license_number ? (
         <View style={styles.readonly}>
           <Text style={styles.readonlyText}>
-            Verified against license/registration <Text style={{ fontFamily: fonts.semibold }}>{app.license_number}</Text>. To change your credentials, contact
-            support. That needs re-verification.
+            {t('m.pro.license_verified_before')} <Text style={{ fontFamily: fonts.semibold }}>{app.license_number}</Text>. {t('m.pro.license_verified_after')}
           </Text>
         </View>
       ) : null}
-      <TextField label="Full name" value={name} onChangeText={setName} placeholder="Your full name, as clients should see it" autoComplete="name" />
-      <TextField label="Professional title" value={title} onChangeText={setTitle} placeholder="e.g. Licensed Clinical Psychologist" />
-      <Text style={styles.fieldHint}>Shown next to your name everywhere clients see you: your role or qualification, not just “Dr”.</Text>
-      <TextField label="Specialty" value={specialty} onChangeText={setSpecialty} placeholder="e.g. Anxiety, trauma, relationships" />
-      <TextField label="Years of experience" value={years} onChangeText={(t) => setYears(t.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder="e.g. 8" />
-      <TextField label="Bio" value={bio} onChangeText={setBio} multiline textAlignVertical="top" style={styles.bio} placeholder="A few sentences clients will see on your profile." />
-      <TextField label="Your rate per session (₦)" value={rate} onChangeText={(t) => setRate(t.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholder="e.g. 15000" />
+      <TextField label={t('m.pro.apply_full_name')} value={name} onChangeText={setName} placeholder={t('m.pro.full_name_hint')} autoComplete="name" />
+      <TextField label={t('m.pro.f_title')} value={title} onChangeText={setTitle} placeholder={t('m.pro.f_title_hint')} />
+      <Text style={styles.fieldHint}>{t('m.pro.title_hint_long')}</Text>
+      <TextField label={t('m.pro.f_specialty')} value={specialty} onChangeText={setSpecialty} placeholder={t('m.pro.f_specialty_hint')} />
+      <TextField label={t('m.pro.f_years')} value={years} onChangeText={(v) => setYears(v.replace(/\D/g, '').slice(0, 2))} keyboardType="number-pad" placeholder={t('m.pro.f_years_hint')} />
+      <TextField label={t('m.pro.bio')} value={bio} onChangeText={setBio} multiline textAlignVertical="top" style={styles.bio} placeholder={t('m.pro.f_bio_hint')} />
+      <TextField label={t('m.pro.f_rate')} value={rate} onChangeText={(v) => setRate(v.replace(/[^\d.]/g, ''))} keyboardType="decimal-pad" placeholder={t('m.pro.f_rate_hint')} />
       {data.rate_usd_hint ? <Text style={styles.fieldHint}>{data.rate_usd_hint}</Text> : null}
       {data.free_options.length > 0 && (
         <>
-          <SelectField label="Free sessions" value={freeLabel} onPress={() => setChoosingFree(true)} />
-          <Text style={styles.fieldHint}>
-            A free first session is a gentle way for someone to see if you’re the right fit. Each client gets the free sessions once; after that they pay your rate.
-            Choose “every session” if you offer your time pro bono (your rate isn’t needed then).
-          </Text>
+          <SelectField label={t('m.pro.free_sessions')} value={freeLabel} onPress={() => setChoosingFree(true)} />
+          <Text style={styles.fieldHint}>{t('m.pro.free_sessions_hint')}</Text>
           <ChoiceSheet
             visible={choosingFree}
-            title="Free sessions"
+            title={t('m.pro.free_sessions')}
             choices={data.free_options}
             selected={free}
             onPick={setFree}
@@ -274,7 +275,7 @@ function ProfileForm({ data, toast, reload }: { data: ProDashboard; toast: (t: s
         </>
       )}
       {message ? <FormMessage tone={message.tone} text={message.text} /> : null}
-      <Button title="Save changes" onPress={save} busy={busy} />
+      <Button title={t('m.pro.save_changes')} onPress={save} busy={busy} />
     </Panel>
   );
 }
@@ -283,6 +284,7 @@ function ProfileForm({ data, toast, reload }: { data: ProDashboard; toast: (t: s
 
 function VideoSetting({ video, toast, reload }: { video: ProDashboard['video']; toast: (t: string) => void; reload: () => Promise<void> }) {
   const styles = useStyles();
+  const { t } = useLanguage();
   const colors = useColors();
   const { config } = useSession();
   const [mode, setMode] = useState(video.mode);
@@ -300,26 +302,23 @@ function VideoSetting({ video, toast, reload }: { video: ProDashboard['video']; 
       return;
     }
     setMessage({ tone: 'success', text: res.data.message });
-    toast('Video setting saved');
+    toast(t('m.pro.video_saved'));
     reload();
   }
 
   if (!video.allowed) {
     return (
-      <Panel title="Video calls" note="Where your sessions happen">
-        <Text style={styles.body}>
-          Your sessions use Kounselia’s private video room: nothing to install, and it opens right from the app. Prefer to use your own Zoom, Google Meet, Teams or
-          Whereby link? Email hello@kounselia.com and we’ll switch it on for you.
-        </Text>
+      <Panel title={t('m.pro.video_calls')} note={t('m.pro.video_calls_note')}>
+        <Text style={styles.body}>{t('m.pro.video_kounselia_only')}</Text>
       </Panel>
     );
   }
   const options: { key: 'kounselia' | 'own'; label: string }[] = [
-    { key: 'kounselia', label: 'Kounselia’s private video room (recommended)' },
-    { key: 'own', label: 'My own meeting link' },
+    { key: 'kounselia', label: t('m.pro.video_kounselia') },
+    { key: 'own', label: t('m.pro.video_own') },
   ];
   return (
-    <Panel title="Video calls" note="Where your sessions happen">
+    <Panel title={t('m.pro.video_calls')} note={t('m.pro.video_calls_note')}>
       {options.map((o) => {
         const on = mode === o.key;
         return (
@@ -331,16 +330,13 @@ function VideoSetting({ video, toast, reload }: { video: ProDashboard['video']; 
       })}
       {mode === 'own' && (
         <>
-          <TextField label="Meeting link" value={link} onChangeText={setLink} placeholder="https://zoom.us/j/… or https://meet.google.com/…" keyboardType="url" autoCapitalize="none" autoCorrect={false} />
-          <Text style={styles.fieldHint}>
-            Zoom, Google Meet, Microsoft Teams or Whereby. Clients only get it by pressing Join on Kounselia at session time; it’s never emailed. Please turn on a
-            waiting room or passcode, or set a separate link for each session (from Bookings).
-          </Text>
+          <TextField label={t('m.pro.meeting_link')} value={link} onChangeText={setLink} placeholder="https://zoom.us/j/… / https://meet.google.com/…" keyboardType="url" autoCapitalize="none" autoCorrect={false} />
+          <Text style={styles.fieldHint}>{t('m.pro.video_own_hint')}</Text>
         </>
       )}
-      <Text style={styles.fieldHint}>Bookings, payments and messages always stay on Kounselia. Kounselia’s safety checks only cover what’s said on Kounselia.</Text>
+      <Text style={styles.fieldHint}>{t('m.pro.video_safety_note')}</Text>
       {message ? <FormMessage tone={message.tone} text={message.text} /> : null}
-      <Button title="Save video setting" onPress={save} busy={busy} />
+      <Button title={t('m.pro.save_video')} onPress={save} busy={busy} />
     </Panel>
   );
 }
@@ -349,6 +345,7 @@ function VideoSetting({ video, toast, reload }: { video: ProDashboard['video']; 
 
 function Documents({ data, toast, reload }: { data: ProDashboard; toast: (t: string) => void; reload: () => Promise<void> }) {
   const styles = useStyles();
+  const { t } = useLanguage();
   const colors = useColors();
   const { config } = useSession();
   const [docType, setDocType] = useState<DocumentType>('certificate');
@@ -357,12 +354,12 @@ function Documents({ data, toast, reload }: { data: ProDashboard; toast: (t: str
   const [opening, setOpening] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  async function add(pick: () => Promise<PickResult>) {
+  async function add(pick: (t: Translate) => Promise<PickResult>) {
     setError(null);
     // Let the question box finish closing first: a phone won't open its
     // file picker over another pop-up.
     await new Promise((resolve) => setTimeout(resolve, 350));
-    const picked = await pick();
+    const picked = await pick(t);
     if (!picked) return;
     if (!picked.ok) {
       setError(picked.message);
@@ -376,19 +373,19 @@ function Documents({ data, toast, reload }: { data: ProDashboard; toast: (t: str
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-    toast('Document added');
+    toast(t('m.pro.doc_added'));
     reload();
   }
 
   function choose() {
     showDialog({
-      title: 'Add a document',
-      message: 'PDF, JPG, or PNG, up to 8MB.',
+      title: t('m.pro.doc_add_title'),
+      message: t('m.pro.doc_add_formats'),
       icon: 'file-text',
       buttons: [
-        { text: 'Choose a file', onPress: () => add(pickDocumentFile) },
-        { text: 'Choose a photo', onPress: () => add(pickDocumentPhoto) },
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('m.pro.doc_choose_file'), onPress: () => add(pickDocumentFile) },
+        { text: t('m.pro.doc_choose_photo'), onPress: () => add(pickDocumentPhoto) },
+        { text: t('m.pro.cancel'), style: 'cancel' },
       ],
     });
   }
@@ -402,22 +399,22 @@ function Documents({ data, toast, reload }: { data: ProDashboard; toast: (t: str
       return;
     }
     // The phone's own viewer handles PDFs, which the in-app browser can't on Android.
-    Linking.openURL(res.data.url).catch(() => toast("Couldn't open that document."));
+    Linking.openURL(res.data.url).catch(() => toast(t('m.pro.doc_open_failed')));
   }
 
   function remove(id: number, name: string) {
     showDialog({
-      title: 'Remove this document?',
+      title: t('m.pro.doc_remove_q'),
       message: name,
       icon: 'trash',
       buttons: [
-        { text: 'Keep it', style: 'cancel' },
+        { text: t('m.pro.keep_it'), style: 'cancel' },
         {
-          text: 'Remove',
+          text: t('m.pro.remove'),
           style: 'destructive',
           onPress: async () => {
             const res = await deleteProDocument(config, id);
-            toast(res.ok ? res.data.message || 'Document removed.' : res.message);
+            toast(res.ok ? res.data.message || t('m.pro.doc_removed') : res.message);
             reload();
           },
         },
@@ -426,8 +423,8 @@ function Documents({ data, toast, reload }: { data: ProDashboard; toast: (t: str
   }
 
   return (
-    <Panel title="Documents" note="Up to 10 files. Add a certificate or a second ID any time.">
-      {data.documents.length === 0 ? <Text style={styles.body}>No documents on file yet.</Text> : null}
+    <Panel title={t('m.pro.documents')} note={t('m.pro.documents_note')}>
+      {data.documents.length === 0 ? <Text style={styles.body}>{t('m.pro.no_documents')}</Text> : null}
       {data.documents.map((d) => (
         <View key={d.id} style={styles.doc}>
           <TablerIcon name="file-text" size={18} color={colors.accentText} />
@@ -437,19 +434,19 @@ function Documents({ data, toast, reload }: { data: ProDashboard; toast: (t: str
             </Text>
             <Text style={styles.docType}>{d.type_label}</Text>
           </View>
-          <Pressable onPress={() => view(d.id)} accessibilityRole="button" accessibilityLabel={`View ${d.name}`} hitSlop={8}>
-            {opening === d.id ? <ActivityIndicator size="small" color={colors.accentText} /> : <Text style={styles.docView}>View</Text>}
+          <Pressable onPress={() => view(d.id)} accessibilityRole="button" accessibilityLabel={t('m.pro.doc_view_named', { name: d.name })} hitSlop={8}>
+            {opening === d.id ? <ActivityIndicator size="small" color={colors.accentText} /> : <Text style={styles.docView}>{t('m.pro.view')}</Text>}
           </Pressable>
-          <Pressable onPress={() => remove(d.id, d.name)} accessibilityRole="button" accessibilityLabel={`Remove ${d.name}`} hitSlop={8}>
+          <Pressable onPress={() => remove(d.id, d.name)} accessibilityRole="button" accessibilityLabel={t('m.pro.doc_remove_named', { name: d.name })} hitSlop={8}>
             <TablerIcon name="trash" size={18} color={colors.text3} />
           </Pressable>
         </View>
       ))}
       <View style={{ height: 12 }} />
-      <SelectField label="Document type" value={DOC_TYPES.find((t) => t.value === docType)?.label ?? null} onPress={() => setChoosingType(true)} />
+      <SelectField label={t('m.pro.doc_type')} value={t(DOC_TYPES.find((d) => d.value === docType)?.label ?? 'm.pro.doc_other')} onPress={() => setChoosingType(true)} />
       {error ? <FormMessage tone="error" text={error} /> : null}
-      <Button title="Add document" onPress={choose} busy={busy} disabled={data.documents.length >= 10} />
-      <ChoiceSheet visible={choosingType} title="Document type" choices={DOC_TYPES} selected={docType} onPick={setDocType} onClose={() => setChoosingType(false)} />
+      <Button title={t('m.pro.doc_add')} onPress={choose} busy={busy} disabled={data.documents.length >= 10} />
+      <ChoiceSheet visible={choosingType} title={t('m.pro.doc_type')} choices={DOC_TYPES.map((d) => ({ value: d.value, label: t(d.label) }))} selected={docType} onPick={setDocType} onClose={() => setChoosingType(false)} />
     </Panel>
   );
 }
@@ -458,24 +455,25 @@ function Documents({ data, toast, reload }: { data: ProDashboard; toast: (t: str
 
 function Reviews({ data }: { data: ProDashboard }) {
   const styles = useStyles();
+  const { language, t } = useLanguage();
   const { rating, reviews } = data;
   return (
     <Panel
-      title="Client reviews"
+      title={t('m.pro.client_reviews')}
       note={
         rating.count > 0
-          ? `★ ${rating.average.toFixed(1)} average across ${rating.count} review${rating.count === 1 ? '' : 's'}`
-          : 'Clients can rate a session once it’s happened. Reviews will show up here, and your average rating appears on your public profile.'
+          ? t(rating.count === 1 ? 'm.pro.reviews_average_one' : 'm.pro.reviews_average', { average: rating.average.toFixed(1), count: rating.count })
+          : t('m.pro.reviews_empty')
       }
     >
       {reviews.map((r, i) => (
         <View key={i} style={styles.review}>
-          <Text style={styles.reviewStars} accessibilityLabel={`${r.rating} out of 5`}>
+          <Text style={styles.reviewStars} accessibilityLabel={t('m.pro.stars_of_5', { n: r.rating })}>
             {'★'.repeat(r.rating)}
             {'☆'.repeat(5 - r.rating)} <Text style={styles.reviewName}>{r.client_name}</Text>
           </Text>
           {r.comment ? <Text style={styles.body}>{r.comment}</Text> : null}
-          <Text style={styles.docType}>{sessionWhen(r.date_utc, true)}</Text>
+          <Text style={styles.docType}>{sessionWhen(r.date_utc, true, language)}</Text>
         </View>
       ))}
     </Panel>
@@ -486,6 +484,7 @@ function Reviews({ data }: { data: ProDashboard }) {
 
 function PublicToggle({ data }: { data: ProDashboard }) {
   const styles = useStyles();
+  const { t } = useLanguage();
   const colors = useColors();
   const { config } = useSession();
   const { openInApp } = useBrowser();
@@ -503,18 +502,14 @@ function PublicToggle({ data }: { data: ProDashboard }) {
     <Panel>
       <View style={styles.toggleRow}>
         <View style={{ flex: 1 }}>
-          <Text style={styles.toggleTitle}>Show my profile on the public website</Text>
-          <Text style={styles.toggleText}>
-            Your name, photo, title, specialty, experience, bio, rate and reviews appear in the public directory at kounselia.com/professionals once you’re verified,
-            so new clients can find you. Your licence number is never shown, and reviews never show your clients’ names. Turn this off any time; signed-in members can
-            still book you.
-          </Text>
+          <Text style={styles.toggleTitle}>{t('m.pro.public_title')}</Text>
+          <Text style={styles.toggleText}>{t('m.pro.public_body')}</Text>
         </View>
-        <Switch value={on} onValueChange={toggle} trackColor={{ true: colors.accent, false: colors.surface3 }} accessibilityLabel="Show my profile on the public website" />
+        <Switch value={on} onValueChange={toggle} trackColor={{ true: colors.accent, false: colors.surface3 }} accessibilityLabel={t('m.pro.public_title')} />
       </View>
       {data.public_profile.url ? (
-        <Pressable onPress={() => openInApp(data.public_profile.url!, { title: 'Your public profile', web: true })} accessibilityRole="link" style={{ marginTop: 10 }}>
-          <Text style={styles.link}>View my public profile →</Text>
+        <Pressable onPress={() => openInApp(data.public_profile.url!, { title: t('m.pro.public_profile'), web: true })} accessibilityRole="link" style={{ marginTop: 10 }}>
+          <Text style={styles.link}>{t('m.pro.public_view')} →</Text>
         </Pressable>
       ) : null}
       {message ? (

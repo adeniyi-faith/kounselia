@@ -13,6 +13,7 @@ import { TablerIcon } from '@/components/TablerIcon';
 import { NotificationBell } from '@/components/pro/NotificationsSheet';
 import { Banner, StatGrid } from '@/components/pro/ui';
 import { naira, usePro } from '@/professional/ProDashboard';
+import { useLanguage } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, useColors } from '@/theme';
 
@@ -24,6 +25,7 @@ export default function ProOverview() {
   const colors = useColors();
   const { config, setViewMode } = useSession();
   const { data, failed, reload } = usePro();
+  const { language, t } = useLanguage();
   const [refreshing, setRefreshing] = useState(false);
   const [joining, setJoining] = useState(false);
   const toast = useToast();
@@ -41,24 +43,24 @@ export default function ProOverview() {
   async function join() {
     if (!next) return;
     setJoining(true);
-    const problem = await joinSession(config, next.id);
+    const problem = await joinSession(config, next.id, t);
     setJoining(false);
     if (problem) toast.show(problem);
   }
 
   const unlocked: { icon: string; label: string; on: boolean; tag: string }[] = data
     ? [
-        { icon: 'user-edit', label: 'Edit your profile and rate', on: true, tag: 'Available' },
-        { icon: 'heart-handshake', label: 'Use Kounselia as a client too', on: true, tag: 'Available' },
-        { icon: 'calendar-event', label: 'Receive client bookings', on: verified, tag: verified ? 'Available' : 'Locked until verified' },
-        { icon: 'cash', label: 'Earnings and payouts', on: verified, tag: verified ? 'Available' : 'Locked until verified' },
+        { icon: 'user-edit', label: t('m.pro.cap_profile'), on: true, tag: t('m.pro.cap_available') },
+        { icon: 'heart-handshake', label: t('m.pro.cap_client'), on: true, tag: t('m.pro.cap_available') },
+        { icon: 'calendar-event', label: t('m.pro.cap_bookings'), on: verified, tag: verified ? t('m.pro.cap_available') : t('m.pro.cap_locked') },
+        { icon: 'cash', label: t('m.pro.cap_earnings'), on: verified, tag: verified ? t('m.pro.cap_available') : t('m.pro.cap_locked') },
         ...(data.articles.enabled
           ? [
               {
                 icon: 'feather',
-                label: 'Write articles for the Journal',
+                label: t('m.pro.cap_articles'),
                 on: data.articles.access.allowed,
-                tag: data.articles.access.allowed ? 'Available' : verified ? 'Not available' : 'Locked until verified',
+                tag: data.articles.access.allowed ? t('m.pro.cap_available') : verified ? t('m.pro.cap_not_available') : t('m.pro.cap_locked'),
               },
             ]
           : []),
@@ -68,12 +70,12 @@ export default function ProOverview() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.top}>
-        <Text style={styles.brand}>Your practice</Text>
+        <Text style={styles.brand}>{t('m.pro.your_practice')}</Text>
         <NotificationBell config={config} />
         <Pressable
           onPress={() => setViewMode('client')}
           accessibilityRole="button"
-          accessibilityLabel="Switch to client view"
+          accessibilityLabel={t('m.pro.switch_client')}
           style={styles.iconBtn}
           hitSlop={6}
         >
@@ -87,8 +89,8 @@ export default function ProOverview() {
         {!data || !app ? (
           failed ? (
             <View style={styles.center}>
-              <Text style={styles.notice}>We couldn’t load your practice. Please check your internet connection.</Text>
-              <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+              <Text style={styles.notice}>{t('m.pro.load_failed')}</Text>
+              <Button title={t('m.pro.try_again')} variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
             <ListSkeleton rows={4} square />
@@ -97,11 +99,11 @@ export default function ProOverview() {
           <>
             <LinearGradient colors={[colors.accent, colors.navyFill]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.welcome}>
               <View style={styles.eyebrowRow}>
-                <Text style={styles.eyebrow}>Your practice</Text>
+                <Text style={styles.eyebrow}>{t('m.pro.your_practice')}</Text>
                 {verified && (
                   <View style={styles.whitePill}>
                     <TablerIcon name="check" size={11} color="#fff" />
-                    <Text style={styles.whitePillText}>Verified</Text>
+                    <Text style={styles.whitePillText}>{t('m.pro.verified')}</Text>
                   </View>
                 )}
                 {data.rating.count > 0 && (
@@ -113,72 +115,71 @@ export default function ProOverview() {
                 )}
               </View>
               <Text style={styles.h1} accessibilityRole="header">
-                Welcome back, <Text style={styles.h1Name}>{data.user.first_name}</Text>.
+                {t('m.pro.welcome_back')} <Text style={styles.h1Name}>{data.user.first_name}</Text>.
               </Text>
               <Text style={styles.welcomeBody}>
                 {verified
-                  ? 'This is what clients will see, and your rate is entirely yours to set. Kounselia never changes it for you.'
-                  : 'Get your profile ready while your application is reviewed. It stays private until you’re verified.'}
+                  ? t('m.pro.welcome_verified')
+                  : t('m.pro.welcome_pending')}
               </Text>
               <Pressable onPress={() => router.push('/pro/profile')} accessibilityRole="button" style={styles.welcomeBtn}>
                 <TablerIcon name="user-edit" size={16} color={colors.accent} />
-                <Text style={styles.welcomeBtnText}>Edit profile and rate</Text>
+                <Text style={styles.welcomeBtnText}>{t('m.pro.edit_profile_rate')}</Text>
               </Pressable>
             </LinearGradient>
 
             {app.status === 'pending' ? (
-              <Banner tone="gold" title="Under review">
-                We’re checking your documents. We’ll email you once there’s a decision, usually within a few business days.
+              <Banner tone="gold" title={t('m.pro.status_pending')}>
+                {t('m.pro.status_pending_body')}
               </Banner>
             ) : app.status === 'suspended' ? (
-              <Banner tone="rose" title="Account suspended">
-                {app.suspended_reason || 'Your account is under review.'} Clients can’t find or book you while your account is suspended. Questions?
-                Email hello@kounselia.com.
+              <Banner tone="rose" title={t('m.pro.status_suspended')}>
+                {app.suspended_reason || t('m.pro.status_suspended_default')} {t('m.pro.status_suspended_body')}
               </Banner>
             ) : app.status === 'rejected' ? (
               <View>
-                <Banner tone="rose" title="Not approved yet">
-                  {app.rejection_reason || 'Update your documents and reapply when you’re ready.'}
+                <Banner tone="rose" title={t('m.pro.status_rejected')}>
+                  {app.rejection_reason || t('m.pro.status_rejected_default')}
                 </Banner>
-                <Button title="Reapply with new documents" variant="ghost" onPress={() => router.push('/apply')} style={{ marginTop: 12 }} />
+                <Button title={t('m.pro.reapply')} variant="ghost" onPress={() => router.push('/apply')} style={{ marginTop: 12 }} />
               </View>
             ) : (
-              <Banner tone="sage" title="Verified">
-                Your profile is live for clients.
+              <Banner tone="sage" title={t('m.pro.verified')}>
+                {t('m.pro.status_verified_body')}
               </Banner>
             )}
 
             <StatGrid
               items={[
-                { icon: 'cash', color: 'blue', num: app.all_free ? 'Free' : app.rate_amount ? naira(app.rate_amount) : 'Not set', label: 'Rate per session' },
-                { icon: 'award', color: 'gold', num: app.years_experience ? String(app.years_experience) : '—', label: 'Years of experience' },
-                { icon: 'calendar-event', color: 'sage', num: String(data.bookings.length), label: 'Upcoming bookings' },
-                { icon: 'wallet', color: 'teal', num: naira(data.earnings.available), label: 'Available to pay out' },
+                { icon: 'cash', color: 'blue', num: app.all_free ? t('m.pro.free') : app.rate_amount ? naira(app.rate_amount) : t('m.pro.not_set'), label: t('m.pro.stat_rate') },
+                { icon: 'award', color: 'gold', num: app.years_experience ? String(app.years_experience) : '—', label: t('m.pro.f_years') },
+                { icon: 'calendar-event', color: 'sage', num: String(data.bookings.length), label: t('m.pro.stat_upcoming') },
+                { icon: 'wallet', color: 'teal', num: naira(data.earnings.available), label: t('m.pro.stat_available') },
               ]}
             />
 
             {next && (
               <>
-                <SectionHead title="Next session" action={{ label: 'All bookings', onPress: () => router.push('/pro/bookings') }} />
+                <SectionHead title={t('m.pro.next_session')} action={{ label: t('m.pro.all_bookings'), onPress: () => router.push('/pro/bookings') }} />
                 <View style={styles.next}>
                   <View style={styles.nextIcon}>
                     <TablerIcon name="calendar-event" size={18} color={colors.sage} />
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.nextName}>{next.client_name}</Text>
-                    <Text style={styles.nextWhen}>{sessionWhen(next.start_utc)}</Text>
+                    <Text style={styles.nextWhen}>{sessionWhen(next.start_utc, false, language)}</Text>
                   </View>
                   {next.joinable && (
                     <Pressable onPress={join} accessibilityRole="button" style={styles.join}>
                       {joining ? <ActivityIndicator size="small" color="#fff" /> : <TablerIcon name="video" size={16} color="#fff" />}
-                      <Text style={styles.joinText}>Join</Text>
+                      <Text style={styles.joinText}>{t('m.pro.join')}</Text>
                     </Pressable>
                   )}
                 </View>
               </>
             )}
 
-            <SectionHead title="What’s unlocked" />
+            <SectionHead title={t('m.pro.unlocked')} />
             <View style={{ gap: 8 }}>
               {unlocked.map((u) => (
                 <View key={u.label} style={styles.cap}>
@@ -191,7 +192,7 @@ export default function ProOverview() {
 
             <Pressable onPress={() => setViewMode('client')} accessibilityRole="button" style={styles.switch}>
               <TablerIcon name="switch-horizontal" size={17} color={colors.gold} />
-              <Text style={styles.switchText}>Switch to client view</Text>
+              <Text style={styles.switchText}>{t('m.pro.switch_client')}</Text>
             </Pressable>
           </>
         )}
