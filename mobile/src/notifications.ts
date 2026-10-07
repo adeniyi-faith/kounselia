@@ -159,6 +159,7 @@ export function routeForLink(url: string): Href {
   const article = /^\/blog\/([^/?#]+)/.exec(path);
   if (article && article[1] !== 'tag') return { pathname: '/articles/[slug]', params: { slug: decodeURIComponent(article[1]) } };
   if (path.includes('tab=upgrade')) return '/plan';
+  if (path.includes('tab=growth')) return '/growth';
   if (path.startsWith('/dashboard.php#professionals') || path.includes('booking')) return '/sessions';
   return '/';
 }

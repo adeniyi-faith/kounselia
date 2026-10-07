@@ -14,7 +14,7 @@ const day = (daysAgo) => new Date(Date.now() - daysAgo * 864e5).toISOString().sl
 const counselors = [
   ['serena', 'Madam Serena', 'Emotional Healing', 'heart', 'rose', false],
   ['marcus', 'Marcus', 'Career and Purpose', 'briefcase', 'blue', false],
-  ['noa', 'Noa', 'Personal Growth', 'leaf', 'sage', false],
+  ['noa', 'Noa', 'Personal Development', 'leaf', 'sage', false],
   ['eli', 'Eli', 'Relationships', 'users', 'gold', false],
   ['dr_lena', 'Dr. Lena', 'Trauma and PTSD', 'stethoscope', 'teal', true],
   ['james', 'Dr. James', "Men's Mental Health", 'shield', 'navy', true],

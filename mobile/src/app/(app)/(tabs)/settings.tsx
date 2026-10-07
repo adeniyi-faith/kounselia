@@ -6,7 +6,10 @@
 import {
   changePassword,
   fetchAccount,
+  LANGUAGES,
+  makeT,
   saveEmailPrefs,
+  setLanguage,
   updateName,
   uploadAvatar,
   type Account,
@@ -141,6 +144,31 @@ export default function Settings() {
       await lock.setAfter(null);
       toast.show('App lock is off');
     }
+  }
+
+  // Language: counselors, growth plans and reminders write in it; screens follow as they are translated.
+  function chooseLanguage() {
+    const t = makeT(account?.language ?? 'en');
+    showDialog({
+      title: t('lang.choose'),
+      message: t('lang.note'),
+      icon: 'message-language',
+      buttons: [
+        ...LANGUAGES.map((l) => ({
+          text: l.name,
+          onPress: async () => {
+            const res = await setLanguage(config, l.code);
+            if (!res.ok) {
+              toast.show(res.message);
+              return;
+            }
+            setAccount((a) => (a ? { ...a, language: res.data.language } : a));
+            toast.show(res.data.message);
+          },
+        })),
+        { text: t('lang.cancel'), style: 'cancel' as const },
+      ],
+    });
   }
 
   function notificationsBlocked() {
@@ -299,6 +327,7 @@ export default function Settings() {
           <Row icon="user" label="Name" value={name} onPress={() => setSheet('name')} />
           <Row icon="mail" label="Email" value={email} />
           <Row icon="camera" label="Profile photo" value={account?.user.avatar ? 'Change' : 'Add'} onPress={changePhoto} />
+          <Row icon="message-language" label={makeT(account?.language ?? 'en')('lang.setting')} value={LANGUAGES.find((l) => l.code === account?.language)?.name ?? 'English'} onPress={chooseLanguage} />
           <Row icon="key" label="Password" value="Change" onPress={() => setSheet('password')} last />
         </Group>
 
