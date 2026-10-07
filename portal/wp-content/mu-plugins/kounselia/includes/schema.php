@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.26.0'; // Bumped version: push tokens tied to the app sign-in that registered them
+    $current_version   = '1.27.0'; // Bumped version: growth plans (Personal Development) and their daily progress
 
     if ( $installed_version === $current_version ) {
         return;
@@ -270,6 +270,40 @@ function kounselia_install_tables() {
         PRIMARY KEY  (id),
         UNIQUE KEY user_event (user_id, event_date, event_text),
         KEY user_status (user_id, status)
+    ) {$charset_collate};";
+
+    /*
+     * A member's 30 day growth plan (see growth-plans.php): what they
+     * chose to work on, their answers to the intake questions, and the
+     * AI-written days as JSON. status: active / completed / ended.
+     */
+    $sql_growth_plans = "CREATE TABLE {$prefix}kounselia_growth_plans (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        user_id BIGINT UNSIGNED NOT NULL,
+        area VARCHAR(32) NOT NULL,
+        title VARCHAR(191) NOT NULL,
+        summary TEXT NULL,
+        answers LONGTEXT NULL,
+        days LONGTEXT NOT NULL,
+        total_days SMALLINT UNSIGNED NOT NULL DEFAULT 30,
+        start_date DATE NOT NULL,
+        status VARCHAR(16) NOT NULL DEFAULT 'active',
+        created_at DATETIME NOT NULL,
+        ended_at DATETIME NULL,
+        PRIMARY KEY  (id),
+        KEY user_status (user_id, status)
+    ) {$charset_collate};";
+
+    // One row per growth plan day the member ticked off.
+    $sql_growth_plan_progress = "CREATE TABLE {$prefix}kounselia_growth_plan_progress (
+        id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+        plan_id BIGINT UNSIGNED NOT NULL,
+        user_id BIGINT UNSIGNED NOT NULL,
+        day_number SMALLINT UNSIGNED NOT NULL,
+        done_at DATETIME NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY plan_day (plan_id, day_number),
+        KEY user_id (user_id)
     ) {$charset_collate};";
 
     /*
@@ -919,6 +953,8 @@ function kounselia_install_tables() {
     dbDelta( $sql_memory_preferences );
     dbDelta( $sql_safety_escalations );
     dbDelta( $sql_memory_upcoming_events );
+    dbDelta( $sql_growth_plans );
+    dbDelta( $sql_growth_plan_progress );
     dbDelta( $sql_professionals );
     dbDelta( $sql_professional_documents );
     dbDelta( $sql_professional_availability );

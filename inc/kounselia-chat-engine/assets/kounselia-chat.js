@@ -11,7 +11,7 @@ const fallbackC={
     greeting:"Hello. I am really glad you are here.\n\nThis is your space. There is no agenda, no clock, and nothing you say here will be judged. Whatever you have been carrying, you do not have to carry it alone right now.\n\nTake your time. When you are ready, what has been sitting with you lately?"},
   marcus:{name:'Marcus',spec:'Career and Purpose',av:'ic-blue',icon:'ti-briefcase',
     greeting:"Good to have you here. I am Marcus.\n\nI work with people who are at crossroads. Careers that no longer fit, purposes they cannot locate, next steps that feel both necessary and terrifying.\n\nLet us get into it. What is the career or purpose question taking up the most space in your head right now?"},
-  noa:{name:'Noa',spec:'Personal Growth',av:'ic-sage',icon:'ti-leaf',
+  noa:{name:'Noa',spec:'Personal Development',av:'ic-sage',icon:'ti-leaf',
     greeting:"Hey. I am Noa and I am genuinely glad you are here.\n\nI work with people who are in the middle of becoming. Sometimes that looks like reinvention. Sometimes it is understanding why certain patterns keep repeating. Sometimes it is just a quiet feeling that the current version of you is not the whole story.\n\nSo tell me. Who are you right now and who do you think you are becoming?"},
   eli:{name:'Eli',spec:'Relationships',av:'ic-gold',icon:'ti-users',
     greeting:"Hi, I am Eli. Welcome.\n\nRelationships are where most of our deepest joy and most of our real pain come from. They are also where we are most likely to repeat patterns we have not fully understood yet.\n\nI am here to help you see those patterns more clearly.\n\nWhat is the relationship situation you have been turning over in your mind?"},

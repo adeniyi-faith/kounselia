@@ -133,6 +133,8 @@ $kp_price = function ( $plan, $currency ) {
                   return $v ? (int) $v . ' / month' : 'Unlimited';
               case 'auto_reflection_days':
                   return $v ? 'Every ' . (int) $v . ' days' : 'Off';
+              case 'growth_plans':
+                  return $v ? (int) $v . ' plans' : 'Unlimited';
               case 'booking_discount':
                   return (float) $v > 0 ? rtrim( rtrim( number_format( (float) $v, 1 ), '0' ), '.' ) . '% off' : '<span class="no">—</span>';
           }
@@ -145,6 +147,7 @@ $kp_price = function ( $plan, $currency ) {
           'recurring_patterns'    => 'Notices your recurring patterns across sessions',
           'reflections_per_month' => 'Milestone Reflections',
           'auto_reflection_days'  => 'Reflection refreshes itself',
+          'growth_plans'          => 'Growth plans (30 days of daily steps)',
           'booking_discount'      => 'Sessions with licensed professionals',
           'safety'                => 'Safety support and crisis resources',
       );
