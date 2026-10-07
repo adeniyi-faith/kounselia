@@ -311,4 +311,47 @@ class Test_Growth_Plans extends WP_Ajax_UnitTestCase {
         $this->assertTrue( $res['success'] );
         $this->assertSame( 7, $res['data']['plan']['remind_hour'] );
     }
+
+    function test_a_plan_follows_the_members_own_time_zone() {
+        $user = self::factory()->user->create();
+        $this->use_fake_ai();
+
+        // Kiritimati is 14 hours ahead of UTC and Pago Pago is 11 behind, so their calendar days differ from the server's.
+        $id = kounselia_growth_create_plan( $user, 'discipline', $this->answers(), 'Pacific/Kiritimati' );
+        $row = kounselia_growth_active_plan( $user );
+        $this->assertSame( 'Pacific/Kiritimati', $row->timezone );
+        $this->assertSame( ( new DateTimeImmutable( 'now', new DateTimeZone( 'Pacific/Kiritimati' ) ) )->format( 'Y-m-d' ), $row->start_date );
+        $this->assertSame( 1, kounselia_growth_day_number( $row ) );
+
+        // Opening the screen from another part of the world moves the plan with them.
+        kounselia_growth_update_timezone( $user, 'Pacific/Pago_Pago' );
+        $row = kounselia_growth_active_plan( $user );
+        $this->assertSame( 'Pacific/Pago_Pago', $row->timezone );
+        $this->assertSame( 1, kounselia_growth_day_number( $row ), 'Moving zones must not skip a day.' );
+
+        // A made-up zone is ignored.
+        kounselia_growth_update_timezone( $user, 'Mars/Olympus' );
+        $this->assertSame( 'Pacific/Pago_Pago', kounselia_growth_active_plan( $user )->timezone );
+    }
+
+    function test_the_reminder_goes_out_on_the_members_own_morning() {
+        global $wpdb;
+        $user = self::factory()->user->create();
+        $this->use_fake_ai();
+        $id = kounselia_growth_create_plan( $user, 'discipline', $this->answers(), 'Asia/Tokyo' );
+        $row = kounselia_growth_active_plan( $user );
+        $hour = (int) kounselia_growth_local_now( $row, 'G' );
+
+        // Not reminded since yesterday, and the reminder hour is one hour from now on their clock.
+        $wpdb->update( kounselia_growth_table(), array( 'start_date' => gmdate( 'Y-m-d', time() - 2 * DAY_IN_SECONDS ), 'last_reminded' => '2020-01-01', 'remind_hour' => min( 23, $hour + 1 ) ), array( 'id' => $id ) );
+        if ( $hour < 23 ) {
+            kounselia_growth_send_reminders();
+            $this->assertSame( 0, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_notifications WHERE user_id = %d AND type = 'growth_reminder'", $user ) ) );
+        }
+
+        // Now the hour has come on their clock.
+        $wpdb->update( kounselia_growth_table(), array( 'remind_hour' => $hour ), array( 'id' => $id ) );
+        kounselia_growth_send_reminders();
+        $this->assertSame( 1, (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_notifications WHERE user_id = %d AND type = 'growth_reminder'", $user ) ) );
+    }
 }

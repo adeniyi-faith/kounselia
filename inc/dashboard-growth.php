@@ -67,10 +67,11 @@ if ( ! function_exists( 'kounselia_growth_overview' ) ) {
   function post(data){
     return fetch(KOUNSELIA.ajaxUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(Object.assign({ nonce: KOUNSELIA.nonce }, data)) }).then(function(r){ return r.json(); });
   }
+  var TZ = (function(){ try { return Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch(e) { return ''; } })();
   function esc(s){ var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
 
   function load(){
-    return post({ action: 'kounselia_growth_get' }).then(function(res){
+    return post({ action: 'kounselia_growth_get', timezone: TZ }).then(function(res){
       if(res.success){ state.data = res.data; state.loaded = true; render(); }
       else { root.innerHTML = '<p style="color:var(--text3)">' + esc((res.data && res.data.message) || 'Could not load your plan.') + '</p>'; }
     }).catch(function(){ root.innerHTML = '<p style="color:var(--text3)">Connection problem. Please try again.</p>'; });
@@ -131,7 +132,7 @@ if ( ! function_exists( 'kounselia_growth_overview' ) ) {
       var missing = area.questions.filter(function(q){ return q.required && !(state.answers[q.key] || '').trim(); })[0];
       if(missing){ document.getElementById('gp-err').textContent = 'Please answer: ' + missing.label; return; }
       state.busy = true; document.getElementById('gp-make').disabled = true; document.getElementById('gp-make').textContent = 'Writing your plan… this can take up to a minute';
-      post({ action: 'kounselia_growth_create', area: state.picked, answers: JSON.stringify(state.answers) }).then(function(res){
+      post({ action: 'kounselia_growth_create', area: state.picked, answers: JSON.stringify(state.answers), timezone: TZ }).then(function(res){
         state.busy = false;
         if(res.success){ state.data = res.data; state.picked = null; state.answers = {}; toast('Your plan is ready.'); render(); }
         else { render(); document.getElementById('gp-err').textContent = (res.data && res.data.message) || 'Could not make your plan.'; }
@@ -165,7 +166,7 @@ if ( ! function_exists( 'kounselia_growth_overview' ) ) {
       h += '<div class="gp-day-detail"><b>Day ' + open.day + (open.title ? ': ' + esc(open.title) : '') + '</b><br>' + esc(open.task) + (open.state !== 'upcoming' ? '<br><button type="button" class="gp-link" id="gp-day-toggle">' + (open.done ? 'Mark as not done' : 'Mark as done') + '</button>' : '') + '</div>';
     }
     h += '<p class="gp-note">Missed a day? That\'s fine. Your plan keeps going, and you can tick off any earlier day later.</p></div>';
-    h += '<div class="gp-card"><p style="font-size:14px;line-height:1.6;color:var(--text2)">' + esc(p.summary) + '</p><div style="margin:12px 0;font-size:14px;color:var(--text2)"><label for="gp-hour">Daily reminder </label><select class="gp-sel" id="gp-hour"><option value="-1">Off</option>' + hourOptions(p.remind_hour) + '</select><div class="gp-note">Sent at the chosen time in our server time zone, as a notification in the app and on the website.</div></div><button type="button" class="gp-link" id="gp-end">End this plan</button></div>';
+    h += '<div class="gp-card"><p style="font-size:14px;line-height:1.6;color:var(--text2)">' + esc(p.summary) + '</p><div style="margin:12px 0;font-size:14px;color:var(--text2)"><label for="gp-hour">Daily reminder </label><select class="gp-sel" id="gp-hour"><option value="-1">Off</option>' + hourOptions(p.remind_hour) + '</select><div class="gp-note">Sent at that time on your own clock, as a notification in the app and on the website.</div></div><button type="button" class="gp-link" id="gp-end">End this plan</button></div>';
     h += renderPrevious(d);
     root.innerHTML = h;
 

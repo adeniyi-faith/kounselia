@@ -333,7 +333,7 @@ export default function Growth() {
               );
             })}
           </View>
-          <Text style={styles.prevMeta}>Sent as a notification at that time in our server time zone.</Text>
+          <Text style={styles.prevMeta}>Sent as a notification at that time on your own clock.</Text>
           <Pressable onPress={() => end(plan)} accessibilityRole="button" hitSlop={8}>
             <Text style={styles.link}>End this plan</Text>
           </Pressable>

@@ -18,7 +18,11 @@
  *     their mind straight away gets that plan back.
  *   - Daily reminder: a push and in-app notification with today's task
  *     at the hour the member picks (9am unless they change it or turn it
- *     off), sent by an hourly job. Uses the site's time zone.
+ *     off), sent by an hourly job.
+ *   - Everything is in the member's own time zone (Kounselia is global):
+ *     their phone or browser tells us which one when they open the Growth
+ *     screen, and the plan's days, reminders and "today" follow it. If they
+ *     travel, the next time they open the screen it moves with them.
  *   - Weekly review: after each week (days 7, 14, 21, 28 and the final
  *     day 30) the member can ask for a short review. The AI looks at what
  *     they did, writes a few kind sentences, and can make the next days
@@ -167,20 +171,66 @@ function kounselia_growth_active_plan( $user_id ) {
         return null;
     }
     if ( kounselia_growth_day_number( $row ) > (int) $row->total_days ) {
-        $wpdb->update( $table, array( 'status' => 'completed', 'ended_at' => current_time( 'mysql' ) ), array( 'id' => $row->id ) );
+        $wpdb->update( $table, array( 'status' => 'completed', 'ended_at' => kounselia_growth_local_now( $row, 'Y-m-d H:i:s' ) ), array( 'id' => $row->id ) );
         return null;
     }
     return $row;
 }
 
 /**
- * Which day of the plan it is today (1 on the day it was started), in
- * the site's own time zone. Can be past the last day.
+ * A time zone name from a phone or browser (like "Africa/Lagos" or
+ * "America/Chicago") if it is a real one, otherwise ''.
+ */
+function kounselia_growth_clean_timezone( $tz ) {
+    $tz = is_string( $tz ) ? trim( $tz ) : '';
+    return ( '' !== $tz && in_array( $tz, timezone_identifiers_list(), true ) ) ? $tz : '';
+}
+
+/**
+ * The time zone a plan runs in: the member's own, or the site's when we
+ * don't know it.
+ */
+function kounselia_growth_plan_timezone( $row ) {
+    $name = kounselia_growth_clean_timezone( $row->timezone ?? '' );
+    return $name ? new DateTimeZone( $name ) : wp_timezone();
+}
+
+/**
+ * The plan's current date or time on the member's clock, in a PHP date
+ * format ('Y-m-d', 'G' for the hour 0 to 23, or 'Y-m-d H:i:s').
+ */
+function kounselia_growth_local_now( $row, $format ) {
+    return ( new DateTimeImmutable( 'now', kounselia_growth_plan_timezone( $row ) ) )->format( $format );
+}
+
+/**
+ * Which day of the plan it is today (1 on the day it was started), on
+ * the member's own calendar. Can be past the last day.
  */
 function kounselia_growth_day_number( $row ) {
-    $start = strtotime( $row->start_date . ' 00:00:00' );
-    $today = strtotime( current_time( 'Y-m-d' ) . ' 00:00:00' );
+    $start = strtotime( $row->start_date . ' 00:00:00 UTC' );
+    $today = strtotime( kounselia_growth_local_now( $row, 'Y-m-d' ) . ' 00:00:00 UTC' );
     return (int) floor( ( $today - $start ) / DAY_IN_SECONDS ) + 1;
+}
+
+/**
+ * Moves a running plan to the member's current time zone (they travelled,
+ * or we did not know it yet). The day they are on stays the same, so
+ * flying across the world never skips or repeats a day of the plan.
+ */
+function kounselia_growth_update_timezone( $user_id, $tz ) {
+    $tz  = kounselia_growth_clean_timezone( $tz );
+    $row = kounselia_growth_active_plan( $user_id );
+    if ( ! $tz || ! $row || $tz === (string) $row->timezone ) {
+        return;
+    }
+    $day   = kounselia_growth_day_number( $row );
+    $today = new DateTimeImmutable( 'now', new DateTimeZone( $tz ) );
+    global $wpdb;
+    $wpdb->update( kounselia_growth_table(), array(
+        'timezone'   => $tz,
+        'start_date' => $today->modify( '-' . ( $day - 1 ) . ' days' )->format( 'Y-m-d' ),
+    ), array( 'id' => $row->id ) );
 }
 
 /**
@@ -259,7 +309,8 @@ function kounselia_growth_format_plan( $row, $with_days = true ) {
         'streak'         => kounselia_growth_streak( $current, $done ),
         'today'          => $today,
         'counselor_slug' => kounselia_growth_counselor_slug(),
-        'remind_hour'    => (int) $row->remind_hour, // 0-23 in site time, -1 = off
+        'timezone'       => (string) $row->timezone,
+        'remind_hour'    => (int) $row->remind_hour, // 0-23 on the member's clock, -1 = off
         'reviews'        => array_values( kounselia_growth_reviews( $row ) ),
         'review_ready'   => kounselia_growth_next_review( $row ),
     );
@@ -484,7 +535,7 @@ function kounselia_growth_generate( $area_key, $answers, $first_name ) {
  * Starts a new plan for a member. Returns the new plan row's id, or a
  * WP_Error with a message the member can read.
  */
-function kounselia_growth_create_plan( $user_id, $area_key, $answers ) {
+function kounselia_growth_create_plan( $user_id, $area_key, $answers, $timezone = '' ) {
     if ( ! array_key_exists( $area_key, kounselia_growth_areas() ) ) {
         return new WP_Error( 'unknown_area', 'Please choose what you want to work on.' );
     }
@@ -508,6 +559,11 @@ function kounselia_growth_create_plan( $user_id, $area_key, $answers ) {
         return $plan;
     }
 
+    // The plan starts on the member's own calendar day.
+    $timezone = kounselia_growth_clean_timezone( $timezone );
+    $zone     = $timezone ? new DateTimeZone( $timezone ) : wp_timezone();
+    $today    = ( new DateTimeImmutable( 'now', $zone ) )->format( 'Y-m-d' );
+
     global $wpdb;
     $wpdb->insert( kounselia_growth_table(), array(
         'user_id'    => $user_id,
@@ -517,9 +573,10 @@ function kounselia_growth_create_plan( $user_id, $area_key, $answers ) {
         'answers'    => wp_json_encode( $answers ),
         'days'       => wp_json_encode( $plan['days'] ),
         'total_days' => count( $plan['days'] ),
-        'start_date' => current_time( 'Y-m-d' ),
+        'start_date' => $today,
+        'timezone'   => $timezone,
         // Day 1's task is on screen right now, so the first reminder is tomorrow's.
-        'last_reminded' => current_time( 'Y-m-d' ),
+        'last_reminded' => $today,
         'status'     => 'active',
         'created_at' => current_time( 'mysql' ),
     ) );
@@ -556,10 +613,14 @@ function kounselia_growth_set_day_done( $user_id, $plan_id, $day, $done ) {
 
 function kounselia_growth_end_plan( $user_id, $plan_id ) {
     global $wpdb;
+    $row = $wpdb->get_row( $wpdb->prepare( 'SELECT * FROM ' . kounselia_growth_table() . " WHERE id = %d AND user_id = %d AND status = 'active'", $plan_id, $user_id ) );
+    if ( ! $row ) {
+        return false;
+    }
     return (bool) $wpdb->update(
         kounselia_growth_table(),
-        array( 'status' => 'ended', 'ended_at' => current_time( 'mysql' ) ),
-        array( 'id' => (int) $plan_id, 'user_id' => $user_id, 'status' => 'active' )
+        array( 'status' => 'ended', 'ended_at' => kounselia_growth_local_now( $row, 'Y-m-d H:i:s' ) ),
+        array( 'id' => $row->id )
     );
 }
 
@@ -601,14 +662,19 @@ add_action( 'init', function () {
 function kounselia_growth_send_reminders() {
     global $wpdb;
     $table = kounselia_growth_table();
-    $today = current_time( 'Y-m-d' );
-    $rows  = $wpdb->get_results( $wpdb->prepare(
-        "SELECT * FROM {$table} WHERE status = 'active' AND remind_hour >= 0 AND remind_hour <= %d AND ( last_reminded IS NULL OR last_reminded < %s ) LIMIT 500",
-        (int) current_time( 'G' ),
-        $today
+    // Whose morning it is depends on where they live, so every plan with a
+    // reminder on (not yet reminded on a date that has already started
+    // somewhere on Earth) is checked against its own clock below.
+    $rows = $wpdb->get_results( $wpdb->prepare(
+        "SELECT * FROM {$table} WHERE status = 'active' AND remind_hour >= 0 AND ( last_reminded IS NULL OR last_reminded < %s ) LIMIT 5000",
+        gmdate( 'Y-m-d', time() + 14 * HOUR_IN_SECONDS )
     ) );
 
     foreach ( $rows as $row ) {
+        $today = kounselia_growth_local_now( $row, 'Y-m-d' );
+        if ( (int) kounselia_growth_local_now( $row, 'G' ) < (int) $row->remind_hour || ( $row->last_reminded && $row->last_reminded >= $today ) ) {
+            continue; // Not their time yet, or already reminded today.
+        }
         // Marked first, so an overlapping run can never send it twice.
         $wpdb->update( $table, array( 'last_reminded' => $today ), array( 'id' => $row->id ) );
 
@@ -860,6 +926,8 @@ function kounselia_growth_require_member() {
 
 function kounselia_ajax_growth_get() {
     $user_id = kounselia_growth_require_member();
+    // The phone or browser says where the member is, so days and reminders follow them.
+    kounselia_growth_update_timezone( $user_id, isset( $_POST['timezone'] ) ? sanitize_text_field( wp_unslash( $_POST['timezone'] ) ) : '' );
     wp_send_json_success( kounselia_growth_overview( $user_id ) );
 }
 add_action( 'wp_ajax_kounselia_growth_get', 'kounselia_ajax_growth_get' );
@@ -872,7 +940,7 @@ function kounselia_ajax_growth_create() {
     }
     $area    = isset( $_POST['area'] ) ? sanitize_key( wp_unslash( $_POST['area'] ) ) : '';
     $answers = json_decode( (string) wp_unslash( $_POST['answers'] ?? '{}' ), true );
-    $result  = kounselia_growth_create_plan( $user_id, $area, is_array( $answers ) ? $answers : array() );
+    $result  = kounselia_growth_create_plan( $user_id, $area, is_array( $answers ) ? $answers : array(), isset( $_POST['timezone'] ) ? sanitize_text_field( wp_unslash( $_POST['timezone'] ) ) : '' );
     if ( is_wp_error( $result ) ) {
         wp_send_json_error( array( 'message' => $result->get_error_message(), 'code' => $result->get_error_code() ), 'ai_failed' === $result->get_error_code() ? 503 : 400 );
     }
