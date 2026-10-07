@@ -110,7 +110,8 @@ export interface GrowthPlanSummary {
   streak: number;
   today: GrowthDay | null;
   counselor_slug: string; // who to talk to about the plan
-  remind_hour: number; // 0-23 in the site's time zone, -1 = off
+  timezone: string; // the member's own time zone, '' until we know it
+  remind_hour: number; // 0-23 on the member's clock, -1 = off
   reviews: GrowthReview[];
   review_ready: number | null; // the week that can be reviewed now (5 = the final days)
 }
@@ -153,11 +154,21 @@ export interface GrowthOverview {
   is_pro: boolean;
 }
 
-export const fetchGrowth = (config: KounseliaConfig) => call<GrowthOverview>(config, 'kounselia_growth_get');
+// Where the member is (like "Africa/Lagos"), so a plan's days and reminders
+// follow their own clock wherever they live. The phone or browser knows it.
+function deviceTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export const fetchGrowth = (config: KounseliaConfig) => call<GrowthOverview>(config, 'kounselia_growth_get', { timezone: deviceTimeZone() });
 
 // The AI takes a little while to write the plan; the default timeout already allows for it.
 export const createGrowthPlan = (config: KounseliaConfig, area: string, answers: Record<string, string>) =>
-  call<GrowthOverview>(config, 'kounselia_growth_create', { area, answers: JSON.stringify(answers) });
+  call<GrowthOverview>(config, 'kounselia_growth_create', { area, answers: JSON.stringify(answers), timezone: deviceTimeZone() });
 
 export const markGrowthDay = (config: KounseliaConfig, planId: number, day: number, done: boolean) =>
   call<{ plan: GrowthPlan | null }>(config, 'kounselia_growth_mark_day', { plan_id: planId, day, done: done ? 1 : 0 });
