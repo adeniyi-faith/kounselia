@@ -47,6 +47,42 @@ if ( $pro_application && 'client' !== ( $_GET['as'] ?? '' ) ) {
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_auth' );
 $dash_lang = function_exists( 'kounselia_current_language' ) ? kounselia_current_language( get_current_user_id() ) : 'en';
+$dash_dict = function_exists( 'kounselia_i18n_subset' ) ? kounselia_i18n_subset( $dash_lang, 'd.' ) : array();
+
+/** Date in the member's language (English keeps the WordPress format). $icu is the same format as an ICU pattern. */
+function kd_date( $ts, $php_format, $icu, $lang ) {
+    if ( 'en' === $lang || ! class_exists( 'IntlDateFormatter' ) ) {
+        return date_i18n( $php_format, $ts );
+    }
+    $fmt  = new IntlDateFormatter( $lang . '@numbers=latn', IntlDateFormatter::NONE, IntlDateFormatter::NONE, 'UTC', IntlDateFormatter::GREGORIAN, $icu );
+    $text = $fmt ? $fmt->format( $ts ) : false;
+    return false === $text ? date_i18n( $php_format, $ts ) : $text;
+}
+
+/** "3 hours ago" in the member's language. */
+function kd_ago( $from, $to, $lang ) {
+    $diff = max( 0, (int) $to - (int) $from );
+    if ( $diff < HOUR_IN_SECONDS ) {
+        $unit = 'mins'; $n = (int) round( $diff / MINUTE_IN_SECONDS );
+    } elseif ( $diff < DAY_IN_SECONDS ) {
+        $unit = 'hours'; $n = (int) round( $diff / HOUR_IN_SECONDS );
+    } elseif ( $diff < WEEK_IN_SECONDS ) {
+        $unit = 'days'; $n = (int) round( $diff / DAY_IN_SECONDS );
+    } elseif ( $diff < 30 * DAY_IN_SECONDS ) {
+        $unit = 'weeks'; $n = (int) round( $diff / WEEK_IN_SECONDS );
+    } elseif ( $diff < YEAR_IN_SECONDS ) {
+        $unit = 'months'; $n = (int) round( $diff / ( 30 * DAY_IN_SECONDS ) );
+    } else {
+        $unit = 'years'; $n = (int) round( $diff / YEAR_IN_SECONDS );
+    }
+    $n = max( 1, $n );
+    return kounselia_t( 'd.ago.' . $unit . ( 1 === $n ? '_one' : '_other' ), array( 'n' => $n ), $lang );
+}
+
+/** 12.5 -> "12.5", 20.0 -> "20". */
+function kd_pct( $value ) {
+    return rtrim( rtrim( number_format( (float) $value, 1 ), '0' ), '.' );
+}
 
 $available_plans     = function_exists( 'kounselia_get_plans' ) ? kounselia_get_plans( true ) : array();
 $user_subscription   = function_exists( 'kounselia_get_user_subscription' ) ? kounselia_get_user_subscription( $user->ID ) : null;
@@ -69,12 +105,12 @@ $latest_reflection_json = get_user_meta( $user->ID, 'kounselia_latest_reflection
 $reflection_date        = get_user_meta( $user->ID, 'kounselia_reflection_date', true );
 
 $hour = (int) current_time( 'G' );
-if ( $hour < 5 )       { $greeting = 'Still up,'; }
-elseif ( $hour < 12 )  { $greeting = 'Good morning,'; }
-elseif ( $hour < 17 )  { $greeting = 'Good afternoon,'; }
-else                   { $greeting = 'Good evening,'; }
+if ( $hour < 5 )       { $greeting = kounselia_t( 'd.greet.late', array(), $dash_lang ); }
+elseif ( $hour < 12 )  { $greeting = kounselia_t( 'd.greet.morning', array(), $dash_lang ); }
+elseif ( $hour < 17 )  { $greeting = kounselia_t( 'd.greet.afternoon', array(), $dash_lang ); }
+else                   { $greeting = kounselia_t( 'd.greet.evening', array(), $dash_lang ); }
 
-$member_since_label = date_i18n( 'F Y', strtotime( $stats['member_since'] ) );
+$member_since_label = kd_date( strtotime( $stats['member_since'] ), 'F Y', 'LLLL y', $dash_lang );
 
 // Fetch ALL unified counselors, then filter to only the active ones
 $all_ui = function_exists('kounselia_get_all_ui') ? kounselia_get_all_ui() : array();
@@ -93,11 +129,11 @@ list( $recommended_slug, $recommend_reason ) = kounselia_recommended_counselor( 
 $recommended = isset($counselors[$recommended_slug]) ? $counselors[$recommended_slug] : array('name' => 'Counselor', 'spec' => '', 'icon' => 'ti-heart', 'class' => 'ic-blue');
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html <?php echo function_exists( 'kounselia_html_attrs' ) ? kounselia_html_attrs() : 'lang="en"'; ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Your space — Kounselia</title>
+<title><?php echo esc_html( kounselia_t( 'd.page_title', array(), $dash_lang ) ); ?></title>
 <meta name="robots" content="noindex, nofollow">
 
 <!-- Favicon -->
@@ -105,7 +141,7 @@ $recommended = isset($counselors[$recommended_slug]) ? $counselors[$recommended_
 <link rel="apple-touch-icon" href="https://kounselia.com/img/fv.png">
 
 <!-- Open Graph fallback for protected pages -->
-<meta property="og:title" content="Your space — Kounselia">
+<meta property="og:title" content="<?php echo esc_attr( kounselia_t( 'd.page_title', array(), $dash_lang ) ); ?>">
 <meta property="og:image" content="https://kounselia.com/img/Kounselia_Banner_02_16_9.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://kounselia.com/img/Kounselia_Banner_02_16_9.png">
@@ -659,17 +695,17 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <a href="/dashboard.php" class="logo-link" style="display:inline-block; outline:none;">
           <img src="https://kounselia.com/img/Kounselia_Logo_IconMark_MidnightNavy.png" alt="Kounselia" class="site-logo" fetchpriority="high">
         </a>
-        <button id="notif-bell-desktop" onclick="openNotifications()" aria-label="Notifications" style="position:relative;background:none;border:none;cursor:pointer;color:var(--text2);padding:6px"><i class="ti ti-bell" style="font-size:19px"></i><span class="notif-dot" id="notif-dot-desktop" style="display:none"></span></button>
+        <button id="notif-bell-desktop" onclick="openNotifications()" aria-label="<?php echo esc_attr( kounselia_t( 'd.nav.notifications', array(), $dash_lang ) ); ?>" style="position:relative;background:none;border:none;cursor:pointer;color:var(--text2);padding:6px"><i class="ti ti-bell" style="font-size:19px"></i><span class="notif-dot" id="notif-dot-desktop" style="display:none"></span></button>
       </div>
       <nav class="side-nav">
-        <button class="nav-link js-nav active" id="desk-tab-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span>Home</span></button>
-        <button class="nav-link js-nav" id="desk-tab-sessions" onclick="switchTab('sessions')"><i class="ti ti-history"></i><span>Sessions</span></button>
-        <button class="nav-link js-nav" id="desk-tab-professionals" onclick="switchTab('professionals')"><i class="ti ti-calendar-event"></i><span>Book a professional</span></button>
+        <button class="nav-link js-nav active" id="desk-tab-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span><?php echo esc_html( kounselia_t( 'd.nav.home', array(), $dash_lang ) ); ?></span></button>
+        <button class="nav-link js-nav" id="desk-tab-sessions" onclick="switchTab('sessions')"><i class="ti ti-history"></i><span><?php echo esc_html( kounselia_t( 'd.nav.sessions', array(), $dash_lang ) ); ?></span></button>
+        <button class="nav-link js-nav" id="desk-tab-professionals" onclick="switchTab('professionals')"><i class="ti ti-calendar-event"></i><span><?php echo esc_html( kounselia_t( 'd.nav.book', array(), $dash_lang ) ); ?></span></button>
         <button class="nav-link js-nav" id="desk-tab-growth" onclick="switchTab('growth')"><i class="ti ti-plant-2"></i><span><?php echo esc_html( kounselia_t( 'growth.title', array(), $dash_lang ) ); ?></span></button>
-        <button class="nav-link js-nav" id="desk-tab-memory" onclick="switchTab('memory')"><i class="ti ti-brain"></i><span>Memory Profile</span></button>
-        <button class="nav-link js-nav" id="desk-tab-settings" onclick="switchTab('settings')"><i class="ti ti-settings"></i><span>Settings</span></button>
-        <button class="nav-link js-nav" id="desk-tab-upgrade" onclick="switchTab('upgrade')"><i class="ti ti-sparkles"></i><span>My plan</span></button>
-        <a class="nav-link" href="/talk.php" style="margin-top:16px;"><i class="ti ti-message-2-plus"></i><span>Talk to someone</span></a>
+        <button class="nav-link js-nav" id="desk-tab-memory" onclick="switchTab('memory')"><i class="ti ti-brain"></i><span><?php echo esc_html( kounselia_t( 'd.nav.memory', array(), $dash_lang ) ); ?></span></button>
+        <button class="nav-link js-nav" id="desk-tab-settings" onclick="switchTab('settings')"><i class="ti ti-settings"></i><span><?php echo esc_html( kounselia_t( 'd.nav.settings', array(), $dash_lang ) ); ?></span></button>
+        <button class="nav-link js-nav" id="desk-tab-upgrade" onclick="switchTab('upgrade')"><i class="ti ti-sparkles"></i><span><?php echo esc_html( kounselia_t( 'd.nav.plan', array(), $dash_lang ) ); ?></span></button>
+        <a class="nav-link" href="/talk.php" style="margin-top:16px;"><i class="ti ti-message-2-plus"></i><span><?php echo esc_html( kounselia_t( 'd.nav.talk', array(), $dash_lang ) ); ?></span></a>
       </nav>
     </div>
     <div class="side-foot">
@@ -677,10 +713,10 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="side-av" id="side-av"><?php echo $avatar_url ? '<img src="' . esc_url( $avatar_url ) . '" alt="">' : esc_html( $initial ); ?></div>
         <div class="side-user-meta">
           <div class="side-user-name"><?php echo esc_html( $display_name ); ?></div>
-          <div class="side-user-plan"><?php echo ( function_exists( 'kounselia_member_is_pro' ) && kounselia_member_is_pro( $user->ID ) ) ? 'Pro member' : 'Free plan'; ?></div>
+          <div class="side-user-plan"><?php echo ( function_exists( 'kounselia_member_is_pro' ) && kounselia_member_is_pro( $user->ID ) ) ? esc_html( kounselia_t( 'd.nav.pro_member', array(), $dash_lang ) ) : esc_html( kounselia_t( 'd.nav.free_plan', array(), $dash_lang ) ); ?></div>
         </div>
       </div>
-      <button class="signout-btn" onclick="signOut()"><i class="ti ti-logout"></i> Sign out</button>
+      <button class="signout-btn" onclick="signOut()"><i class="ti ti-logout"></i> <?php echo esc_html( kounselia_t( 'd.nav.sign_out', array(), $dash_lang ) ); ?></button>
     </div>
   </aside>
 
@@ -690,10 +726,10 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <img src="https://kounselia.com/img/Kounselia_Logo_IconMark_MidnightNavy.png" alt="Kounselia" style="max-height:24px; width:auto; object-fit:contain;" fetchpriority="high">
     </a>
     <div class="mobile-topbar-right">
-      <button class="mobile-signout" onclick="switchTab('professionals')" aria-label="Sessions with professionals" style="position:relative"><i class="ti ti-calendar-event"></i><?php if ( ! empty( $my_bookings ) ) : ?><span class="notif-dot" style="background:var(--gold)"></span><?php endif; ?></button>
-      <button class="mobile-signout" id="notif-bell" onclick="openNotifications()" aria-label="Notifications" style="position:relative"><i class="ti ti-bell"></i><span class="notif-dot" id="notif-dot" style="display:none"></span></button>
+      <button class="mobile-signout" onclick="switchTab('professionals')" aria-label="<?php echo esc_attr( kounselia_t( 'd.nav.pro_sessions', array(), $dash_lang ) ); ?>" style="position:relative"><i class="ti ti-calendar-event"></i><?php if ( ! empty( $my_bookings ) ) : ?><span class="notif-dot" style="background:var(--gold)"></span><?php endif; ?></button>
+      <button class="mobile-signout" id="notif-bell" onclick="openNotifications()" aria-label="<?php echo esc_attr( kounselia_t( 'd.nav.notifications', array(), $dash_lang ) ); ?>" style="position:relative"><i class="ti ti-bell"></i><span class="notif-dot" id="notif-dot" style="display:none"></span></button>
       <button class="mobile-av" id="mobile-av" onclick="switchTab('settings')"><?php echo $avatar_url ? '<img src="' . esc_url( $avatar_url ) . '" alt="">' : esc_html( $initial ); ?></button>
-      <button class="mobile-signout" onclick="signOut()" aria-label="Sign out"><i class="ti ti-logout"></i></button>
+      <button class="mobile-signout" onclick="signOut()" aria-label="<?php echo esc_attr( kounselia_t( 'd.nav.sign_out', array(), $dash_lang ) ); ?>"><i class="ti ti-logout"></i></button>
     </div>
   </header>
 
@@ -704,12 +740,12 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 
     <section class="welcome">
       <div class="welcome-orb"></div>
-      <div class="welcome-eyebrow">Your space</div>
+      <div class="welcome-eyebrow"><?php echo esc_html( kounselia_t( 'd.home.eyebrow', array(), $dash_lang ) ); ?></div>
       <h1><?php echo esc_html( $greeting ); ?> <em><?php echo esc_html( $first_name ); ?></em>.</h1>
-      <p>This is where everything you bring to Kounselia lives, your conversations, your people, your pace. Nothing here is urgent. Come back whenever you need to.</p>
+      <p><?php echo esc_html( kounselia_t( 'd.home.intro', array(), $dash_lang ) ); ?></p>
       <div class="welcome-actions">
-        <a class="btn-w primary" href="/talk.php"><i class="ti ti-message-2-plus"></i> Talk to someone now</a>
-        <button class="btn-w ghost" onclick="switchTab('sessions')"><i class="ti ti-history"></i> View your sessions</button>
+        <a class="btn-w primary" href="/talk.php"><i class="ti ti-message-2-plus"></i> <?php echo esc_html( kounselia_t( 'd.home.talk_now', array(), $dash_lang ) ); ?></a>
+        <button class="btn-w ghost" onclick="switchTab('sessions')"><i class="ti ti-history"></i> <?php echo esc_html( kounselia_t( 'd.home.view_sessions', array(), $dash_lang ) ); ?></button>
       </div>
     </section>
 
@@ -719,16 +755,16 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         echo 'verified' === $pro_application->status ? 'ti-check' : ( 'rejected' === $pro_application->status ? 'ti-x' : 'ti-clock' );
       ?>"></i></div>
       <div class="rec-meta">
-        <h3>You're viewing your client dashboard</h3>
+        <h3><?php echo esc_html( kounselia_t( 'd.pro.viewing_client', array(), $dash_lang ) ); ?></h3>
         <?php if ( 'pending' === $pro_application->status ) : ?>
-          <p class="reason">Your professional application is under review — we'll email you once there's a decision.</p>
+          <p class="reason"><?php echo esc_html( kounselia_t( 'd.pro.pending', array(), $dash_lang ) ); ?></p>
         <?php elseif ( 'verified' === $pro_application->status ) : ?>
-          <p class="reason">Your professional profile is verified and live for clients.</p>
+          <p class="reason"><?php echo esc_html( kounselia_t( 'd.pro.verified', array(), $dash_lang ) ); ?></p>
         <?php else : ?>
-          <p class="reason">Your professional application wasn't approved<?php echo $pro_application->rejection_reason ? ' — ' . esc_html( $pro_application->rejection_reason ) : ''; ?>. You can update your documents and reapply.</p>
+          <p class="reason"><?php echo esc_html( $pro_application->rejection_reason ? kounselia_t( 'd.pro.rejected_reason', array( 'reason' => $pro_application->rejection_reason ), $dash_lang ) : kounselia_t( 'd.pro.rejected', array(), $dash_lang ) ); ?></p>
         <?php endif; ?>
       </div>
-      <a class="btn-rec secondary" href="/pro-dashboard.php"><i class="ti ti-switch-horizontal" style="margin-right:6px;"></i>Switch back</a>
+      <a class="btn-rec secondary" href="/pro-dashboard.php"><i class="ti ti-switch-horizontal" style="margin-right:6px;"></i><?php echo esc_html( kounselia_t( 'd.pro.switch_back', array(), $dash_lang ) ); ?></a>
     </section>
     <?php endif; ?>
 
@@ -739,12 +775,12 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     <section class="rec-card" id="checkin-card" style="margin-bottom:20px;">
       <div class="rec-av <?php echo esc_attr( $checkin_counselor['class'] ); ?>"><i class="ti <?php echo esc_attr( $checkin_counselor['icon'] ); ?>"></i></div>
       <div class="rec-meta">
-        <h3><?php echo esc_html( $checkin_counselor['name'] ); ?> wants to check in</h3>
-        <p class="reason">You mentioned "<?php echo esc_html( $next_checkin->event_text ); ?>" — how did it go?</p>
+        <h3><?php echo esc_html( kounselia_t( 'd.checkin.title', array('name' => $checkin_counselor['name']), $dash_lang ) ); ?></h3>
+        <p class="reason"><?php echo esc_html( kounselia_t( 'd.checkin.body', array('event' => $next_checkin->event_text), $dash_lang ) ); ?></p>
       </div>
       <div style="display:flex;flex-direction:column;gap:8px;align-items:flex-end;">
-        <a class="btn-rec" href="/talk.php?checkin=<?php echo (int) $next_checkin->id; ?>#<?php echo esc_attr( $checkin_slug ); ?>">Tell them</a>
-        <button type="button" onclick="dismissCheckin(<?php echo (int) $next_checkin->id; ?>)" style="background:none;border:none;color:var(--text3,#8a8578);font-size:12px;cursor:pointer;font-family:inherit;padding:2px;">Not now</button>
+        <a class="btn-rec" href="/talk.php?checkin=<?php echo (int) $next_checkin->id; ?>#<?php echo esc_attr( $checkin_slug ); ?>"><?php echo esc_html( kounselia_t( 'd.checkin.tell', array(), $dash_lang ) ); ?></a>
+        <button type="button" onclick="dismissCheckin(<?php echo (int) $next_checkin->id; ?>)" style="background:none;border:none;color:var(--text3,#8a8578);font-size:12px;cursor:pointer;font-family:inherit;padding:2px;"><?php echo esc_html( kounselia_t( 'd.checkin.not_now', array(), $dash_lang ) ); ?></button>
       </div>
     </section>
     <?php endif; ?>
@@ -770,14 +806,14 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 
     <section class="mood-card">
       <div class="mood-head">
-        <h3>How are you feeling today?</h3>
-        <span class="mood-saved-tag" id="mood-saved-tag" style="<?php echo $today_mood ? '' : 'display:none'; ?>"><i class="ti ti-check"></i> Saved</span>
+        <h3><?php echo esc_html( kounselia_t( 'd.mood.title', array(), $dash_lang ) ); ?></h3>
+        <span class="mood-saved-tag" id="mood-saved-tag" style="<?php echo $today_mood ? '' : 'display:none'; ?>"><i class="ti ti-check"></i> <?php echo esc_html( kounselia_t( 'd.mood.saved', array(), $dash_lang ) ); ?></span>
       </div>
       <div class="mood-options" id="mood-options">
         <?php foreach ( $mood_options as $key => $m ) : ?>
         <button class="mood-btn <?php echo esc_attr( $m['class'] ); ?> <?php echo ( $today_mood === $key ) ? 'selected' : ''; ?>" data-mood="<?php echo esc_attr( $key ); ?>" onclick="saveMood('<?php echo esc_js( $key ); ?>')">
           <i class="ti <?php echo esc_attr( $m['icon'] ); ?>"></i>
-          <span><?php echo esc_html( $m['label'] ); ?></span>
+          <span><?php $kd_mk = 'd.mood.' . $key; $kd_ml = kounselia_t( $kd_mk, array(), $dash_lang ); echo esc_html( $kd_ml === $kd_mk ? $m['label'] : $kd_ml ); ?></span>
         </button>
         <?php endforeach; ?>
       </div>
@@ -785,7 +821,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <?php foreach ( $recent_moods as $day ) :
             $is_filled  = ! empty( $day['mood'] ) && isset( $mood_options[ $day['mood'] ] );
             $dot_class  = $is_filled ? esc_attr( $mood_options[ $day['mood'] ]['class'] ) : '';
-            $day_letter = mb_substr( date_i18n( 'D', strtotime( $day['date'] ) ), 0, 1 );
+            $day_letter = 'en' === $dash_lang ? mb_substr( date_i18n( 'D', strtotime( $day['date'] ) ), 0, 1 ) : kd_date( strtotime( $day['date'] ), 'D', 'ccccc', $dash_lang );
         ?>
         <div class="rhythm-day">
           <div class="rhythm-dot <?php echo $dot_class; ?> <?php echo $is_filled ? 'filled' : ''; ?>"></div>
@@ -799,24 +835,24 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <div class="stat-card">
         <div class="stat-icon ic-blue"><i class="ti ti-message-circle"></i></div>
         <div class="stat-num"><?php echo (int) $stats['total_sessions']; ?></div>
-        <div class="stat-label">Conversations</div>
+        <div class="stat-label"><?php echo esc_html( kounselia_t( 'd.stats.conversations', array(), $dash_lang ) ); ?></div>
       </div>
       <div class="stat-card">
         <div class="stat-icon ic-sage"><i class="ti ti-calendar-week"></i></div>
         <div class="stat-num"><?php echo (int) $stats['messages_this_week']; ?></div>
-        <div class="stat-label">Messages this week</div>
+        <div class="stat-label"><?php echo esc_html( kounselia_t( 'd.stats.messages_week', array(), $dash_lang ) ); ?></div>
       </div>
       <div class="stat-card">
         <div class="stat-icon ic-gold"><i class="ti ti-users"></i></div>
         <div class="stat-num"><?php echo (int) $stats['counselors_met']; ?></div>
-        <div class="stat-label">Counselors met</div>
+        <div class="stat-label"><?php echo esc_html( kounselia_t( 'd.stats.counselors_met', array(), $dash_lang ) ); ?></div>
       </div>
     </section>
 
     <section class="section">
       <div class="section-head">
-        <h2>Recommended for you</h2>
-        <span class="section-sub">Member since <?php echo esc_html( $member_since_label ); ?></span>
+        <h2><?php echo esc_html( kounselia_t( 'd.home.recommended', array(), $dash_lang ) ); ?></h2>
+        <span class="section-sub"><?php echo esc_html( kounselia_t( 'd.home.member_since', array('date' => $member_since_label), $dash_lang ) ); ?></span>
       </div>
       <div class="rec-card">
         <div class="rec-av <?php echo esc_attr( $recommended['class'] ); ?>"><i class="ti <?php echo esc_attr( $recommended['icon'] ); ?>"></i></div>
@@ -825,43 +861,43 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
           <p class="spec"><?php echo esc_html( $recommended['spec'] ); ?></p>
           <p class="reason"><?php echo esc_html( $recommend_reason ); ?></p>
         </div>
-        <a class="btn-rec" href="/talk.php#<?php echo esc_attr( $recommended_slug ); ?>">Start talking</a>
+        <a class="btn-rec" href="/talk.php#<?php echo esc_attr( $recommended_slug ); ?>"><?php echo esc_html( kounselia_t( 'd.home.start_talking', array(), $dash_lang ) ); ?></a>
       </div>
     </section>
 
     <section class="section">
       <div class="section-head">
-        <h2>Today's reflection</h2>
-        <span class="section-sub">Private, never shared</span>
+        <h2><?php echo esc_html( kounselia_t( 'd.home.reflection_title', array(), $dash_lang ) ); ?></h2>
+        <span class="section-sub"><?php echo esc_html( kounselia_t( 'd.home.reflection_sub', array(), $dash_lang ) ); ?></span>
       </div>
       <div class="journal-card">
-        <textarea id="journal-text" placeholder="What's on your mind today? This stays just between you and this page."><?php echo esc_textarea( $today_journal ? $today_journal : '' ); ?></textarea>
+        <textarea id="journal-text" placeholder="<?php echo esc_attr( kounselia_t( 'd.home.reflection_ph', array(), $dash_lang ) ); ?>"><?php echo esc_textarea( $today_journal ? $today_journal : '' ); ?></textarea>
         <div class="journal-foot">
           <span class="inline-msg" id="journal-msg"></span>
-          <button class="btn-save" id="journal-save">Save reflection</button>
+          <button class="btn-save" id="journal-save"><?php echo esc_html( kounselia_t( 'd.home.save_reflection', array(), $dash_lang ) ); ?></button>
         </div>
       </div>
     </section>
 
     <section class="section" id="insights-sec">
       <div class="section-head">
-        <h2>Reflection Engine</h2>
-        <span class="section-sub">Your deep psychological patterns</span>
+        <h2><?php echo esc_html( kounselia_t( 'd.engine.title', array(), $dash_lang ) ); ?></h2>
+        <span class="section-sub"><?php echo esc_html( kounselia_t( 'd.engine.sub', array(), $dash_lang ) ); ?></span>
       </div>
       <div class="memory-card">
-        <p class="sub" style="margin-bottom:16px;">Every 10 sessions, Kounselia's analytical engine reads your Memory Profile and looks for deeper patterns, blind spots, and growth.</p>
+        <p class="sub" style="margin-bottom:16px;"><?php echo esc_html( kounselia_t( 'd.engine.body', array(), $dash_lang ) ); ?></p>
         
         <button class="generate-insight-btn" id="btn-gen-insight" onclick="generateInsights()">
           <i class="ti ti-bulb"></i>
-          <span>Generate Milestone Reflection</span>
+          <span><?php echo esc_html( kounselia_t( 'd.engine.generate', array(), $dash_lang ) ); ?></span>
         </button>
         <?php if ( $kounselia_reflection_allowance && $kounselia_reflection_allowance['limit'] ) : ?>
-          <p class="reflection-allowance" id="reflection-allowance"><?php echo (int) $kounselia_reflection_allowance['remaining']; ?> of <?php echo (int) $kounselia_reflection_allowance['limit']; ?> left this month · <a href="javascript:void(0)" onclick="switchTab('upgrade')">Unlimited with Pro</a></p>
+          <p class="reflection-allowance" id="reflection-allowance"><?php echo esc_html( kounselia_t( 'd.engine.allowance', array( 'remaining' => (int) $kounselia_reflection_allowance['remaining'], 'limit' => (int) $kounselia_reflection_allowance['limit'] ), $dash_lang ) ); ?> · <a href="javascript:void(0)" onclick="switchTab('upgrade')"><?php echo esc_html( kounselia_t( 'd.engine.unlimited', array(), $dash_lang ) ); ?></a></p>
         <?php endif; ?>
 
         <div id="insight-ui" class="insight-wrapper">
           <div class="insight-header">
-            <h3>Your Milestone Report</h3>
+            <h3><?php echo esc_html( kounselia_t( 'd.engine.report_title', array(), $dash_lang ) ); ?></h3>
             <p id="insight-date"></p>
           </div>
           <div class="insight-grid" id="insight-grid"></div>
@@ -874,12 +910,12 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
   <!-- SESSIONS PANEL -->
   <div class="view-panel" id="view-sessions">
     <section class="section">
-      <div class="section-head"><h2>Recent sessions</h2></div>
+      <div class="section-head"><h2><?php echo esc_html( kounselia_t( 'd.sessions.title', array(), $dash_lang ) ); ?></h2></div>
       <?php if ( empty( $recent_sessions ) ) : ?>
         <div class="empty-state">
           <i class="ti ti-feather"></i>
-          <p>Your story starts with one conversation. Nothing saved here yet.</p>
-          <a class="btn-w primary" style="background:var(--accent);color:#fff;display:inline-flex;border:none;cursor:pointer" href="/talk.php"><i class="ti ti-message-2-plus"></i> Start session</a>
+          <p><?php echo esc_html( kounselia_t( 'd.sessions.empty', array(), $dash_lang ) ); ?></p>
+          <a class="btn-w primary" style="background:var(--accent);color:#fff;display:inline-flex;border:none;cursor:pointer" href="/talk.php"><i class="ti ti-message-2-plus"></i> <?php echo esc_html( kounselia_t( 'd.sessions.start', array(), $dash_lang ) ); ?></a>
         </div>
       <?php else : ?>
         <?php foreach ( $recent_sessions as $s ) :
@@ -889,9 +925,9 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
           <div class="session-av <?php echo esc_attr( $c['class'] ); ?>"><i class="ti <?php echo esc_attr( $c['icon'] ); ?>"></i></div>
           <div class="session-meta">
             <h4><?php echo esc_html( $c['name'] ); ?></h4>
-            <p><?php echo (int) $s->message_count; ?> msgs · <?php echo esc_html( human_time_diff( strtotime( $s->last_message_at ? $s->last_message_at : $s->started_at ), current_time( 'timestamp' ) ) ); ?> ago</p>
+            <p><?php echo esc_html( kounselia_t( 'd.sessions.meta', array( 'count' => (int) $s->message_count, 'ago' => kd_ago( strtotime( $s->last_message_at ? $s->last_message_at : $s->started_at ), current_time( 'timestamp' ), $dash_lang ) ), $dash_lang ) ); ?></p>
           </div>
-          <a class="session-link" href="/talk.php#<?php echo esc_attr( $s->counselor_slug ); ?>">Continue →</a>
+          <a class="session-link" href="/talk.php#<?php echo esc_attr( $s->counselor_slug ); ?>"><?php echo esc_html( kounselia_t( 'd.sessions.continue', array(), $dash_lang ) ); ?></a>
         </div>
         <?php endforeach; ?>
       <?php endif; ?>
@@ -902,12 +938,12 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
   <div class="view-panel" id="view-professionals">
     <section class="section">
       <div class="section-head">
-        <h2>Your upcoming sessions</h2>
+        <h2><?php echo esc_html( kounselia_t( 'd.pros.upcoming', array(), $dash_lang ) ); ?></h2>
       </div>
       <?php if ( empty( $my_bookings ) ) : ?>
         <div class="empty-state">
           <i class="ti ti-calendar-event"></i>
-          <p>No sessions booked yet. Find a licensed professional below and pick a time that works for you.</p>
+          <p><?php echo esc_html( kounselia_t( 'd.pros.none', array(), $dash_lang ) ); ?></p>
         </div>
       <?php else : ?>
         <div id="my-booking-list">
@@ -916,18 +952,18 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <div class="session-row booking-session-row" data-booking-id="<?php echo (int) $booking->id; ?>">
           <div class="session-av ic-gold"><i class="ti ti-calendar-event"></i></div>
           <div class="session-meta">
-            <h4><?php echo esc_html( $booking->pro_name ); ?><?php echo $booking->pro_title ? ' · ' . esc_html( $booking->pro_title ) : ''; ?><?php if ( $booking->series_id ) : ?><span class="weekly-tag">Weekly</span><?php endif; ?><?php if ( ! empty( $booking->is_free ) ) : ?><span class="weekly-tag" style="color:var(--sage);background:var(--sage-light)">Free</span><?php endif; ?><?php $kounselia_where = function_exists( 'kounselia_booking_video' ) ? kounselia_booking_video( $booking ) : null; if ( $kounselia_where && $kounselia_where['external'] ) : ?><span class="weekly-tag" title="Press Join here when it's time">On <?php echo esc_html( $kounselia_where['provider'] ); ?></span><?php endif; ?></h4>
-            <p><?php echo esc_html( date_i18n( 'D, M j — g:i A', strtotime( $booking->scheduled_start ) ) ); ?></p>
+            <h4><?php echo esc_html( $booking->pro_name ); ?><?php echo $booking->pro_title ? ' · ' . esc_html( $booking->pro_title ) : ''; ?><?php if ( $booking->series_id ) : ?><span class="weekly-tag"><?php echo esc_html( kounselia_t( 'd.pros.weekly', array(), $dash_lang ) ); ?></span><?php endif; ?><?php if ( ! empty( $booking->is_free ) ) : ?><span class="weekly-tag" style="color:var(--sage);background:var(--sage-light)"><?php echo esc_html( kounselia_t( 'd.pros.free', array(), $dash_lang ) ); ?></span><?php endif; ?><?php $kounselia_where = function_exists( 'kounselia_booking_video' ) ? kounselia_booking_video( $booking ) : null; if ( $kounselia_where && $kounselia_where['external'] ) : ?><span class="weekly-tag" title="<?php echo esc_attr( kounselia_t( 'd.pros.press_join', array(), $dash_lang ) ); ?>"><?php echo esc_html( kounselia_t( 'd.pros.on_provider', array('provider' => $kounselia_where['provider']), $dash_lang ) ); ?></span><?php endif; ?></h4>
+            <p><?php echo esc_html( kd_date( strtotime( $booking->scheduled_start ), 'D, M j — g:i A', 'EEE, d MMM — HH:mm', $dash_lang ) ); ?></p>
           </div>
           <div class="booking-actions">
             <?php if ( $can_join ) : ?>
-              <a class="session-link booking-join" href="/video-call.php?booking_id=<?php echo (int) $booking->id; ?>"><i class="ti ti-video"></i> Join</a>
+              <a class="session-link booking-join" href="/video-call.php?booking_id=<?php echo (int) $booking->id; ?>"><i class="ti ti-video"></i> <?php echo esc_html( kounselia_t( 'd.pros.join', array(), $dash_lang ) ); ?></a>
             <?php endif; ?>
-            <a class="session-link js-booking-chat" href="javascript:void(0)" data-booking-id="<?php echo (int) $booking->id; ?>" data-other-name="<?php echo esc_attr( $booking->pro_name ); ?>">Message</a>
-            <a class="session-link js-reschedule" href="javascript:void(0)" data-booking-id="<?php echo (int) $booking->id; ?>" data-pro-id="<?php echo (int) $booking->professional_id; ?>" data-other-name="<?php echo esc_attr( $booking->pro_name ); ?>">Reschedule</a>
-            <a class="session-link" href="javascript:void(0)" onclick="cancelMyBooking(<?php echo (int) $booking->id; ?>, this)">Cancel</a>
+            <a class="session-link js-booking-chat" href="javascript:void(0)" data-booking-id="<?php echo (int) $booking->id; ?>" data-other-name="<?php echo esc_attr( $booking->pro_name ); ?>"><?php echo esc_html( kounselia_t( 'd.pros.message', array(), $dash_lang ) ); ?></a>
+            <a class="session-link js-reschedule" href="javascript:void(0)" data-booking-id="<?php echo (int) $booking->id; ?>" data-pro-id="<?php echo (int) $booking->professional_id; ?>" data-other-name="<?php echo esc_attr( $booking->pro_name ); ?>"><?php echo esc_html( kounselia_t( 'd.pros.reschedule', array(), $dash_lang ) ); ?></a>
+            <a class="session-link" href="javascript:void(0)" onclick="cancelMyBooking(<?php echo (int) $booking->id; ?>, this)"><?php echo esc_html( kounselia_t( 'd.common.cancel', array(), $dash_lang ) ); ?></a>
             <?php if ( $booking->series_id ) : ?>
-              <a class="session-link" href="javascript:void(0)" onclick="cancelMySeries(<?php echo (int) $booking->series_id; ?>, this)" style="color:var(--rose)">Cancel weekly</a>
+              <a class="session-link" href="javascript:void(0)" onclick="cancelMySeries(<?php echo (int) $booking->series_id; ?>, this)" style="color:var(--rose)"><?php echo esc_html( kounselia_t( 'd.pros.cancel_weekly', array(), $dash_lang ) ); ?></a>
             <?php endif; ?>
           </div>
         </div>
@@ -939,7 +975,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     <?php if ( ! empty( $past_bookings ) ) : ?>
     <section class="section">
       <div class="section-head">
-        <h2>Past sessions</h2>
+        <h2><?php echo esc_html( kounselia_t( 'd.pros.past', array(), $dash_lang ) ); ?></h2>
       </div>
       <div id="past-booking-list">
         <?php foreach ( $past_bookings as $booking ) : ?>
@@ -947,12 +983,12 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
           <div class="session-av ic-blue"><i class="ti ti-check"></i></div>
           <div class="session-meta">
             <h4><?php echo esc_html( $booking->pro_name ); ?><?php echo $booking->pro_title ? ' · ' . esc_html( $booking->pro_title ) : ''; ?></h4>
-            <p><?php echo esc_html( date_i18n( 'D, M j, Y', strtotime( $booking->scheduled_start ) ) ); ?></p>
+            <p><?php echo esc_html( kd_date( strtotime( $booking->scheduled_start ), 'D, M j, Y', 'EEE, d MMM y', $dash_lang ) ); ?></p>
           </div>
           <?php if ( $booking->review_id ) : ?>
             <span class="session-link" style="color:var(--gold)"><?php echo str_repeat( '★', (int) $booking->review_rating ) . str_repeat( '☆', 5 - (int) $booking->review_rating ); ?></span>
           <?php else : ?>
-            <a class="session-link js-rate-session" href="javascript:void(0)" data-booking-id="<?php echo (int) $booking->id; ?>" data-other-name="<?php echo esc_attr( $booking->pro_name ); ?>">Rate this session</a>
+            <a class="session-link js-rate-session" href="javascript:void(0)" data-booking-id="<?php echo (int) $booking->id; ?>" data-other-name="<?php echo esc_attr( $booking->pro_name ); ?>"><?php echo esc_html( kounselia_t( 'd.pros.rate', array(), $dash_lang ) ); ?></a>
           <?php endif; ?>
         </div>
         <?php endforeach; ?>
@@ -962,13 +998,13 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 
     <section class="section">
       <div class="section-head">
-        <h2>Find a professional</h2>
-        <span class="section-sub">Licensed and verified by Kounselia</span>
+        <h2><?php echo esc_html( kounselia_t( 'd.pros.find', array(), $dash_lang ) ); ?></h2>
+        <span class="section-sub"><?php echo esc_html( kounselia_t( 'd.pros.licensed', array(), $dash_lang ) ); ?></span>
       </div>
       <?php if ( empty( $verified_professionals ) ) : ?>
         <div class="empty-state">
           <i class="ti ti-users"></i>
-          <p>No verified professionals are available to book just yet. Check back soon.</p>
+          <p><?php echo esc_html( kounselia_t( 'd.pros.none_available', array(), $dash_lang ) ); ?></p>
         </div>
       <?php else : ?>
         <div class="counselor-grid">
@@ -985,9 +1021,9 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
             <div class="tile-name"><?php echo esc_html( $pro->display_name ); ?></div>
             <div class="tile-spec"><?php echo esc_html( $pro->title ); ?><?php echo $pro->specialty ? ' · ' . esc_html( $pro->specialty ) : ''; ?></div>
             <?php if ( $pro_rating['count'] > 0 ) : ?>
-              <div class="tile-spec" style="margin-top:4px;color:var(--gold)">★ <?php echo esc_html( number_format( $pro_rating['average'], 1 ) ); ?> <span style="color:var(--text3)">(<?php echo (int) $pro_rating['count']; ?> review<?php echo 1 === $pro_rating['count'] ? '' : 's'; ?>)</span></div>
+              <div class="tile-spec" style="margin-top:4px;color:var(--gold)">★ <?php echo esc_html( number_format( $pro_rating['average'], 1 ) ); ?> <span style="color:var(--text3)">(<?php echo esc_html( kounselia_t( 1 === (int) $pro_rating['count'] ? 'd.pros.reviews_one' : 'd.pros.reviews_other', array( 'n' => (int) $pro_rating['count'] ), $dash_lang ) ); ?>)</span></div>
             <?php else : ?>
-              <div class="tile-spec" style="margin-top:4px;color:var(--text3)">No reviews yet</div>
+              <div class="tile-spec" style="margin-top:4px;color:var(--text3)"><?php echo esc_html( kounselia_t( 'd.pros.no_reviews', array(), $dash_lang ) ); ?></div>
             <?php endif; ?>
             <?php if ( $kounselia_free_left ) : ?>
               <div class="tile-spec" style="margin-top:6px;font-weight:600;color:var(--sage)">🎁 <?php echo esc_html( kounselia_free_sessions_label( $pro, $user->ID ) ); ?></div>
@@ -997,9 +1033,9 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
                   // Shown in the viewer's currency, with the Pro discount (if any) applied.
                   $kounselia_full  = kounselia_convert_ngn( $pro->rate_amount, $viewer_currency );
                   $kounselia_price = round( $kounselia_full * ( 1 - (float) $kounselia_session_discount / 100 ), 2 );
-                  echo esc_html( kounselia_format_money( $kounselia_price, $viewer_currency ) ) . ' / session';
+                  echo esc_html( kounselia_t( 'd.pros.per_session', array( 'price' => kounselia_format_money( $kounselia_price, $viewer_currency ) ), $dash_lang ) );
                   if ( $kounselia_price < $kounselia_full ) {
-                      echo ' <s style="color:var(--text3);font-weight:400">' . esc_html( kounselia_format_money( $kounselia_full, $viewer_currency ) ) . '</s> <span style="color:var(--gold);font-weight:500">Pro price</span>';
+                      echo ' <s style="color:var(--text3);font-weight:400">' . esc_html( kounselia_format_money( $kounselia_full, $viewer_currency ) ) . '</s> <span style="color:var(--gold);font-weight:500">' . esc_html( kounselia_t( 'd.pros.pro_price', array(), $dash_lang ) ) . '</span>';
                   }
               }
             ?></div>
@@ -1014,8 +1050,8 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
   <div class="view-panel" id="view-talk">
     <section class="section">
       <div class="section-head">
-        <h2>Talk to someone</h2>
-        <span class="section-sub">Pick whoever fits right now</span>
+        <h2><?php echo esc_html( kounselia_t( 'd.nav.talk', array(), $dash_lang ) ); ?></h2>
+        <span class="section-sub"><?php echo esc_html( kounselia_t( 'd.talk.sub', array(), $dash_lang ) ); ?></span>
       </div>
       <div class="counselor-grid">
         <?php foreach ( $counselors as $slug => $c ) : ?>
@@ -1030,7 +1066,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     <section class="section">
       <button type="button" class="talk-human" onclick="switchTab('professionals')">
         <span class="talk-human-icon"><i class="ti ti-user-heart"></i></span>
-        <span class="talk-human-copy"><b>Prefer a real person?</b><small>Book a video session with a licensed professional<?php echo $kounselia_session_discount ? ' — ' . esc_html( rtrim( rtrim( number_format( (float) $kounselia_session_discount, 1 ), '0' ), '.' ) ) . '% off with Pro' : ''; ?>.</small></span>
+        <span class="talk-human-copy"><b><?php echo esc_html( kounselia_t( 'd.talk.prefer_real', array(), $dash_lang ) ); ?></b><small><?php echo $kounselia_session_discount ? esc_html( kounselia_t( 'd.talk.book_video_off', array( 'pct' => kd_pct( $kounselia_session_discount ) ), $dash_lang ) ) : esc_html( kounselia_t( 'd.talk.book_video', array(), $dash_lang ) ); ?></small></span>
         <i class="ti ti-chevron-right"></i>
       </button>
     </section>
@@ -1039,7 +1075,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
   <!-- SETTINGS PANEL -->
   <div class="view-panel" id="view-settings">
     <section class="section">
-      <div class="section-head"><h2>Profile and settings</h2></div>
+      <div class="section-head"><h2><?php echo esc_html( kounselia_t( 'd.settings.title', array(), $dash_lang ) ); ?></h2></div>
       <div class="settings-grid">
         <div class="avatar-card">
           <div class="avatar-wrap">
@@ -1055,7 +1091,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
           
           <!-- Mobile-only fast link to Memory -->
           <button class="btn-w outline" onclick="switchTab('memory')" style="width:100%; justify-content:center; margin-top:24px; display:flex;">
-            <i class="ti ti-brain"></i> Manage Memory Profile
+            <i class="ti ti-brain"></i> <?php echo esc_html( kounselia_t( 'd.settings.manage_memory', array(), $dash_lang ) ); ?>
           </button>
 
           <?php if ( function_exists( 'kounselia_languages' ) ) : ?>
@@ -1074,39 +1110,39 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 
         <div class="settings-stack">
           <div class="settings-card">
-            <h4>Display name</h4>
+            <h4><?php echo esc_html( kounselia_t( 'd.settings.display_name', array(), $dash_lang ) ); ?></h4>
             <div class="form-field">
-              <label>Full name</label>
+              <label><?php echo esc_html( kounselia_t( 'd.settings.full_name', array(), $dash_lang ) ); ?></label>
               <input type="text" id="name-input" value="<?php echo esc_attr( $display_name ); ?>">
             </div>
-            <button class="btn-save" id="name-save">Save changes</button>
+            <button class="btn-save" id="name-save"><?php echo esc_html( kounselia_t( 'd.settings.save_changes', array(), $dash_lang ) ); ?></button>
             <div class="inline-msg" id="name-msg"></div>
           </div>
 
           <div class="settings-card">
-            <h4>Password</h4>
+            <h4><?php echo esc_html( kounselia_t( 'd.settings.password', array(), $dash_lang ) ); ?></h4>
             <div class="form-field">
-              <label>Current password</label>
+              <label><?php echo esc_html( kounselia_t( 'd.settings.current_pw', array(), $dash_lang ) ); ?></label>
               <input type="password" id="pw-current" autocomplete="current-password">
             </div>
             <div class="form-field">
-              <label>New password</label>
+              <label><?php echo esc_html( kounselia_t( 'd.settings.new_pw', array(), $dash_lang ) ); ?></label>
               <input type="password" id="pw-new" autocomplete="new-password">
             </div>
             <div class="form-field">
-              <label>Confirm new password</label>
+              <label><?php echo esc_html( kounselia_t( 'd.settings.confirm_pw', array(), $dash_lang ) ); ?></label>
               <input type="password" id="pw-confirm" autocomplete="new-password">
             </div>
-            <button class="btn-save" id="pw-save">Update password</button>
+            <button class="btn-save" id="pw-save"><?php echo esc_html( kounselia_t( 'd.settings.update_pw', array(), $dash_lang ) ); ?></button>
             <div class="inline-msg" id="pw-msg"></div>
           </div>
 
           <div class="settings-card">
-            <h4>Email preferences</h4>
-            <label class="email-pref"><input type="checkbox" id="pref-newsletter"> <span><b>Newsletter</b><small>Occasional ideas for looking after your mind, and news from Kounselia.</small></span></label>
-            <label class="email-pref"><input type="checkbox" id="pref-blog"> <span><b>New blog posts</b><small>A short email when a new story is published on the journal.</small></span></label>
-            <p class="email-pref-note">Emails about your account, like booking confirmations and reminders, are always sent.</p>
-            <button class="btn-save" id="pref-save">Save preferences</button>
+            <h4><?php echo esc_html( kounselia_t( 'd.settings.email_prefs', array(), $dash_lang ) ); ?></h4>
+            <label class="email-pref"><input type="checkbox" id="pref-newsletter"> <span><b><?php echo esc_html( kounselia_t( 'd.settings.newsletter', array(), $dash_lang ) ); ?></b><small><?php echo esc_html( kounselia_t( 'd.settings.newsletter_desc', array(), $dash_lang ) ); ?></small></span></label>
+            <label class="email-pref"><input type="checkbox" id="pref-blog"> <span><b><?php echo esc_html( kounselia_t( 'd.settings.blog', array(), $dash_lang ) ); ?></b><small><?php echo esc_html( kounselia_t( 'd.settings.blog_desc', array(), $dash_lang ) ); ?></small></span></label>
+            <p class="email-pref-note"><?php echo esc_html( kounselia_t( 'd.settings.email_note', array(), $dash_lang ) ); ?></p>
+            <button class="btn-save" id="pref-save"><?php echo esc_html( kounselia_t( 'd.settings.save_prefs', array(), $dash_lang ) ); ?></button>
             <div class="inline-msg" id="pref-msg"></div>
           </div>
         </div>
@@ -1118,49 +1154,49 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
   <div class="view-panel" id="view-memory">
     <section class="section">
       <div class="section-head">
-        <h2>Structured Memory Engine</h2>
-        <span class="section-sub">Automatically maintained by AI across your sessions</span>
+        <h2><?php echo esc_html( kounselia_t( 'd.mem.title', array(), $dash_lang ) ); ?></h2>
+        <span class="section-sub"><?php echo esc_html( kounselia_t( 'd.mem.sub', array(), $dash_lang ) ); ?></span>
       </div>
       <div class="memory-card">
         
         <div id="memory-preview" class="memory-preview" style="<?php echo $core_memory_json ? 'display:block' : 'display:none'; ?>">
           <div class="memory-preview-head">
-            <h5>Current Psychological Profile</h5>
-            <span class="memory-preview-date" id="memory-preview-date">Updated dynamically</span>
+            <h5><?php echo esc_html( kounselia_t( 'd.mem.profile_title', array(), $dash_lang ) ); ?></h5>
+            <span class="memory-preview-date" id="memory-preview-date"><?php echo esc_html( kounselia_t( 'd.mem.updated_dynamically', array(), $dash_lang ) ); ?></span>
           </div>
           
           <div id="memory-preview-grid"></div>
           
           <div class="foot-actions" style="justify-content: space-between;">
-            <button class="btn-copy" onclick="openMemoryEdit()" style="margin:0; border:none; background:var(--surface2);"><i class="ti ti-pencil"></i> Edit Details</button>
-            <button class="btn-delete-memory" onclick="deleteMemory()"><i class="ti ti-trash"></i> Delete Profile</button>
+            <button class="btn-copy" onclick="openMemoryEdit()" style="margin:0; border:none; background:var(--surface2);"><i class="ti ti-pencil"></i> <?php echo esc_html( kounselia_t( 'd.mem.edit_details', array(), $dash_lang ) ); ?></button>
+            <button class="btn-delete-memory" onclick="deleteMemory()"><i class="ti ti-trash"></i> <?php echo esc_html( kounselia_t( 'd.mem.delete_profile', array(), $dash_lang ) ); ?></button>
           </div>
         </div>
 
         <div id="memory-import-section" style="<?php echo $core_memory_json ? 'display:none' : 'display:block'; ?>">
-          <h4>Import from another AI</h4>
-          <p class="sub">Your counselors will use this context in every conversation going forward. The raw text you paste is processed and discarded — only a structured JSON profile is kept.</p>
+          <h4><?php echo esc_html( kounselia_t( 'd.mem.import_title', array(), $dash_lang ) ); ?></h4>
+          <p class="sub"><?php echo esc_html( kounselia_t( 'd.mem.import_sub', array(), $dash_lang ) ); ?></p>
           <div class="memory-steps">
             <div class="memory-step">
               <div class="step-num">1</div>
               <div class="step-body">
-                <h5>Copy this prompt</h5>
-                <p>Open ChatGPT or Gemini and paste this into a new message:</p>
-                <div class="prompt-box" id="copy-prompt-text">Please summarize everything you know about me as a person. Include my life timeline (dates and events), my emotional patterns and feelings about specific things in my life, my relationships, my work situation and goals, and any mental health themes. Write it as a clear factual summary.</div>
-                <button class="btn-copy" id="btn-copy-prompt" onclick="copyImportPrompt()"><i class="ti ti-copy"></i> Copy prompt</button>
+                <h5><?php echo esc_html( kounselia_t( 'd.mem.step1', array(), $dash_lang ) ); ?></h5>
+                <p><?php echo esc_html( kounselia_t( 'd.mem.step1_p', array(), $dash_lang ) ); ?></p>
+                <div class="prompt-box" id="copy-prompt-text"><?php echo esc_html( kounselia_t( 'd.mem.prompt_text', array(), $dash_lang ) ); ?></div>
+                <button class="btn-copy" id="btn-copy-prompt" onclick="copyImportPrompt()"><i class="ti ti-copy"></i> <?php echo esc_html( kounselia_t( 'd.mem.copy_prompt', array(), $dash_lang ) ); ?></button>
               </div>
             </div>
             <div class="memory-step">
               <div class="step-num">2</div>
               <div class="step-body">
-                <h5>Paste the response here</h5>
-                <p>Copy the full response from the other AI and paste it below.</p>
-                <textarea class="memory-paste" id="memory-paste" placeholder="Paste the AI response here..."></textarea>
+                <h5><?php echo esc_html( kounselia_t( 'd.mem.step2', array(), $dash_lang ) ); ?></h5>
+                <p><?php echo esc_html( kounselia_t( 'd.mem.step2_p', array(), $dash_lang ) ); ?></p>
+                <textarea class="memory-paste" id="memory-paste" placeholder="<?php echo esc_attr( kounselia_t( 'd.mem.paste_ph', array(), $dash_lang ) ); ?>"></textarea>
                 <div class="memory-paste-foot">
                   <span class="inline-msg" id="memory-import-msg"></span>
-                  <button class="btn-process" id="btn-process-memory" onclick="processMemory()"><i class="ti ti-brain"></i> Extract Structured Profile</button>
+                  <button class="btn-process" id="btn-process-memory" onclick="processMemory()"><i class="ti ti-brain"></i> <?php echo esc_html( kounselia_t( 'd.mem.extract', array(), $dash_lang ) ); ?></button>
                 </div>
-                <div class="memory-processing" id="memory-processing" style="display:none"><i class="ti ti-loader-2"></i> Analyzing your data and building profile...</div>
+                <div class="memory-processing" id="memory-processing" style="display:none"><i class="ti ti-loader-2"></i> <?php echo esc_html( kounselia_t( 'd.mem.analyzing', array(), $dash_lang ) ); ?></div>
               </div>
             </div>
           </div>
@@ -1178,11 +1214,11 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 
   <!-- MOBILE BOTTOM TAB BAR -->
   <nav class="mobile-tabbar">
-    <button class="mob-tab active" id="mob-tab-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span>Home</span></button>
-    <button class="mob-tab" id="mob-tab-sessions" onclick="switchTab('sessions')"><i class="ti ti-history"></i><span>Sessions</span></button>
-    <button class="tabbar-fab" onclick="switchTab('talk')" aria-label="Talk to someone"><i class="ti ti-message-2-plus"></i></button>
-    <button class="mob-tab" id="mob-tab-upgrade" onclick="switchTab('upgrade')"><i class="ti ti-sparkles"></i><span>My plan</span></button>
-    <button class="mob-tab" id="mob-tab-settings" onclick="switchTab('settings')"><i class="ti ti-settings"></i><span>Settings</span></button>
+    <button class="mob-tab active" id="mob-tab-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span><?php echo esc_html( kounselia_t( 'd.nav.home', array(), $dash_lang ) ); ?></span></button>
+    <button class="mob-tab" id="mob-tab-sessions" onclick="switchTab('sessions')"><i class="ti ti-history"></i><span><?php echo esc_html( kounselia_t( 'd.nav.sessions', array(), $dash_lang ) ); ?></span></button>
+    <button class="tabbar-fab" onclick="switchTab('talk')" aria-label="<?php echo esc_attr( kounselia_t( 'd.nav.talk', array(), $dash_lang ) ); ?>"><i class="ti ti-message-2-plus"></i></button>
+    <button class="mob-tab" id="mob-tab-upgrade" onclick="switchTab('upgrade')"><i class="ti ti-sparkles"></i><span><?php echo esc_html( kounselia_t( 'd.nav.plan', array(), $dash_lang ) ); ?></span></button>
+    <button class="mob-tab" id="mob-tab-settings" onclick="switchTab('settings')"><i class="ti ti-settings"></i><span><?php echo esc_html( kounselia_t( 'd.nav.settings', array(), $dash_lang ) ); ?></span></button>
   </nav>
 
 </div>
@@ -1197,31 +1233,31 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
     </div>
     
     <div class="intake-step active" id="step-1">
-      <h2>Welcome to your space.</h2>
-      <p>We are so glad you are here, <?php echo esc_html( $first_name ); ?>. Before you dive in, taking a moment to tell us where you're at helps your counselors understand you right away. You can skip this if you prefer.</p>
+      <h2><?php echo esc_html( kounselia_t( 'd.intake.welcome_title', array(), $dash_lang ) ); ?></h2>
+      <p><?php echo esc_html( kounselia_t( 'd.intake.welcome_p', array('name' => $first_name), $dash_lang ) ); ?></p>
       <div class="intake-actions">
-        <button class="intake-btn ghost" onclick="skipIntake()">Skip for now</button>
-        <button class="intake-btn" onclick="nextIntake(2)">Let's begin</button>
+        <button class="intake-btn ghost" onclick="skipIntake()"><?php echo esc_html( kounselia_t( 'd.intake.skip', array(), $dash_lang ) ); ?></button>
+        <button class="intake-btn" onclick="nextIntake(2)"><?php echo esc_html( kounselia_t( 'd.intake.begin', array(), $dash_lang ) ); ?></button>
       </div>
     </div>
 
     <div class="intake-step" id="step-2">
-      <h2>What brings you here?</h2>
-      <p>Is there a specific situation, feeling, or pattern on your mind lately?</p>
-      <textarea id="intake-q1" placeholder="I've been feeling really overwhelmed with..."></textarea>
+      <h2><?php echo esc_html( kounselia_t( 'd.intake.q1_title', array(), $dash_lang ) ); ?></h2>
+      <p><?php echo esc_html( kounselia_t( 'd.intake.q1_p', array(), $dash_lang ) ); ?></p>
+      <textarea id="intake-q1" placeholder="<?php echo esc_attr( kounselia_t( 'd.intake.q1_ph', array(), $dash_lang ) ); ?>"></textarea>
       <div class="intake-actions">
-        <button class="intake-btn ghost" onclick="nextIntake(1)">Back</button>
-        <button class="intake-btn" onclick="nextIntake(3)">Continue</button>
+        <button class="intake-btn ghost" onclick="nextIntake(1)"><?php echo esc_html( kounselia_t( 'd.common.back', array(), $dash_lang ) ); ?></button>
+        <button class="intake-btn" onclick="nextIntake(3)"><?php echo esc_html( kounselia_t( 'd.common.continue', array(), $dash_lang ) ); ?></button>
       </div>
     </div>
 
     <div class="intake-step" id="step-3">
-      <h2>What are your goals?</h2>
-      <p>What would a successful conversation look like for you today?</p>
-      <textarea id="intake-q2" placeholder="I just need someone to listen, or I'm looking for clarity on..."></textarea>
+      <h2><?php echo esc_html( kounselia_t( 'd.intake.q2_title', array(), $dash_lang ) ); ?></h2>
+      <p><?php echo esc_html( kounselia_t( 'd.intake.q2_p', array(), $dash_lang ) ); ?></p>
+      <textarea id="intake-q2" placeholder="<?php echo esc_attr( kounselia_t( 'd.intake.q2_ph', array(), $dash_lang ) ); ?>"></textarea>
       <div class="intake-actions">
-        <button class="intake-btn ghost" onclick="nextIntake(2)">Back</button>
-        <button class="intake-btn" id="intake-finish-btn" onclick="finishIntake()">Finish & Start</button>
+        <button class="intake-btn ghost" onclick="nextIntake(2)"><?php echo esc_html( kounselia_t( 'd.common.back', array(), $dash_lang ) ); ?></button>
+        <button class="intake-btn" id="intake-finish-btn" onclick="finishIntake()"><?php echo esc_html( kounselia_t( 'd.intake.finish', array(), $dash_lang ) ); ?></button>
       </div>
     </div>
   </div>
@@ -1232,41 +1268,41 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
   <div class="intake-modal" style="max-width: 600px;">
     <div class="intake-step active">
       <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px;">
-        <h2 style="margin:0; font-size:28px;">Edit Profile</h2>
+        <h2 style="margin:0; font-size:28px;"><?php echo esc_html( kounselia_t( 'd.mem.edit_title', array(), $dash_lang ) ); ?></h2>
         <button onclick="closeMemoryEdit()" style="background:none; border:none; font-size:24px; cursor:pointer; color:var(--text3); padding:4px;"><i class="ti ti-x"></i></button>
       </div>
-      <p style="margin-bottom: 24px;">Update your core psychological profile manually. Your counselors will use this updated context.</p>
+      <p style="margin-bottom: 24px;"><?php echo esc_html( kounselia_t( 'd.mem.edit_sub', array(), $dash_lang ) ); ?></p>
       
       <div style="max-height: 50vh; overflow-y: auto; padding-right: 10px; margin-bottom: 24px; display:flex; flex-direction:column; gap:16px;">
           <div class="form-field" style="margin:0;">
-            <label>Identity & Core Self</label>
+            <label><?php echo esc_html( kounselia_t( 'd.mem.f_identity', array(), $dash_lang ) ); ?></label>
             <textarea id="edit-mem-identity" style="width:100%; min-height:80px; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; font-family:inherit; font-size:14.5px; background:var(--bg); color:var(--text); resize:vertical; outline:none; transition:all 0.2s ease;" onfocus="this.style.borderColor='var(--accent)'; this.style.boxShadow='0 0 0 4px var(--accent-light)'" onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none'"></textarea>
           </div>
           <div class="form-field" style="margin:0;">
-            <label>Career</label>
+            <label><?php echo esc_html( kounselia_t( 'd.mem.l_career', array(), $dash_lang ) ); ?></label>
             <textarea id="edit-mem-career" style="width:100%; min-height:80px; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; font-family:inherit; font-size:14.5px; background:var(--bg); color:var(--text); resize:vertical; outline:none; transition:all 0.2s ease;" onfocus="this.style.borderColor='var(--accent)'; this.style.boxShadow='0 0 0 4px var(--accent-light)'" onblur="this.style.borderColor='var(--border)'; this.style.boxShadow='none'"></textarea>
           </div>
           <div class="form-field" style="margin:0;">
-            <label>Goals (comma-separated)</label>
+            <label><?php echo esc_html( kounselia_t( 'd.mem.f_goals', array(), $dash_lang ) ); ?></label>
             <input type="text" id="edit-mem-goals">
           </div>
           <div class="form-field" style="margin:0;">
-            <label>Core Values (comma-separated)</label>
+            <label><?php echo esc_html( kounselia_t( 'd.mem.f_values', array(), $dash_lang ) ); ?></label>
             <input type="text" id="edit-mem-values">
           </div>
           <div class="form-field" style="margin:0;">
-            <label>Habits & Patterns (comma-separated)</label>
+            <label><?php echo esc_html( kounselia_t( 'd.mem.f_habits', array(), $dash_lang ) ); ?></label>
             <input type="text" id="edit-mem-habits">
           </div>
           <div class="form-field" style="margin:0;">
-            <label>Triggers (comma-separated)</label>
+            <label><?php echo esc_html( kounselia_t( 'd.mem.f_triggers', array(), $dash_lang ) ); ?></label>
             <input type="text" id="edit-mem-triggers">
           </div>
       </div>
 
       <div class="intake-actions">
-        <button class="intake-btn ghost" onclick="closeMemoryEdit()">Cancel</button>
-        <button class="intake-btn" id="btn-save-memory-edit" onclick="saveMemoryEdit()">Save Changes</button>
+        <button class="intake-btn ghost" onclick="closeMemoryEdit()"><?php echo esc_html( kounselia_t( 'd.common.cancel', array(), $dash_lang ) ); ?></button>
+        <button class="intake-btn" id="btn-save-memory-edit" onclick="saveMemoryEdit()"><?php echo esc_html( kounselia_t( 'd.mem.save', array(), $dash_lang ) ); ?></button>
       </div>
     </div>
   </div>
@@ -1277,29 +1313,29 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
   <div class="intake-modal" style="max-width:560px">
     <div class="intake-step active">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
-        <h2 style="margin:0;font-size:26px" id="book-modal-name">Book a session</h2>
+        <h2 style="margin:0;font-size:26px" id="book-modal-name"><?php echo esc_html( kounselia_t( 'd.book.title', array(), $dash_lang ) ); ?></h2>
         <button onclick="closeBooking()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text3);padding:4px;"><i class="ti ti-x"></i></button>
       </div>
       <p id="book-modal-bio" style="display:none;color:var(--text2);font-size:14px;line-height:1.5;margin:-8px 0 16px"></p>
-      <p style="margin-bottom:20px">Pick an open time below. Sessions are <?php echo (int) ( function_exists( 'kounselia_session_length_minutes' ) ? kounselia_session_length_minutes() : 60 ); ?> minutes. You'll pay securely by card or transfer on the next screen — the slot is only reserved for a few minutes while you do.</p>
+      <p style="margin-bottom:20px"><?php echo esc_html( kounselia_t( 'd.book.intro', array('minutes' => (int) ( function_exists( 'kounselia_session_length_minutes' ) ? kounselia_session_length_minutes() : 60 )), $dash_lang ) ); ?></p>
 
       <div id="book-slots" style="max-height:280px;overflow-y:auto;margin-bottom:20px">
-        <p style="color:var(--text3);font-size:14px" id="book-slots-loading">Loading available times...</p>
+        <p style="color:var(--text3);font-size:14px" id="book-slots-loading"><?php echo esc_html( kounselia_t( 'd.book.loading_times', array(), $dash_lang ) ); ?></p>
       </div>
 
       <div class="form-field" id="book-note-field" style="display:none;margin:0 0 16px">
-        <label>A short note for them (optional)</label>
+        <label><?php echo esc_html( kounselia_t( 'd.book.note_label', array(), $dash_lang ) ); ?></label>
         <textarea id="book-note" style="width:100%;min-height:70px;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;font-family:inherit;font-size:14.5px;background:var(--bg);color:var(--text);resize:vertical;outline:none"></textarea>
       </div>
 
       <label id="book-recurring-field" style="display:none;align-items:flex-start;gap:10px;margin-bottom:20px;cursor:pointer;font-size:13.5px;color:var(--text2);line-height:1.5">
         <input type="checkbox" id="book-recurring" style="margin-top:3px">
-        <span>Make this a weekly session at the same time. You'll be charged automatically each week using this payment method — cancel anytime.</span>
+        <span><?php echo esc_html( kounselia_t( 'd.book.recurring', array(), $dash_lang ) ); ?></span>
       </label>
 
       <div class="intake-actions">
-        <button class="intake-btn ghost" onclick="closeBooking()">Cancel</button>
-        <button class="intake-btn" id="book-confirm-btn" onclick="confirmBooking()" style="display:none">Confirm booking</button>
+        <button class="intake-btn ghost" onclick="closeBooking()"><?php echo esc_html( kounselia_t( 'd.common.cancel', array(), $dash_lang ) ); ?></button>
+        <button class="intake-btn" id="book-confirm-btn" onclick="confirmBooking()" style="display:none"><?php echo esc_html( kounselia_t( 'd.book.confirm', array(), $dash_lang ) ); ?></button>
       </div>
     </div>
   </div>
@@ -1310,10 +1346,10 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
   <div class="intake-modal" style="max-width:480px">
     <div class="intake-step active">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;">
-        <h2 style="margin:0;font-size:24px">Notifications</h2>
+        <h2 style="margin:0;font-size:24px"><?php echo esc_html( kounselia_t( 'd.nav.notifications', array(), $dash_lang ) ); ?></h2>
         <button onclick="closeNotifications()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text3);padding:4px;"><i class="ti ti-x"></i></button>
       </div>
-      <div class="notif-list" id="notif-list"><p style="color:var(--text3);font-size:13px">Loading...</p></div>
+      <div class="notif-list" id="notif-list"><p style="color:var(--text3);font-size:13px"><?php echo esc_html( kounselia_t( 'd.common.loading', array(), $dash_lang ) ); ?></p></div>
     </div>
   </div>
 </div>
@@ -1323,17 +1359,17 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
   <div class="intake-modal" style="max-width:460px">
     <div class="intake-step active">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
-        <h2 style="margin:0;font-size:24px" id="rate-modal-name">Rate this session</h2>
+        <h2 style="margin:0;font-size:24px" id="rate-modal-name"><?php echo esc_html( kounselia_t( 'd.pros.rate', array(), $dash_lang ) ); ?></h2>
         <button onclick="closeRateModal()" style="background:none;border:none;font-size:24px;cursor:pointer;color:var(--text3);padding:4px;"><i class="ti ti-x"></i></button>
       </div>
       <div id="rate-stars" style="font-size:32px;letter-spacing:6px;color:var(--border);margin-bottom:16px;cursor:pointer">★★★★★</div>
       <div class="form-field" style="margin:0 0 20px">
-        <label>A word about your experience (optional)</label>
+        <label><?php echo esc_html( kounselia_t( 'd.rate.comment_label', array(), $dash_lang ) ); ?></label>
         <textarea id="rate-comment" style="width:100%;min-height:70px;border:1.5px solid var(--border);border-radius:12px;padding:12px 14px;font-family:inherit;font-size:14.5px;background:var(--bg);color:var(--text);resize:vertical;outline:none"></textarea>
       </div>
       <div class="intake-actions">
-        <button class="intake-btn ghost" onclick="closeRateModal()">Cancel</button>
-        <button class="intake-btn" id="rate-submit-btn" onclick="submitReview()">Submit rating</button>
+        <button class="intake-btn ghost" onclick="closeRateModal()"><?php echo esc_html( kounselia_t( 'd.common.cancel', array(), $dash_lang ) ); ?></button>
+        <button class="intake-btn" id="rate-submit-btn" onclick="submitReview()"><?php echo esc_html( kounselia_t( 'd.rate.submit', array(), $dash_lang ) ); ?></button>
       </div>
     </div>
   </div>
@@ -1343,12 +1379,12 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 <div class="chat-overlay" id="chat-overlay">
   <div class="chat-modal">
     <div class="chat-modal-head">
-      <h3 id="chat-modal-name">Conversation</h3>
+      <h3 id="chat-modal-name"><?php echo esc_html( kounselia_t( 'd.chat.title', array(), $dash_lang ) ); ?></h3>
       <button type="button" onclick="closeBookingChat()"><i class="ti ti-x"></i></button>
     </div>
     <div class="chat-messages" id="chat-messages"></div>
     <form id="chat-form" class="chat-input-row">
-      <input type="text" id="chat-input" placeholder="Write a message..." autocomplete="off">
+      <input type="text" id="chat-input" placeholder="<?php echo esc_attr( kounselia_t( 'd.chat.placeholder', array(), $dash_lang ) ); ?>" autocomplete="off">
       <button type="submit"><i class="ti ti-send"></i></button>
     </form>
   </div>
@@ -1358,6 +1394,15 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 
 <script>
 const KOUNSELIA={ajaxUrl:<?php echo wp_json_encode( $ajax_url ); ?>,nonce:<?php echo wp_json_encode( $nonce ); ?>};
+
+// Words on this page, in the member's language (packages/core/src/locales).
+const DASH_LANG=<?php echo wp_json_encode( $dash_lang ); ?>;
+const DASH_DICT=<?php echo wp_json_encode( $dash_dict ); ?>;
+const DATE_LOC=DASH_LANG==='en'?undefined:(DASH_LANG==='ar'?'ar-u-nu-latn':DASH_LANG);
+function tr(key,vars){
+  const text=DASH_DICT[key]!=null?String(DASH_DICT[key]):key;
+  return text.replace(/\{(\w+)\}/g,function(m,name){ return vars&&vars[name]!=null?vars[name]:m; });
+}
 
 function toast(msg,isErr){
   const wrap=document.getElementById('toast-wrap');
@@ -1435,12 +1480,12 @@ function setupAvatarUpload(inputId, imgId, sideAvId, mobileAvId, msgId){
       .then(r=>r.json())
       .then(res=>{
         if(res.success){
-          showInline(msgId,'Profile picture updated.',true);
+          showInline(msgId,tr('d.settings.avatar_ok'),true);
           const html=`<img src="${res.data.avatar_url}" alt="">`;
           [imgId,sideAvId,mobileAvId].forEach(id=>{ const el=document.getElementById(id); if(el) el.innerHTML=html; });
-        } else { showInline(msgId,res.data&&res.data.message?res.data.message:'Could not upload that image.',false); }
+        } else { showInline(msgId,res.data&&res.data.message?res.data.message:tr('d.settings.avatar_fail'),false); }
       })
-      .catch(()=>showInline(msgId,'Something went wrong, please try again.',false));
+      .catch(()=>showInline(msgId,tr('d.err.generic'),false));
   });
 }
 setupAvatarUpload('avatar-input','avatar-img','side-av','mobile-av','avatar-msg');
@@ -1450,7 +1495,7 @@ function setupNameSave(inputId, btnId, msgId){
   if(!btn) return;
   btn.addEventListener('click',function(){
     const name=document.getElementById(inputId).value.trim();
-    if(!name){ showInline(msgId,'Please enter a name.',false); return; }
+    if(!name){ showInline(msgId,tr('d.settings.name_needed'),false); return; }
     btn.disabled=true;
     fetch(KOUNSELIA.ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
       body:new URLSearchParams({action:'kounselia_update_profile',nonce:KOUNSELIA.nonce,name})})
@@ -1458,13 +1503,13 @@ function setupNameSave(inputId, btnId, msgId){
     .then(res=>{
       btn.disabled=false;
       if(res.success){
-        showInline(msgId,'Saved.',true);
+        showInline(msgId,tr('d.common.saved'),true);
         const sideEl=document.querySelector('.side-user-name');
         if(sideEl) sideEl.textContent=res.data.name;
         document.querySelectorAll('.avatar-card h4').forEach(el=>el.textContent=res.data.name);
-      } else { showInline(msgId,res.data&&res.data.message?res.data.message:'Could not save your name.',false); }
+      } else { showInline(msgId,res.data&&res.data.message?res.data.message:tr('d.settings.name_fail'),false); }
     })
-    .catch(()=>{btn.disabled=false;showInline(msgId,'Something went wrong, please try again.',false);});
+    .catch(()=>{btn.disabled=false;showInline(msgId,tr('d.err.generic'),false);});
   });
 }
 setupNameSave('name-input','name-save','name-msg');
@@ -1479,9 +1524,9 @@ setupNameSave('name-input','name-save','name-msg');
     .then(r=>r.json())
     .then(res=>{
       if(res.success){ showInline('lang-msg',res.data.message,true); setTimeout(()=>location.reload(),600); }
-      else { sel.disabled=false; showInline('lang-msg',res.data&&res.data.message?res.data.message:'Could not save that.',false); }
+      else { sel.disabled=false; showInline('lang-msg',res.data&&res.data.message?res.data.message:tr('d.err.save_that'),false); }
     })
-    .catch(()=>{sel.disabled=false;showInline('lang-msg','Something went wrong, please try again.',false);});
+    .catch(()=>{sel.disabled=false;showInline('lang-msg',tr('d.err.generic'),false);});
   });
 })();
 
@@ -1492,9 +1537,9 @@ function setupPasswordSave(curId, newId, cfmId, btnId, msgId){
     const cur=document.getElementById(curId).value;
     const next=document.getElementById(newId).value;
     const confirm=document.getElementById(cfmId).value;
-    if(!cur||!next||!confirm){ showInline(msgId,'Please fill in all three fields.',false); return; }
-    if(next!==confirm){ showInline(msgId,'New passwords do not match.',false); return; }
-    if(next.length<8){ showInline(msgId,'New password must be at least 8 characters.',false); return; }
+    if(!cur||!next||!confirm){ showInline(msgId,tr('d.settings.pw_fill'),false); return; }
+    if(next!==confirm){ showInline(msgId,tr('d.settings.pw_mismatch'),false); return; }
+    if(next.length<8){ showInline(msgId,tr('d.settings.pw_short'),false); return; }
     btn.disabled=true;
     fetch(KOUNSELIA.ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
       body:new URLSearchParams({action:'kounselia_update_password',nonce:KOUNSELIA.nonce,current_password:cur,new_password:next})})
@@ -1502,11 +1547,11 @@ function setupPasswordSave(curId, newId, cfmId, btnId, msgId){
     .then(res=>{
       btn.disabled=false;
       if(res.success){
-        showInline(msgId,'Password updated.',true);
+        showInline(msgId,tr('d.settings.pw_ok'),true);
         [curId,newId,cfmId].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
-      } else { showInline(msgId,res.data&&res.data.message?res.data.message:'Could not update your password.',false); }
+      } else { showInline(msgId,res.data&&res.data.message?res.data.message:tr('d.settings.pw_fail'),false); }
     })
-    .catch(()=>{btn.disabled=false;showInline(msgId,'Something went wrong, please try again.',false);});
+    .catch(()=>{btn.disabled=false;showInline(msgId,tr('d.err.generic'),false);});
   });
 }
 setupPasswordSave('pw-current','pw-new','pw-confirm','pw-save','pw-msg');
@@ -1520,8 +1565,8 @@ setupPasswordSave('pw-current','pw-new','pw-confirm','pw-save','pw-msg');
   btn.addEventListener('click',function(){
     btn.disabled=true;
     post({action:'kounselia_save_email_prefs',newsletter:nl.checked?'1':'0',blog:blog.checked?'1':'0'})
-      .then(res=>{ btn.disabled=false; showInline('pref-msg',res.data&&res.data.message?res.data.message:(res.success?'Saved.':'Could not save.'),!!res.success); })
-      .catch(()=>{ btn.disabled=false; showInline('pref-msg','Something went wrong, please try again.',false); });
+      .then(res=>{ btn.disabled=false; showInline('pref-msg',res.data&&res.data.message?res.data.message:(res.success?tr('d.common.saved'):tr('d.err.save')),!!res.success); })
+      .catch(()=>{ btn.disabled=false; showInline('pref-msg',tr('d.err.generic'),false); });
   });
 })();
 
@@ -1553,10 +1598,10 @@ function saveMood(mood){
         today.className='rhythm-dot filled '+(colorClass?colorClass[0]:'');
       });
     } else {
-      toast(res.data&&res.data.message?res.data.message:'Could not save your mood.',true);
+      toast(res.data&&res.data.message?res.data.message:tr('d.mood.save_fail'),true);
     }
   })
-  .catch(()=>toast('Something went wrong, please try again.',true));
+  .catch(()=>toast(tr('d.err.generic'),true));
 }
 
 let journalTimer=null;
@@ -1575,10 +1620,10 @@ function saveJournal(sourceId,msgId){
   if(!el) return;
   const content=el.value;
   fetch(KOUNSELIA.ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
-    body:newSearchParams({action:'kounselia_save_journal',nonce:KOUNSELIA.nonce,content})})
+    body:new URLSearchParams({action:'kounselia_save_journal',nonce:KOUNSELIA.nonce,content})})
   .then(r=>r.json())
-  .then(res=>{ if(res.success) showInline(msgId,'Saved.',true); else showInline(msgId,'Could not save, please try again.',false); })
-  .catch(()=>showInline(msgId,'Could not save, please try again.',false));
+  .then(res=>{ if(res.success) showInline(msgId,tr('d.common.saved'),true); else showInline(msgId,tr('d.err.save_retry'),false); })
+  .catch(()=>showInline(msgId,tr('d.err.save_retry'),false));
 }
 
 // Subscribe / cancel / manage-plan handlers live in inc/dashboard-my-plan.php.
@@ -1596,22 +1641,22 @@ function saveJournal(sourceId,msgId){
   }
   const subResult = params.get('sub');
   if(subResult === 'success'){
-    toast("Payment confirmed — you're all set.");
+    toast(tr('d.pay.confirmed'));
     switchTab('upgrade');
   } else if(subResult === 'failed'){
-    toast('Payment was not completed. Please try again.', true);
+    toast(tr('d.pay.not_completed'), true);
     switchTab('upgrade');
   }
 
   const bookingResult = params.get('booking');
   if(bookingResult === 'free'){
-    toast("You're booked in. This session is free.");
+    toast(tr('d.pay.booked_free'));
     switchTab('professionals');
   } else if(bookingResult === 'success'){
-    toast('Payment confirmed — your session is booked.');
+    toast(tr('d.pay.booked_paid'));
     switchTab('professionals');
   } else if(bookingResult === 'failed'){
-    toast('Payment was not completed, so that session was not booked. Please try again.', true);
+    toast(tr('d.pay.booking_failed'), true);
     switchTab('professionals');
   }
 })();
@@ -1623,16 +1668,16 @@ function renderMemoryUI(data) {
   currentMemoryData = data;
   
   const buildChips = (arr) => {
-    if(!arr || !arr.length) return '<span class="mem-text">None noted yet</span>';
+    if(!arr || !arr.length) return '<span class="mem-text">'+tr('d.mem.none_noted')+'</span>';
     return `<div class="chip-list">${arr.map(t => `<span class="chip">${escHTML(t)}</span>`).join('')}</div>`;
   };
 
   const buildText = (str) => {
-    return str ? `<div class="mem-text">${escHTML(str)}</div>` : '<span class="mem-text">Not established yet</span>';
+    return str ? `<div class="mem-text">${escHTML(str)}</div>` : '<span class="mem-text">'+tr('d.mem.not_established')+'</span>';
   };
   
   const buildTimeline = (arr) => {
-    if(!arr || !arr.length) return '<span class="mem-text">No timeline events recorded yet</span>';
+    if(!arr || !arr.length) return '<span class="mem-text">'+tr('d.mem.no_timeline')+'</span>';
     return `<div class="mem-timeline">
       ${arr.map(item => `
         <div class="timeline-item">
@@ -1645,13 +1690,13 @@ function renderMemoryUI(data) {
   };
 
   const buildEmotions = (obj) => {
-    if(!obj || Object.keys(obj).length === 0) return '<span class="mem-text">No emotional anchors recorded yet</span>';
+    if(!obj || Object.keys(obj).length === 0) return '<span class="mem-text">'+tr('d.mem.no_emotions')+'</span>';
     return `<div class="emotion-grid">
       ${Object.entries(obj).map(([entity, details]) => `
         <div class="emotion-card">
           <div class="emo-head">
             <span class="emo-entity">${escHTML(entity)}</span>
-            <span class="emo-badge badge-${details.intensity}">${escHTML(details.intensity)}</span>
+            <span class="emo-badge badge-${details.intensity}">${escHTML(DASH_DICT['d.mem.int_'+String(details.intensity||'').toLowerCase()]||details.intensity)}</span>
           </div>
           <div class="emo-feeling">${escHTML(details.emotion)}</div>
           ${details.context ? `<div class="emo-context">${escHTML(details.context)}</div>` : ''}
@@ -1663,25 +1708,25 @@ function renderMemoryUI(data) {
   const html = `
     <div class="profile-layout">
       <div class="profile-sidebar">
-        <div class="mem-block"><div class="mem-label">Identity</div>${buildText(data.identity)}</div>
-        <div class="mem-block"><div class="mem-label">Career</div>${buildText(data.career)}</div>
-        <div class="mem-block"><div class="mem-label">Goals</div>${buildChips(data.goals)}</div>
-        <div class="mem-block"><div class="mem-label">Core Values</div>${buildChips(data.values)}</div>
-        <div class="mem-block"><div class="mem-label">Habits & Patterns</div>${buildChips(data.habits)}</div>
-        <div class="mem-block"><div class="mem-label">Triggers</div>${buildChips(data.triggers)}</div>
+        <div class="mem-block"><div class="mem-label">${tr('d.mem.l_identity')}</div>${buildText(data.identity)}</div>
+        <div class="mem-block"><div class="mem-label">${tr('d.mem.l_career')}</div>${buildText(data.career)}</div>
+        <div class="mem-block"><div class="mem-label">${tr('d.mem.l_goals')}</div>${buildChips(data.goals)}</div>
+        <div class="mem-block"><div class="mem-label">${tr('d.mem.l_values')}</div>${buildChips(data.values)}</div>
+        <div class="mem-block"><div class="mem-label">${tr('d.mem.l_habits')}</div>${buildChips(data.habits)}</div>
+        <div class="mem-block"><div class="mem-label">${tr('d.mem.l_triggers')}</div>${buildChips(data.triggers)}</div>
       </div>
       <div class="profile-main">
         <div class="mem-block">
-          <div class="mem-label">Life Timeline</div>
+          <div class="mem-label">${tr('d.mem.l_timeline')}</div>
           ${buildTimeline(data.life_timeline)}
         </div>
         <div class="mem-block" style="margin-top:28px;">
-          <div class="mem-label">Emotional Memory Map</div>
+          <div class="mem-label">${tr('d.mem.l_emotions')}</div>
           ${buildEmotions(data.emotional_map)}
         </div>
         ${data.temporary_context ? `
         <div class="active-state-box">
-          <div class="mem-label"><i class="ti ti-activity"></i> Active State (AI Managed)</div>
+          <div class="mem-label"><i class="ti ti-activity"></i> ${tr('d.mem.l_active')}</div>
           <div class="mem-text">${escHTML(data.temporary_context)}</div>
         </div>
         ` : ''}
@@ -1716,7 +1761,7 @@ function closeMemoryEdit() {
 function saveMemoryEdit() {
     const btn = document.getElementById('btn-save-memory-edit');
     btn.disabled = true;
-    btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Saving...';
+    btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> '+tr('d.common.saving');
 
     const params = new URLSearchParams({
         action: 'kounselia_edit_memory',
@@ -1737,19 +1782,19 @@ function saveMemoryEdit() {
     .then(r => r.json())
     .then(res => {
         btn.disabled = false;
-        btn.innerHTML = 'Save Changes';
+        btn.innerHTML = tr('d.mem.save');
         if(res.success) {
             renderMemoryUI(res.data.memory);
             closeMemoryEdit();
-            toast('Profile details successfully updated.', false);
+            toast(tr('d.mem.updated_ok'), false);
         } else {
-            toast('Failed to update profile. Please try again.', true);
+            toast(tr('d.mem.update_fail'), true);
         }
     })
     .catch(() => {
         btn.disabled = false;
-        btn.innerHTML = 'Save Changes';
-        toast('A network error occurred. Please check your connection.', true);
+        btn.innerHTML = tr('d.mem.save');
+        toast(tr('d.mem.network_error'), true);
     });
 }
 
@@ -1758,8 +1803,8 @@ if (initialMemory) renderMemoryUI(initialMemory);
 
 function doImportMemory(pasteId, btnId, procId, msgId){
   const text=document.getElementById(pasteId).value.trim();
-  if(!text){showInline(msgId,'Please paste the AI response first.',false);return;}
-  if(text.length<50){showInline(msgId,'That looks too short, paste the full response.',false);return;}
+  if(!text){showInline(msgId,tr('d.mem.paste_first'),false);return;}
+  if(text.length<50){showInline(msgId,tr('d.mem.too_short'),false);return;}
   
   const btn=document.getElementById(btnId);
   const proc=document.getElementById(procId);
@@ -1774,14 +1819,14 @@ function doImportMemory(pasteId, btnId, procId, msgId){
     if(res.success){
       document.getElementById(pasteId).value='';
       renderMemoryUI(res.data.summary);
-      toast('Memory imported successfully.');
-    } else { showInline(msgId,res.data&&res.data.message?res.data.message:'Something went wrong, please try again.',false); }
+      toast(tr('d.mem.imported'));
+    } else { showInline(msgId,res.data&&res.data.message?res.data.message:tr('d.err.generic'),false); }
   })
-  .catch(()=>{ btn.disabled=false; proc.style.display='none'; showInline(msgId,'Something went wrong, please check your connection and try again.',false); });
+  .catch(()=>{ btn.disabled=false; proc.style.display='none'; showInline(msgId,tr('d.err.check_connection'),false); });
 }
 
 function doDeleteMemory(){
-  if(!confirm('Remove your Profile? Your counselors will no longer have this background context.')) return;
+  if(!confirm(tr('d.mem.delete_confirm'))) return;
   fetch(KOUNSELIA.ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
     body:new URLSearchParams({action:'kounselia_delete_memory',nonce:KOUNSELIA.nonce})})
   .then(r=>r.json())
@@ -1791,24 +1836,24 @@ function doDeleteMemory(){
       if (preview) preview.style.display = 'none';
       const importSec = document.getElementById('memory-import-section');
       if (importSec) importSec.style.display = 'block';
-      toast('Memory removed.');
-    } else { toast('Could not remove memory, please try again.',true); }
+      toast(tr('d.mem.removed'));
+    } else { toast(tr('d.mem.remove_fail'),true); }
   })
-  .catch(()=>toast('Something went wrong, please try again.',true));
+  .catch(()=>toast(tr('d.err.generic'),true));
 }
 
 function doCopyPrompt(sourceId, btnId){
   const text=document.getElementById(sourceId).textContent.trim();
   const btn=document.getElementById(btnId);
-  const reset=()=>{ btn.classList.remove('copied'); btn.innerHTML='<i class="ti ti-copy"></i> Copy prompt'; };
+  const reset=()=>{ btn.classList.remove('copied'); btn.innerHTML='<i class="ti ti-copy"></i> '+tr('d.mem.copy_prompt'); };
   navigator.clipboard.writeText(text).then(()=>{
-    btn.classList.add('copied'); btn.innerHTML='<i class="ti ti-check"></i> Copied';
+    btn.classList.add('copied'); btn.innerHTML='<i class="ti ti-check"></i> '+tr('d.mem.copied');
     setTimeout(reset,2500);
   }).catch(()=>{
     const ta=document.createElement('textarea');
     ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
     document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta);
-    btn.classList.add('copied'); btn.innerHTML='<i class="ti ti-check"></i> Copied';
+    btn.classList.add('copied'); btn.innerHTML='<i class="ti ti-check"></i> '+tr('d.mem.copied');
     setTimeout(reset,2500);
   });
 }
@@ -1822,12 +1867,12 @@ function renderInsights(data, dateStr) {
   const buildList = (arr) => arr.map(item => `<li>${escHTML(item)}</li>`).join('');
   
   const html = `
-    <div class="insight-box ib-patterns"><h4><i class="ti ti-repeat"></i> Recurring Patterns</h4><ul class="insight-list">${buildList(data.patterns)}</ul></div>
-    <div class="insight-box ib-growth"><h4><i class="ti ti-trending-up"></i> Growth & Healing</h4><ul class="insight-list">${buildList(data.growth)}</ul></div>
-    <div class="insight-box ib-fears"><h4><i class="ti ti-ghost"></i> Core Fears</h4><ul class="insight-list">${buildList(data.recurring_fears)}</ul></div>
-    <div class="insight-box ib-blind"><h4><i class="ti ti-eye-closed"></i> Blind Spots</h4><ul class="insight-list">${buildList(data.blind_spots)}</ul></div>
-    <div class="insight-box ib-wins"><h4><i class="ti ti-award"></i> Achievements</h4><ul class="insight-list">${buildList(data.achievements)}</ul></div>
-    <div class="insight-box ib-recs"><h4><i class="ti ti-compass"></i> Recommendations</h4><ul class="insight-list">${buildList(data.recommendations)}</ul></div>
+    <div class="insight-box ib-patterns"><h4><i class="ti ti-repeat"></i> ${tr('d.engine.t_patterns')}</h4><ul class="insight-list">${buildList(data.patterns)}</ul></div>
+    <div class="insight-box ib-growth"><h4><i class="ti ti-trending-up"></i> ${tr('d.engine.t_growth')}</h4><ul class="insight-list">${buildList(data.growth)}</ul></div>
+    <div class="insight-box ib-fears"><h4><i class="ti ti-ghost"></i> ${tr('d.engine.t_fears')}</h4><ul class="insight-list">${buildList(data.recurring_fears)}</ul></div>
+    <div class="insight-box ib-blind"><h4><i class="ti ti-eye-closed"></i> ${tr('d.engine.t_blind')}</h4><ul class="insight-list">${buildList(data.blind_spots)}</ul></div>
+    <div class="insight-box ib-wins"><h4><i class="ti ti-award"></i> ${tr('d.engine.t_wins')}</h4><ul class="insight-list">${buildList(data.achievements)}</ul></div>
+    <div class="insight-box ib-recs"><h4><i class="ti ti-compass"></i> ${tr('d.engine.t_recs')}</h4><ul class="insight-list">${buildList(data.recommendations)}</ul></div>
   `;
 
   const wrapper = document.getElementById('insight-ui');
@@ -1837,7 +1882,7 @@ function renderInsights(data, dateStr) {
     grid.innerHTML = html;
     if(dateEl && dateStr) {
       const d = new Date(dateStr.replace(' ', 'T'));
-      dateEl.textContent = 'Generated on ' + d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+      dateEl.textContent = tr('d.engine.generated_on',{date:d.toLocaleDateString(DASH_LANG==='en'?'en-US':DATE_LOC,{month:'long',day:'numeric',year:'numeric'})});
     }
     wrapper.style.display = 'block';
     const genBtn = document.getElementById('btn-gen-insight');
@@ -1851,7 +1896,7 @@ if (initialReflection) renderInsights(initialReflection, initialReflectionDate);
 
 function generateInsights() {
   const btn = document.getElementById('btn-gen-insight');
-  if(btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i><span>Analyzing your psychological profile...</span>'; }
+  if(btn) { btn.disabled = true; btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i><span>'+tr('d.engine.analyzing')+'</span>'; }
   
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
@@ -1863,17 +1908,17 @@ function generateInsights() {
     if(res.success) {
       renderInsights(res.data.reflection, res.data.date);
       const allowanceEl = document.getElementById('reflection-allowance');
-      if(allowanceEl && res.data.allowance && res.data.allowance.limit){ allowanceEl.firstChild.textContent = res.data.allowance.remaining + ' of ' + res.data.allowance.limit + ' left this month · '; }
-      toast('Insights generated successfully!', false);
+      if(allowanceEl && res.data.allowance && res.data.allowance.limit){ allowanceEl.firstChild.textContent = tr('d.engine.allowance',{remaining:res.data.allowance.remaining,limit:res.data.allowance.limit}) + ' · '; }
+      toast(tr('d.engine.ok'), false);
     } else {
-      toast(res.data.message || 'Analysis failed. Have a few more conversations first!', true);
+      toast((res.data && res.data.message) || tr('d.engine.failed'), true);
       if(res.data && res.data.upgrade){ setTimeout(()=>switchTab('upgrade'), 1200); }
-      if(btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-bulb"></i><span>Generate Milestone Reflection</span>'; }
+      if(btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-bulb"></i><span>'+tr('d.engine.generate')+'</span>'; }
     }
   })
   .catch(() => {
-    toast('Connection error.', true);
-    if(btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-bulb"></i><span>Generate Milestone Reflection</span>'; }
+    toast(tr('d.err.connection'), true);
+    if(btn) { btn.disabled = false; btn.innerHTML = '<i class="ti ti-bulb"></i><span>'+tr('d.engine.generate')+'</span>'; }
   });
 }
 
@@ -1909,7 +1954,7 @@ function finishIntake() {
   const q1 = document.getElementById('intake-q1').value.trim();
   const q2 = document.getElementById('intake-q2').value.trim();
   
-  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> Processing...';
+  btn.innerHTML = '<i class="ti ti-loader-2" style="animation:spin 1s linear infinite"></i> '+tr('d.intake.processing');
   btn.disabled = true;
 
   fetch(KOUNSELIA.ajaxUrl, {
@@ -1918,13 +1963,13 @@ function finishIntake() {
     body:new URLSearchParams({action:'kounselia_submit_intake',nonce:KOUNSELIA.nonce,q1,q2})
   }).then(() => {
     document.getElementById('intake-overlay').classList.remove('active');
-    toast('Your private space is ready.', false);
+    toast(tr('d.intake.ready'), false);
     // Reload slightly delayed to fetch the newly created memory profile into the UI
     setTimeout(() => window.location.reload(), 1500);
   }).catch(() => {
-    btn.innerHTML = 'Finish & Start';
+    btn.innerHTML = tr('d.intake.finish');
     btn.disabled = false;
-    toast('Something went wrong. Please try again.', true);
+    toast(tr('d.err.try_again'), true);
   });
 }
 
@@ -1965,8 +2010,8 @@ function openBooking(professionalId, name){
   document.getElementById('book-recurring-field').style.display = bookingIsFree ? 'none' : 'flex';
   document.getElementById('book-recurring').checked = false;
   document.getElementById('book-confirm-btn').style.display = 'none';
-  document.getElementById('book-confirm-btn').textContent = bookingIsFree ? 'Book free session' : 'Confirm booking';
-  document.getElementById('book-slots').innerHTML = '<p style="color:var(--text3);font-size:14px">Loading available times...</p>';
+  document.getElementById('book-confirm-btn').textContent = bookingIsFree ? tr('d.book.book_free') : tr('d.book.confirm');
+  document.getElementById('book-slots').innerHTML = '<p style="color:var(--text3);font-size:14px">'+tr('d.book.loading_times')+'</p>';
   document.getElementById('book-overlay').classList.add('active');
   loadBookingSlots(professionalId, 0);
 }
@@ -1976,13 +2021,13 @@ function openReschedule(bookingId, professionalId, name){
   rescheduleBookingId = bookingId;
   bookingProfessionalId = professionalId;
   bookingSelectedSlot = null;
-  document.getElementById('book-modal-name').textContent = 'Reschedule with ' + name;
+  document.getElementById('book-modal-name').textContent = tr('d.book.reschedule_with',{name:name});
   document.getElementById('book-modal-bio').style.display = 'none';
   document.getElementById('book-note-field').style.display = 'none';
   document.getElementById('book-recurring-field').style.display = 'none';
   document.getElementById('book-confirm-btn').style.display = 'none';
-  document.getElementById('book-confirm-btn').textContent = 'Confirm new time';
-  document.getElementById('book-slots').innerHTML = '<p style="color:var(--text3);font-size:14px">Loading available times...</p>';
+  document.getElementById('book-confirm-btn').textContent = tr('d.book.confirm_new');
+  document.getElementById('book-slots').innerHTML = '<p style="color:var(--text3);font-size:14px">'+tr('d.book.loading_times')+'</p>';
   document.getElementById('book-overlay').classList.add('active');
   loadBookingSlots(professionalId, bookingId);
 }
@@ -2000,20 +2045,20 @@ function loadBookingSlots(professionalId, rescheduleId){
   .then(res => {
     const wrap = document.getElementById('book-slots');
     if (!res.success) {
-      wrap.innerHTML = '<p style="color:var(--rose);font-size:14px">' + ((res.data && res.data.message) || 'Could not load availability.') + '</p>';
+      wrap.innerHTML = '<p style="color:var(--rose);font-size:14px">' + ((res.data && res.data.message) || tr('d.book.no_availability')) + '</p>';
       return;
     }
     const slots = res.data.slots || [];
     if (!slots.length) {
-      wrap.innerHTML = '<p style="color:var(--text3);font-size:14px">This professional has no open times right now. Please check back soon.</p>';
+      wrap.innerHTML = '<p style="color:var(--text3);font-size:14px">'+tr('d.book.no_times')+'</p>';
       return;
     }
 
     const byDay = {};
     slots.forEach(function(slot){
       const d = new Date(slot.replace(' ', 'T'));
-      const dayKey = d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' });
-      (byDay[dayKey] = byDay[dayKey] || []).push({ raw: slot, time: d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) });
+      const dayKey = d.toLocaleDateString(DATE_LOC, { weekday: 'short', month: 'short', day: 'numeric' });
+      (byDay[dayKey] = byDay[dayKey] || []).push({ raw: slot, time: d.toLocaleTimeString(DATE_LOC, { hour: 'numeric', minute: '2-digit' }) });
     });
 
     wrap.innerHTML = '';
@@ -2047,7 +2092,7 @@ function loadBookingSlots(professionalId, rescheduleId){
     });
   })
   .catch(() => {
-    document.getElementById('book-slots').innerHTML = '<p style="color:var(--rose);font-size:14px">Something went wrong. Please try again.</p>';
+    document.getElementById('book-slots').innerHTML = '<p style="color:var(--rose);font-size:14px">'+tr('d.err.try_again')+'</p>';
   });
 }
 
@@ -2064,7 +2109,7 @@ function confirmBooking(){
 
   const btn = document.getElementById('book-confirm-btn');
   btn.disabled = true;
-  btn.textContent = bookingIsFree ? 'Booking...' : 'Taking you to payment...';
+  btn.textContent = bookingIsFree ? tr('d.book.booking') : tr('d.book.to_payment');
 
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
@@ -2088,21 +2133,21 @@ function confirmBooking(){
       window.location.href = res.data.authorization_url;
     } else {
       btn.disabled = false;
-      btn.textContent = bookingIsFree ? 'Book free session' : 'Confirm booking';
-      toast((res.data && res.data.message) || 'Could not book that slot.', true);
+      btn.textContent = bookingIsFree ? tr('d.book.book_free') : tr('d.book.confirm');
+      toast((res.data && res.data.message) || tr('d.book.slot_fail'), true);
     }
   })
   .catch(() => {
     btn.disabled = false;
-    btn.textContent = bookingIsFree ? 'Book free session' : 'Confirm booking';
-    toast('Something went wrong. Please try again.', true);
+    btn.textContent = bookingIsFree ? tr('d.book.book_free') : tr('d.book.confirm');
+    toast(tr('d.err.try_again'), true);
   });
 }
 
 function confirmReschedule(){
   const btn = document.getElementById('book-confirm-btn');
   btn.disabled = true;
-  btn.textContent = 'Saving...';
+  btn.textContent = tr('d.common.saving');
 
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
@@ -2117,24 +2162,24 @@ function confirmReschedule(){
   .then(r => r.json())
   .then(res => {
     btn.disabled = false;
-    btn.textContent = 'Confirm new time';
+    btn.textContent = tr('d.book.confirm_new');
     if (res.success) {
       closeBooking();
-      toast('Session rescheduled.', false);
+      toast(tr('d.book.rescheduled'), false);
       setTimeout(() => window.location.reload(), 1000);
     } else {
-      toast((res.data && res.data.message) || 'Could not reschedule that session.', true);
+      toast((res.data && res.data.message) || tr('d.book.reschedule_fail'), true);
     }
   })
   .catch(() => {
     btn.disabled = false;
-    btn.textContent = 'Confirm new time';
-    toast('Something went wrong. Please try again.', true);
+    btn.textContent = tr('d.book.confirm_new');
+    toast(tr('d.err.try_again'), true);
   });
 }
 
 function cancelMySeries(seriesId, linkEl){
-  if (!confirm('Cancel your weekly sessions? Any already-booked future sessions will be cancelled and refunded.')) return;
+  if (!confirm(tr('d.book.series_confirm'))) return;
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2143,13 +2188,13 @@ function cancelMySeries(seriesId, linkEl){
   .then(r => r.json())
   .then(res => {
     if (res.success) {
-      toast('Weekly sessions cancelled.', false);
+      toast(tr('d.book.series_cancelled'), false);
       setTimeout(() => window.location.reload(), 1000);
     } else {
-      toast((res.data && res.data.message) || 'Could not cancel that series.', true);
+      toast((res.data && res.data.message) || tr('d.book.series_fail'), true);
     }
   })
-  .catch(() => toast('Something went wrong. Please try again.', true));
+  .catch(() => toast(tr('d.err.try_again'), true));
 }
 
 /* ---------------- RATE A SESSION ---------------- */
@@ -2166,7 +2211,7 @@ document.querySelectorAll('.js-rate-session').forEach(function(link){
 function openRateModal(bookingId, name){
   ratingBookingId = bookingId;
   ratingValue = 0;
-  document.getElementById('rate-modal-name').textContent = 'Rate your session with ' + name;
+  document.getElementById('rate-modal-name').textContent = tr('d.rate.title_with',{name:name});
   document.getElementById('rate-comment').value = '';
   renderStars();
   document.getElementById('rate-overlay').classList.add('active');
@@ -2192,12 +2237,12 @@ renderStars();
 
 function submitReview(){
   if (!ratingBookingId || !ratingValue) {
-    toast('Please pick a star rating first.', true);
+    toast(tr('d.rate.pick_star'), true);
     return;
   }
   const btn = document.getElementById('rate-submit-btn');
   btn.disabled = true;
-  btn.textContent = 'Submitting...';
+  btn.textContent = tr('d.rate.submitting');
 
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
@@ -2213,24 +2258,24 @@ function submitReview(){
   .then(r => r.json())
   .then(res => {
     btn.disabled = false;
-    btn.textContent = 'Submit rating';
+    btn.textContent = tr('d.rate.submit');
     if (res.success) {
       closeRateModal();
-      toast('Thanks for the feedback.', false);
+      toast(tr('d.rate.thanks'), false);
       setTimeout(() => window.location.reload(), 1000);
     } else {
-      toast((res.data && res.data.message) || 'Could not submit that rating.', true);
+      toast((res.data && res.data.message) || tr('d.rate.fail'), true);
     }
   })
   .catch(() => {
     btn.disabled = false;
-    btn.textContent = 'Submit rating';
-    toast('Something went wrong. Please try again.', true);
+    btn.textContent = tr('d.rate.submit');
+    toast(tr('d.err.try_again'), true);
   });
 }
 
 function cancelMyBooking(bookingId, linkEl){
-  if (!confirm("Cancel this session? You'll be refunded, and the professional will be notified.")) return;
+  if (!confirm(tr('d.book.cancel_confirm'))) return;
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2241,12 +2286,12 @@ function cancelMyBooking(bookingId, linkEl){
     if (res.success) {
       const row = document.querySelector('#my-booking-list [data-booking-id="' + bookingId + '"]');
       if (row) row.remove();
-      toast('Booking cancelled.', false);
+      toast(tr('d.book.cancelled'), false);
     } else {
-      toast((res.data && res.data.message) || 'Could not cancel that booking.', true);
+      toast((res.data && res.data.message) || tr('d.book.cancel_fail'), true);
     }
   })
-  .catch(() => toast('Something went wrong. Please try again.', true));
+  .catch(() => toast(tr('d.err.try_again'), true));
 }
 
 /* ---------------- BOOKING CHAT ---------------- */
@@ -2263,7 +2308,7 @@ document.querySelectorAll('.js-booking-chat').forEach(function(link){
 function openBookingChat(bookingId, otherName){
   chatBookingId = bookingId;
   document.getElementById('chat-modal-name').textContent = otherName;
-  document.getElementById('chat-messages').innerHTML = '<p style="text-align:center;color:var(--text3);font-size:13px">Loading...</p>';
+  document.getElementById('chat-messages').innerHTML = '<p style="text-align:center;color:var(--text3);font-size:13px">'+tr('d.common.loading')+'</p>';
   document.getElementById('chat-overlay').classList.add('active');
   loadBookingChat();
   clearInterval(chatPollTimer);
@@ -2291,7 +2336,7 @@ function loadBookingChat(){
     const wasAtBottom = (wrap.scrollTop + wrap.clientHeight) >= (wrap.scrollHeight - 20);
     wrap.innerHTML = '';
     if (!res.data.messages.length) {
-      wrap.innerHTML = '<p style="text-align:center;color:var(--text3);font-size:13px">No messages yet. Say hello.</p>';
+      wrap.innerHTML = '<p style="text-align:center;color:var(--text3);font-size:13px">'+tr('d.chat.empty')+'</p>';
     } else {
       res.data.messages.forEach(function(m){
         const bubble = document.createElement('div');
@@ -2301,7 +2346,7 @@ function loadBookingChat(){
         bubble.appendChild(text);
         const time = document.createElement('div');
         time.className = 'chat-bubble-time';
-        time.textContent = new Date(m.created_at.replace(' ', 'T')).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+        time.textContent = new Date(m.created_at.replace(' ', 'T')).toLocaleString(DATE_LOC, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
         bubble.appendChild(time);
         wrap.appendChild(bubble);
       });
@@ -2350,7 +2395,7 @@ checkUnreadNotifications();
 
 function openNotifications(){
   document.getElementById('notif-overlay').classList.add('active');
-  document.getElementById('notif-list').innerHTML = '<p style="color:var(--text3);font-size:13px">Loading...</p>';
+  document.getElementById('notif-list').innerHTML = '<p style="color:var(--text3);font-size:13px">'+tr('d.common.loading')+'</p>';
 
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
@@ -2361,12 +2406,12 @@ function openNotifications(){
   .then(res => {
     const wrap = document.getElementById('notif-list');
     if (!res.success) {
-      wrap.innerHTML = '<p style="color:var(--rose);font-size:13px">Could not load notifications.</p>';
+      wrap.innerHTML = '<p style="color:var(--rose);font-size:13px">'+tr('d.notif.load_fail')+'</p>';
       return;
     }
     const items = res.data.notifications || [];
     if (!items.length) {
-      wrap.innerHTML = '<p style="color:var(--text3);font-size:13px">Nothing here yet.</p>';
+      wrap.innerHTML = '<p style="color:var(--text3);font-size:13px">'+tr('d.notif.empty')+'</p>';
       return;
     }
     wrap.innerHTML = '';
@@ -2374,7 +2419,7 @@ function openNotifications(){
       const a = document.createElement('a');
       a.className = 'notif-item';
       a.href = n.url || 'javascript:void(0)';
-      const time = new Date(n.created_at.replace(' ', 'T')).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+      const time = new Date(n.created_at.replace(' ', 'T')).toLocaleString(DATE_LOC, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
       a.innerHTML = '<div class="notif-title">' + escHTML(n.title) + '</div>' + (n.body ? '<div class="notif-body">' + escHTML(n.body) + '</div>' : '') + '<div class="notif-time">' + time + '</div>';
       wrap.appendChild(a);
     });
@@ -2384,7 +2429,7 @@ function openNotifications(){
     if (dot2) dot2.style.display = 'none';
   })
   .catch(() => {
-    document.getElementById('notif-list').innerHTML = '<p style="color:var(--rose);font-size:13px">Something went wrong.</p>';
+    document.getElementById('notif-list').innerHTML = '<p style="color:var(--rose);font-size:13px">'+tr('d.notif.error')+'</p>';
   });
 }
 

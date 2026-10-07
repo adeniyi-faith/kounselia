@@ -230,10 +230,11 @@ function kounselia_notify_payout_result( $payout, $result ) {
     }
 
     $amount = kounselia_format_money( $payout->amount, $payout->currency );
+    $lang   = kounselia_mail_lang( (int) $professional->user_id );
     if ( 'success' === $result ) {
-        kounselia_notify_user( $professional->user_id, 'payout_success', 'Your payout of ' . $amount . ' has been sent', 'It should reach your bank account shortly.', '/pro-dashboard.php#earnings' );
+        kounselia_notify_user( $professional->user_id, 'payout_success', kounselia_t( 'mail.payout.sent_title', array( 'amount' => $amount ), $lang ), kounselia_t( 'mail.payout.sent_body', array(), $lang ), '/pro-dashboard.php#earnings' );
     } else {
-        kounselia_notify_user( $professional->user_id, 'payout_failed', 'Your payout of ' . $amount . ' did not go through', 'The amount is back in your available balance — please check your bank details and request it again.', '/pro-dashboard.php#earnings' );
+        kounselia_notify_user( $professional->user_id, 'payout_failed', kounselia_t( 'mail.payout.failed_title', array( 'amount' => $amount ), $lang ), kounselia_t( 'mail.payout.failed_body', array(), $lang ), '/pro-dashboard.php#earnings' );
     }
 }
 
@@ -303,12 +304,16 @@ function kounselia_maybe_alert_admins_payout_otp( $payouts ) {
 
     $admins = get_users( array( 'role__in' => array( 'administrator' ), 'fields' => array( 'user_email' ) ) );
     foreach ( array_filter( array_unique( wp_list_pluck( $admins, 'user_email' ) ) ) as $email ) {
+        // Staff alert: always English.
         kounselia_send_html_email(
             $email,
             'Professional payouts are waiting for your OTP',
             'Payouts need approval',
             '<p>Paystack is holding these payouts until the one-time code it sent to the Paystack account owner is entered:</p><ul>' . $lines . '</ul>'
-            . '<p>Enter the code on the <a href="' . esc_url( home_url( '/portal/admin/pages/settings.php#payouts' ) ) . '">admin Settings page</a> (Payouts waiting for approval) to release them.</p>'
+            . '<p>Enter the code on the <a href="' . esc_url( home_url( '/portal/admin/pages/settings.php#payouts' ) ) . '">admin Settings page</a> (Payouts waiting for approval) to release them.</p>',
+            null,
+            null,
+            array( 'lang' => 'en' )
         );
     }
 }

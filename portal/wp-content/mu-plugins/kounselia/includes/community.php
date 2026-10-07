@@ -178,7 +178,8 @@ function kounselia_set_following( $user_id, $professional_id, $follow ) {
         $key = 'kounselia_new_follower_' . $pro->id;
         if ( $wpdb->insert_id && ! get_transient( $key ) && function_exists( 'kounselia_notify_user' ) ) {
             set_transient( $key, 1, HOUR_IN_SECONDS );
-            kounselia_notify_user( (int) $pro->user_id, 'new_follower', 'You have a new follower', 'Someone started following you. They will hear when you publish an article.', '/pro-dashboard.php?tab=articles' );
+            $lang = kounselia_mail_lang( (int) $pro->user_id );
+            kounselia_notify_user( (int) $pro->user_id, 'new_follower', kounselia_t( 'mail.community.new_follower_title', array(), $lang ), kounselia_t( 'mail.community.new_follower_body', array(), $lang ), '/pro-dashboard.php?tab=articles' );
         }
     } elseif ( ! $follow ) {
         $wpdb->delete( $table, array( 'follower_user_id' => $user_id, 'professional_id' => $pro->id ) );
@@ -381,11 +382,11 @@ function kounselia_comment_tell_people( $comment, $post, $parent = null ) {
     $told = array( (int) $comment->user_id );
 
     if ( $parent && ! in_array( (int) $parent->user_id, $told, true ) ) {
-        kounselia_notify_user( (int) $parent->user_id, 'comment_reply', $who['name'] . ' replied to you', wp_trim_words( $comment->content, 18 ), $url );
+        kounselia_notify_user( (int) $parent->user_id, 'comment_reply', kounselia_t( 'mail.community.reply_title', array( 'name' => $who['name'] ), kounselia_mail_lang( (int) $parent->user_id ) ), wp_trim_words( $comment->content, 18 ), $url );
         $told[] = (int) $parent->user_id;
     }
     if ( kounselia_is_pro_article( $post ) && ! in_array( (int) $post->author_id, $told, true ) ) {
-        kounselia_notify_user( (int) $post->author_id, 'article_comment', 'New comment on "' . wp_trim_words( $post->title, 8 ) . '"', $who['name'] . ': ' . wp_trim_words( $comment->content, 16 ), $url );
+        kounselia_notify_user( (int) $post->author_id, 'article_comment', kounselia_t( 'mail.community.comment_title', array( 'title' => wp_trim_words( $post->title, 8 ) ), kounselia_mail_lang( (int) $post->author_id ) ), $who['name'] . ': ' . wp_trim_words( $comment->content, 16 ), $url );
     }
 }
 
@@ -765,17 +766,18 @@ function kounselia_notify_followers_of_article( $post_id, $after_id = 0 ) {
     ) );
     $author = kounselia_blog_author( $post );
     $url    = kounselia_blog_url( $post->slug );
-    $title  = $author['name'] . ' published a new article';
     foreach ( $rows as $row ) {
+        $lang  = kounselia_mail_lang( (int) $row->follower_user_id );
+        $title = kounselia_t( 'mail.community.followed_title', array( 'name' => $author['name'] ), $lang );
         $email = null;
         if ( ! empty( $s['notify_followers_email'] ) && '0' !== (string) get_user_meta( $row->follower_user_id, 'kounselia_follow_emails', true ) ) {
             $email = array(
                 'subject'      => $title . ': ' . $post->title,
                 'headline'     => $post->title,
-                'content_html' => '<p>' . esc_html( $author['name'] ) . ', who you follow on Kounselia, has published a new article.</p>'
+                'content_html' => '<p>' . esc_html( kounselia_t( 'mail.community.followed_content', array( 'name' => $author['name'] ), $lang ) ) . '</p>'
                     . '<p style="color:#6b675d;">' . esc_html( kounselia_blog_summary( $post, 40 ) ) . '</p>'
-                    . '<p style="font-size:12px;color:#8a867c;">You get these emails because you follow ' . esc_html( $author['name'] ) . '. You can unfollow on their profile, or turn these emails off in your account settings.</p>',
-                'btn_text'     => 'Read the article',
+                    . '<p style="font-size:12px;color:#8a867c;">' . esc_html( kounselia_t( 'mail.community.followed_footnote', array( 'name' => $author['name'] ), $lang ) ) . '</p>',
+                'btn_text'     => kounselia_t( 'mail.community.read_article', array(), $lang ),
                 'btn_url'      => kounselia_blog_url( $post->slug, true ),
             );
         }

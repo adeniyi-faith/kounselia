@@ -4,24 +4,26 @@
 import type { ReactNode } from 'react';
 import { KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from './TablerIcon';
 
 export function Sheet({ visible, title, onClose, children }: { visible: boolean; title: string; onClose: () => void; children: ReactNode }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close" />
+        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel={t('m.b.common.close')} />
         <View style={[styles.panel, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
           <View style={styles.grip} />
           <View style={styles.head}>
             <Text style={styles.title} accessibilityRole="header">
               {title}
             </Text>
-            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={10} style={styles.close}>
+            <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t('m.b.common.close')} hitSlop={10} style={styles.close}>
               <TablerIcon name="x" size={18} color={colors.text2} />
             </Pressable>
           </View>

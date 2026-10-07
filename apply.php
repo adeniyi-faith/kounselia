@@ -23,13 +23,20 @@ $application  = $is_logged_in ? kounselia_get_professional_application( get_curr
 
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_auth' );
+$al       = kounselia_current_language();
+$at       = function ( $key, $vars = array() ) use ( $al ) {
+    return esc_html( kounselia_t( $key, $vars, $al ) );
+};
+$ata      = function ( $key ) use ( $al ) {
+    return esc_attr( kounselia_t( $key, array(), $al ) );
+};
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html <?php echo function_exists( 'kounselia_html_attrs' ) ? kounselia_html_attrs() : 'lang="en"'; ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Join as a Professional — Kounselia</title>
+<title><?php echo $at( 's.apply.title' ); ?></title>
 <meta name="robots" content="noindex, nofollow">
 <link rel="icon" type="image/png" href="https://kounselia.com/img/fv.png">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,400&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -67,70 +74,70 @@ $nonce    = wp_create_nonce( 'kounselia_auth' );
 <body style="background:var(--bg)">
 
 <div class="apply-wrap">
-  <div class="apply-eyebrow">For licensed professionals</div>
-  <h1>Bring your practice to Kounselia</h1>
+  <div class="apply-eyebrow"><?php echo $at( 's.apply.eyebrow' ); ?></div>
+  <h1><?php echo $at( 's.apply.h1' ); ?></h1>
 
   <?php if ( $application ) : ?>
-    <p class="lead">Here's where your application stands.</p>
+    <p class="lead"><?php echo $at( 's.apply.status_lead' ); ?></p>
     <div class="apply-card">
       <?php if ( 'pending' === $application->status ) : ?>
-        <span class="status-badge status-pending"><i class="ti ti-clock"></i> Under review</span>
-        <p style="margin-top:16px;color:var(--text2);font-size:14.5px;line-height:1.6;">Thanks for applying. Our team is reviewing your documents — we'll email you at your account address once there's a decision, usually within a few business days.</p>
-        <a class="apply-submit" style="display:block;text-align:center;text-decoration:none;margin-top:16px" href="/pro-dashboard.php">Go to your professional home</a>
+        <span class="status-badge status-pending"><i class="ti ti-clock"></i> <?php echo $at( 's.apply.under_review' ); ?></span>
+        <p style="margin-top:16px;color:var(--text2);font-size:14.5px;line-height:1.6;"><?php echo $at( 's.apply.pending_p' ); ?></p>
+        <a class="apply-submit" style="display:block;text-align:center;text-decoration:none;margin-top:16px" href="/pro-dashboard.php"><?php echo $at( 's.apply.go_home' ); ?></a>
       <?php elseif ( 'verified' === $application->status ) : ?>
-        <span class="status-badge status-verified"><i class="ti ti-check"></i> Verified</span>
-        <p style="margin-top:16px;color:var(--text2);font-size:14.5px;line-height:1.6;">You're approved as a professional on Kounselia.</p>
-        <a class="apply-submit" style="display:block;text-align:center;text-decoration:none;margin-top:16px" href="/pro-dashboard.php">Manage your profile &amp; rate</a>
+        <span class="status-badge status-verified"><i class="ti ti-check"></i> <?php echo $at( 's.apply.verified' ); ?></span>
+        <p style="margin-top:16px;color:var(--text2);font-size:14.5px;line-height:1.6;"><?php echo $at( 's.apply.verified_p' ); ?></p>
+        <a class="apply-submit" style="display:block;text-align:center;text-decoration:none;margin-top:16px" href="/pro-dashboard.php"><?php echo $at( 's.apply.manage' ); ?></a>
       <?php else : ?>
-        <span class="status-badge status-rejected"><i class="ti ti-x"></i> Not approved</span>
+        <span class="status-badge status-rejected"><i class="ti ti-x"></i> <?php echo $at( 's.apply.not_approved' ); ?></span>
         <?php if ( $application->rejection_reason ) : ?>
-          <p style="margin-top:16px;color:var(--text2);font-size:14.5px;line-height:1.6;"><strong>Reason:</strong> <?php echo esc_html( $application->rejection_reason ); ?></p>
+          <p style="margin-top:16px;color:var(--text2);font-size:14.5px;line-height:1.6;"><strong><?php echo $at( 's.apply.reason' ); ?></strong> <?php echo esc_html( $application->rejection_reason ); ?></p>
         <?php endif; ?>
-        <p style="margin-top:10px;color:var(--text2);font-size:14.5px;line-height:1.6;">You're welcome to update your documents and reapply below.</p>
+        <p style="margin-top:10px;color:var(--text2);font-size:14.5px;line-height:1.6;"><?php echo $at( 's.apply.reapply' ); ?></p>
       <?php endif; ?>
     </div>
   <?php endif; ?>
 
   <?php if ( ! $application || 'rejected' === $application->status ) : ?>
-    <p class="lead">Tell us about your practice and upload your credentials. We review every application by hand before you can see clients here.</p>
+    <p class="lead"><?php echo $at( 's.apply.lead' ); ?></p>
 
     <div class="apply-card">
       <form id="apply-form">
         <?php if ( ! $is_logged_in ) : ?>
-          <h3>Your account</h3>
-          <div class="section-note">You'll use this to sign in and manage your profile.</div>
-          <div class="form-field"><label>Full name</label><input type="text" name="name" id="ap-name" placeholder="Jane Okafor" autocomplete="name"></div>
-          <div class="form-field"><label>Email address</label><input type="email" name="email" id="ap-email" placeholder="you@example.com" autocomplete="email"></div>
-          <div class="form-field"><label>Password</label><input type="password" name="password" id="ap-password" placeholder="Create a password" autocomplete="new-password"></div>
+          <h3><?php echo $at( 's.apply.account' ); ?></h3>
+          <div class="section-note"><?php echo $at( 's.apply.account_note' ); ?></div>
+          <div class="form-field"><label><?php echo $at( 's.apply.full_name' ); ?></label><input type="text" name="name" id="ap-name" placeholder="Jane Okafor" autocomplete="name"></div>
+          <div class="form-field"><label><?php echo $at( 's.apply.email' ); ?></label><input type="email" name="email" id="ap-email" placeholder="you@example.com" autocomplete="email"></div>
+          <div class="form-field"><label><?php echo $at( 's.apply.password' ); ?></label><input type="password" name="password" id="ap-password" placeholder="<?php echo $ata( 's.apply.password_ph' ); ?>" autocomplete="new-password"></div>
         <?php endif; ?>
 
-        <h3>Professional details</h3>
-        <div class="form-field"><label>Professional title</label><input type="text" name="title" id="ap-title" placeholder="e.g. Licensed Clinical Psychologist"></div>
+        <h3><?php echo $at( 's.apply.details' ); ?></h3>
+        <div class="form-field"><label><?php echo $at( 's.apply.prof_title' ); ?></label><input type="text" name="title" id="ap-title" placeholder="<?php echo $ata( 's.apply.prof_title_ph' ); ?>"></div>
         <div class="form-row">
-          <div class="form-field"><label>License / registration number</label><input type="text" name="license_number" id="ap-license" placeholder="Optional, if applicable"></div>
-          <div class="form-field"><label>Years of experience</label><input type="number" name="years_experience" id="ap-years" min="0" max="60" placeholder="e.g. 8"></div>
+          <div class="form-field"><label><?php echo $at( 's.apply.license' ); ?></label><input type="text" name="license_number" id="ap-license" placeholder="<?php echo $ata( 's.apply.license_ph' ); ?>"></div>
+          <div class="form-field"><label><?php echo $at( 's.apply.years' ); ?></label><input type="number" name="years_experience" id="ap-years" min="0" max="60" placeholder="<?php echo $ata( 's.apply.years_ph' ); ?>"></div>
         </div>
-        <div class="form-field"><label>Specialty</label><input type="text" name="specialty" id="ap-specialty" placeholder="e.g. Anxiety, trauma, relationships"></div>
-        <div class="form-field"><label>Short bio</label><textarea name="bio" id="ap-bio" placeholder="A couple of sentences clients will see on your profile."></textarea></div>
+        <div class="form-field"><label><?php echo $at( 's.apply.specialty' ); ?></label><input type="text" name="specialty" id="ap-specialty" placeholder="<?php echo $ata( 's.apply.specialty_ph' ); ?>"></div>
+        <div class="form-field"><label><?php echo $at( 's.apply.bio' ); ?></label><textarea name="bio" id="ap-bio" placeholder="<?php echo $ata( 's.apply.bio_ph' ); ?>"></textarea></div>
 
-        <h3>Your rate</h3>
-        <div class="section-note">You set this — Kounselia doesn't set it for you. You can change it later from your profile.</div>
-        <div class="form-field rate-prefix"><span>₦</span><input type="number" name="rate_amount" id="ap-rate" min="0" step="0.01" placeholder="Per session"></div>
+        <h3><?php echo $at( 's.apply.rate' ); ?></h3>
+        <div class="section-note"><?php echo $at( 's.apply.rate_note' ); ?></div>
+        <div class="form-field rate-prefix"><span>₦</span><input type="number" name="rate_amount" id="ap-rate" min="0" step="0.01" placeholder="<?php echo $ata( 's.apply.rate_ph' ); ?>"></div>
 
-        <h3>Verification documents</h3>
-        <div class="section-note">PDF, JPG, or PNG, up to 8MB each.</div>
+        <h3><?php echo $at( 's.apply.docs' ); ?></h3>
+        <div class="section-note"><?php echo $at( 's.apply.docs_note' ); ?></div>
         <div class="file-field">
-          <label>License or credential document (required)</label>
+          <label><?php echo $at( 's.apply.doc_license' ); ?></label>
           <input type="file" name="license_doc" id="ap-license-doc" accept=".pdf,.jpg,.jpeg,.png">
         </div>
         <div class="file-field" style="margin-top:10px">
-          <label>Government-issued ID (optional, speeds up review)</label>
+          <label><?php echo $at( 's.apply.doc_id' ); ?></label>
           <input type="file" name="id_doc" id="ap-id-doc" accept=".pdf,.jpg,.jpeg,.png">
         </div>
 
         <input type="text" name="website" id="ap-hp" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
 
-        <button type="submit" class="apply-submit" id="apply-btn">Submit application</button>
+        <button type="submit" class="apply-submit" id="apply-btn"><?php echo $at( 's.apply.submit' ); ?></button>
         <div class="apply-msg" id="apply-msg"></div>
       </form>
     </div>
@@ -138,6 +145,7 @@ $nonce    = wp_create_nonce( 'kounselia_auth' );
 </div>
 
 <script>
+const AT = <?php echo wp_json_encode( kounselia_i18n_subset( $al, 's.apply.js_' ) ); ?>;
 const form = document.getElementById('apply-form');
 if (form) {
   form.addEventListener('submit', function(e){
@@ -152,27 +160,27 @@ if (form) {
     fd.append('nonce', <?php echo wp_json_encode( $nonce ); ?>);
 
     btn.disabled = true;
-    btn.textContent = 'Submitting...';
+    btn.textContent = AT['s.apply.js_submitting'];
 
     fetch(<?php echo wp_json_encode( $ajax_url ); ?>, { method: 'POST', body: fd })
       .then(r => r.json())
       .then(res => {
         if (res.success) {
           msg.classList.add('notice');
-          msg.textContent = res.data.message || 'Application submitted.';
+          msg.textContent = res.data.message || AT['s.apply.js_done'];
           setTimeout(() => { window.location.href = (res.data && res.data.redirect) || '/pro-dashboard.php'; }, 1200);
         } else {
           btn.disabled = false;
-          btn.textContent = 'Submit application';
+          btn.textContent = AT['s.apply.js_submit'];
           msg.classList.add('error');
-          msg.textContent = (res.data && res.data.message) ? res.data.message : 'Something went wrong, please try again.';
+          msg.textContent = (res.data && res.data.message) ? res.data.message : AT['s.apply.js_error'];
         }
       })
       .catch(() => {
         btn.disabled = false;
-        btn.textContent = 'Submit application';
+        btn.textContent = AT['s.apply.js_submit'];
         msg.classList.add('error');
-        msg.textContent = 'Something went wrong, please check your connection and try again.';
+        msg.textContent = AT['s.apply.js_network'];
       });
   });
 }

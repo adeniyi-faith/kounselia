@@ -6,11 +6,13 @@ import { Button } from '@/components/Button';
 import { FormMessage } from '@/components/FormMessage';
 import { FormScreen } from '@/components/FormScreen';
 import { TextField } from '@/components/TextField';
+import { useT } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles } from '@/theme';
 
 export default function SignUp() {
   const styles = useStyles();
+  const t = useT();
   const { signUp } = useSession();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -22,11 +24,11 @@ export default function SignUp() {
 
   async function submit() {
     if (!email.trim() || !password) {
-      setError('Please enter both email and password.');
+      setError(t('m.auth.enter_both'));
       return;
     }
     if (password.length < 8) {
-      setError('Please choose a password of at least 8 characters.');
+      setError(t('m.auth.pw_too_short'));
       return;
     }
     setBusy(true);
@@ -40,12 +42,12 @@ export default function SignUp() {
   }
 
   return (
-    <FormScreen title="Create your account" subtitle="Free to start. Your conversations stay private.">
+    <FormScreen title={t('m.auth.create_your_account')} subtitle={t('m.auth.sign_up_sub')}>
       <TextField
-        label="Your name"
+        label={t('m.auth.your_name')}
         value={name}
         onChangeText={setName}
-        placeholder="What should we call you?"
+        placeholder={t('m.auth.name_placeholder')}
         autoComplete="name"
         textContentType="givenName"
         returnKeyType="next"
@@ -54,7 +56,7 @@ export default function SignUp() {
       />
       <TextField
         ref={emailRef}
-        label="Email"
+        label={t('m.auth.email')}
         value={email}
         onChangeText={setEmail}
         placeholder="you@example.com"
@@ -68,20 +70,20 @@ export default function SignUp() {
       />
       <TextField
         ref={passwordRef}
-        label="Password"
+        label={t('m.auth.password')}
         password
         value={password}
         onChangeText={setPassword}
-        placeholder="At least 8 characters"
+        placeholder={t('m.auth.pw_placeholder')}
         autoComplete="new-password"
         textContentType="newPassword"
         returnKeyType="go"
         onSubmitEditing={submit}
       />
       {error ? <FormMessage tone="error" text={error} /> : null}
-      <Button title="Create account" onPress={submit} busy={busy} />
+      <Button title={t('m.auth.create_account')} onPress={submit} busy={busy} />
       <Text style={styles.switch}>
-        Already have an account?{' '}
+        {t('m.auth.have_account')}{' '}
         <Text
           accessibilityRole="link"
           style={styles.link}
@@ -92,7 +94,7 @@ export default function SignUp() {
             router.replace({ pathname: '/sign-in', params: { switched: '1' } });
           }}
         >
-          Sign in
+          {t('m.auth.sign_in')}
         </Text>
       </Text>
     </FormScreen>

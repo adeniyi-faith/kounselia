@@ -62,7 +62,7 @@ $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 
 $nonce    = wp_create_nonce( 'kounselia_auth' );
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html <?php echo function_exists( 'kounselia_html_attrs' ) ? kounselia_html_attrs() : 'lang="en"'; ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">

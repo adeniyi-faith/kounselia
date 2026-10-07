@@ -35,6 +35,10 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param string $body          Short in-app/push body text.
  * @param string $url           Where tapping the notification should go (relative path).
  * @param array  $email         Optional. If given, also emails the user. Keys: subject, headline, content_html, btn_text, btn_url.
+ *
+ * The caller writes $title, $body and $email in the recipient's language
+ * (kounselia_mail_lang( $user_id )); the email's footer and page
+ * direction follow the same language.
  */
 function kounselia_notify_user( $user_id, $type, $title, $body, $url = '', $email = null ) {
     global $wpdb;
@@ -61,7 +65,8 @@ function kounselia_notify_user( $user_id, $type, $title, $body, $url = '', $emai
                 $email['headline'],
                 $email['content_html'],
                 isset( $email['btn_text'] ) ? $email['btn_text'] : null,
-                isset( $email['btn_url'] ) ? $email['btn_url'] : null
+                isset( $email['btn_url'] ) ? $email['btn_url'] : null,
+                array( 'lang' => kounselia_mail_lang( $user ) )
             );
         }
     }

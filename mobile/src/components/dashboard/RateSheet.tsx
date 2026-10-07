@@ -5,6 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Modal, Pressable, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { Button } from '../Button';
 import { FormMessage } from '../FormMessage';
@@ -20,6 +21,7 @@ export function RateSheet({ config, booking, onClose }: Props) {
   const styles = useStyles();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const t = useT();
   const [stars, setStars] = useState(0);
   const [comment, setComment] = useState('');
   const [busy, setBusy] = useState(false);
@@ -44,13 +46,13 @@ export function RateSheet({ config, booking, onClose }: Props) {
 
   return (
     <Modal visible={!!booking} transparent animationType="slide" onRequestClose={() => close(false)}>
-      <Pressable style={styles.backdrop} onPress={() => close(false)} accessibilityLabel="Close" />
+      <Pressable style={styles.backdrop} onPress={() => close(false)} accessibilityLabel={t('m.common.close')} />
       <KeyboardAvoidingView behavior="padding" style={styles.sheetWrap} pointerEvents="box-none">
         <View style={[styles.sheet, { paddingBottom: insets.bottom + 20 }]}>
           <View style={styles.handle} />
-          <Text style={styles.title}>How was your session?</Text>
-          <Text style={styles.sub}>With {booking?.pro_name}. Your rating helps other members choose.</Text>
-          <View style={styles.stars} accessibilityRole="adjustable" accessibilityLabel={`${stars} out of 5 stars`}>
+          <Text style={styles.title}>{t('m.rate.title')}</Text>
+          <Text style={styles.sub}>{t('m.rate.sub', { name: booking?.pro_name ?? '' })}</Text>
+          <View style={styles.stars} accessibilityRole="adjustable" accessibilityLabel={t('m.rate.stars_of_5', { n: stars })}>
             {[1, 2, 3, 4, 5].map((n) => (
               <Pressable
                 key={n}
@@ -59,7 +61,7 @@ export function RateSheet({ config, booking, onClose }: Props) {
                   setStars(n);
                 }}
                 accessibilityRole="button"
-                accessibilityLabel={`${n} star${n > 1 ? 's' : ''}`}
+                accessibilityLabel={t(n === 1 ? 'm.rate.star_one' : 'm.rate.star_other', { n })}
                 hitSlop={4}
               >
                 <TablerIcon name={n <= stars ? 'star-filled' : 'star'} size={36} color={n <= stars ? colors.gold : colors.border} />
@@ -69,7 +71,7 @@ export function RateSheet({ config, booking, onClose }: Props) {
           <TextInput
             value={comment}
             onChangeText={setComment}
-            placeholder="Anything you'd like to share? (optional)"
+            placeholder={t('m.rate.placeholder')}
             placeholderTextColor={colors.text3}
             multiline
             maxLength={1000}
@@ -77,7 +79,7 @@ export function RateSheet({ config, booking, onClose }: Props) {
             textAlignVertical="top"
           />
           {error ? <FormMessage tone="error" text={error} /> : null}
-          <Button title="Send rating" onPress={send} busy={busy} disabled={!stars} />
+          <Button title={t('m.rate.send')} onPress={send} busy={busy} disabled={!stars} />
         </View>
       </KeyboardAvoidingView>
     </Modal>

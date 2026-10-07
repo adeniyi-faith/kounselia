@@ -3,6 +3,7 @@
 import type { HomeData } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useLanguage } from '@/language';
 import { counselorColors, fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 import { Card } from './Card';
@@ -13,26 +14,27 @@ interface Props {
   onPick: (key: string) => void;
 }
 
-function dayLetter(date: string): string {
+function dayLetter(date: string, language: string): string {
   // Dates are the site's calendar days ("2026-09-26"); read them as such.
   const [y, m, d] = date.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString([], { weekday: 'narrow' });
+  return new Date(y, m - 1, d).toLocaleDateString(language, { weekday: 'narrow' });
 }
 
 export function MoodCard({ mood, saving, onPick }: Props) {
   const styles = useStyles();
   const colors = useColors();
+  const { language, t } = useLanguage();
   const colorOf = (key: string | null) => mood.options.find((o) => o.key === key)?.color;
   const shown = saving ?? mood.today;
 
   return (
     <Card>
       <View style={styles.head}>
-        <Text style={styles.title}>How are you feeling today?</Text>
+        <Text style={styles.title}>{t('m.mood.title')}</Text>
         {mood.today && !saving ? (
           <View style={styles.saved}>
             <TablerIcon name="check" size={11} color={colors.sage} />
-            <Text style={styles.savedText}>Saved</Text>
+            <Text style={styles.savedText}>{t('m.common.saved')}</Text>
           </View>
         ) : null}
       </View>
@@ -72,13 +74,13 @@ export function MoodCard({ mood, saving, onPick }: Props) {
           );
         })}
       </ScrollView>
-      <View style={styles.rhythm} accessible accessibilityLabel="Your moods over the last seven days">
+      <View style={styles.rhythm} accessible accessibilityLabel={t('m.mood.week_a11y')}>
         {mood.week.map((day) => {
           const color = colorOf(day.mood);
           return (
             <View key={day.date} style={styles.day}>
               <View style={[styles.dot, color ? { backgroundColor: counselorColors(color, colors).fg, borderColor: 'transparent' } : null]} />
-              <Text style={styles.dayLetter}>{dayLetter(day.date)}</Text>
+              <Text style={styles.dayLetter}>{dayLetter(day.date, language)}</Text>
             </View>
           );
         })}

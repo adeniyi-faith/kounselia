@@ -87,38 +87,40 @@ function kounselia_send_single_booking_reminder( $booking ) {
 
     $client_user       = get_userdata( $booking->client_user_id );
     $professional_user = get_userdata( $booking->professional_user_id );
-    $when              = date_i18n( 'g:i A', strtotime( $booking->scheduled_start ) );
+    $start_ts          = strtotime( $booking->scheduled_start );
     $join_url          = rtrim( home_url(), '/' ) . '/video-call.php?booking_id=' . (int) $booking->id;
 
-    if ( $client_user ) {
+    // Each person is written to in their own language, with their own side's wording.
+    $sides = array(
+        array( $client_user, $booking->client_user_id, $professional_user, '/dashboard.php#professionals' ),
+        array( $professional_user, $booking->professional_user_id, $client_user, '/pro-dashboard.php#bookings' ),
+    );
+    foreach ( $sides as $side ) {
+        list( $me, $me_id, $other, $path ) = $side;
+        if ( ! $me ) {
+            continue;
+        }
+        $lang  = kounselia_mail_lang( $me );
+        $when  = kounselia_mail_time( $start_ts, $lang );
+        $title = kounselia_t( 'mail.reminder.title', array(), $lang );
+        if ( $other ) {
+            $body    = kounselia_t( 'mail.reminder.body_with', array( 'time' => $when, 'name' => $other->display_name ), $lang );
+            $content = kounselia_t( 'mail.reminder.content_with', array( 'time' => esc_html( $when ), 'name' => esc_html( $other->display_name ) ), $lang );
+        } else {
+            $body    = kounselia_t( 'mail.reminder.body', array( 'time' => $when ), $lang );
+            $content = kounselia_t( 'mail.reminder.content', array( 'time' => esc_html( $when ) ), $lang );
+        }
         kounselia_notify_user(
-            $booking->client_user_id,
+            $me_id,
             'booking_reminder',
-            'Your session starts in about an hour',
-            'At ' . $when . ( $professional_user ? ' with ' . $professional_user->display_name : '' ) . '.',
-            '/dashboard.php#professionals',
+            $title,
+            $body,
+            $path,
             array(
-                'subject'      => 'Your session starts in about an hour',
-                'headline'     => 'Coming up',
-                'content_html' => '<p>Your session' . ( $professional_user ? ' with <strong>' . esc_html( $professional_user->display_name ) . '</strong>' : '' ) . ' starts at <strong>' . esc_html( $when ) . '</strong>. The video room opens 10 minutes before.</p>',
-                'btn_text'     => 'Open session page',
-                'btn_url'      => $join_url,
-            )
-        );
-    }
-
-    if ( $professional_user ) {
-        kounselia_notify_user(
-            $booking->professional_user_id,
-            'booking_reminder',
-            'Your session starts in about an hour',
-            'At ' . $when . ( $client_user ? ' with ' . $client_user->display_name : '' ) . '.',
-            '/pro-dashboard.php#bookings',
-            array(
-                'subject'      => 'Your session starts in about an hour',
-                'headline'     => 'Coming up',
-                'content_html' => '<p>Your session' . ( $client_user ? ' with <strong>' . esc_html( $client_user->display_name ) . '</strong>' : '' ) . ' starts at <strong>' . esc_html( $when ) . '</strong>. The video room opens 10 minutes before.</p>',
-                'btn_text'     => 'Open session page',
+                'subject'      => $title,
+                'headline'     => kounselia_t( 'mail.reminder.headline', array(), $lang ),
+                'content_html' => '<p>' . $content . '</p>',
+                'btn_text'     => kounselia_t( 'mail.reminder.button', array(), $lang ),
                 'btn_url'      => $join_url,
             )
         );

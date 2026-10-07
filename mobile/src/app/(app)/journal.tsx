@@ -10,21 +10,23 @@ import { SectionHead } from '@/components/dashboard/Card';
 import { JournalCard } from '@/components/dashboard/JournalCard';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useLanguage } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 import { JournalSkeleton } from '@/components/Skeleton';
 
 // "2026-09-26" is a calendar day, not a moment, so it's read as local noon
 // to never slip into the day before or after.
-function dayLabel(date: string) {
+function dayLabel(date: string, language: string) {
   const d = new Date(`${date}T12:00:00`);
   const sameYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', ...(sameYear ? {} : { year: 'numeric' }) });
+  return d.toLocaleDateString(language, { weekday: 'long', day: 'numeric', month: 'long', ...(sameYear ? {} : { year: 'numeric' }) });
 }
 
 export default function Journal() {
   const styles = useStyles();
   const colors = useColors();
+  const { language, t } = useLanguage();
   const { config } = useSession();
   const [entries, setEntries] = useState<JournalEntry[] | null>(null);
   const [today, setToday] = useState('');
@@ -73,11 +75,11 @@ export default function Journal() {
   if (!entries) {
     return (
       <SafeAreaView style={styles.safe}>
-        <ScreenHeader title="My journal" />
+        <ScreenHeader title={t('m.b.journal.title')} />
         {failed ? (
           <View style={styles.center}>
-            <Text style={styles.notice}>We couldn’t load your journal. Please check your internet connection.</Text>
-            <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+            <Text style={styles.notice}>{t('m.b.journal.load_failed')}</Text>
+            <Button title={t('m.b.common.try_again')} variant="ghost" onPress={refresh} busy={refreshing} />
           </View>
         ) : (
           <View style={styles.skeleton}>
@@ -90,7 +92,7 @@ export default function Journal() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScreenHeader title="My journal" />
+      <ScreenHeader title={t('m.b.journal.title')} />
       <FlatList
         data={entries}
         keyExtractor={(e) => e.date}
@@ -104,17 +106,17 @@ export default function Journal() {
           <>
             <View style={styles.intro}>
               <TablerIcon name="lock" size={15} color={colors.sage} />
-              <Text style={styles.introText}>Only you can see your journal. Your counselors and the Kounselia team can’t read it.</Text>
+              <Text style={styles.introText}>{t('m.b.journal.private')}</Text>
             </View>
-            <SectionHead title="Today" note={new Date().toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long' })} />
+            <SectionHead title={t('m.b.journal.today')} note={new Date().toLocaleDateString(language, { weekday: 'long', day: 'numeric', month: 'long' })} />
             <JournalCard config={config} initial={today} />
-            <SectionHead title="Earlier days" />
+            <SectionHead title={t('m.b.journal.earlier')} />
           </>
         }
         ListEmptyComponent={
           <View style={styles.empty}>
             <TablerIcon name="notebook" size={28} color={colors.text3} />
-            <Text style={styles.emptyText}>Your earlier entries will appear here. Write a little each day, it adds up.</Text>
+            <Text style={styles.emptyText}>{t('m.b.journal.empty')}</Text>
           </View>
         }
         ListFooterComponent={loadingMore ? <View style={{ marginTop: 16 }}><JournalSkeleton /></View> : null}
@@ -126,11 +128,11 @@ export default function Journal() {
               onPress={() => setOpen(expanded ? null : item.date)}
               accessibilityRole="button"
               accessibilityState={{ expanded }}
-              accessibilityHint={expanded ? 'Shows less' : 'Shows the whole entry'}
+              accessibilityHint={expanded ? t('m.b.journal.shows_less') : t('m.b.journal.shows_all')}
               style={({ pressed }) => [styles.entry, pressed && { opacity: 0.9 }]}
             >
               <View style={styles.entryHead}>
-                <Text style={styles.entryDate}>{dayLabel(item.date)}</Text>
+                <Text style={styles.entryDate}>{dayLabel(item.date, language)}</Text>
                 <TablerIcon name={expanded ? 'chevron-up' : 'chevron-down'} size={16} color={colors.text3} />
               </View>
               <Text style={styles.entryText} numberOfLines={expanded ? undefined : 3} selectable={expanded}>

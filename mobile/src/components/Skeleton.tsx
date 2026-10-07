@@ -7,6 +7,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Animated, Easing, StyleSheet, View, type DimensionValue, type StyleProp, type ViewStyle } from 'react-native';
+import { useT } from '@/language';
 import { makeStyles, radius, useTheme } from '@/theme';
 
 // One sweep shared by every placeholder, started while any are showing.
@@ -75,8 +76,9 @@ export function BoneCard({ children, style }: { children?: ReactNode; style?: St
 
 // Wraps a skeleton so screen readers hear "Loading" once.
 function Loading({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const t = useT();
   return (
-    <View style={style} accessible accessibilityLabel="Loading" accessibilityRole="progressbar">
+    <View style={style} accessible accessibilityLabel={t('m.b.common.loading')} accessibilityRole="progressbar">
       {children}
     </View>
   );

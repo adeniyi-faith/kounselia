@@ -12,6 +12,7 @@ import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { Animated, Easing, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useT } from '@/language';
 import { fonts, makeStyles, radius, useColors, type Palette } from '@/theme';
 import { TablerIcon } from './TablerIcon';
 
@@ -40,6 +41,7 @@ export function showDialog(options: DialogOptions) {
 }
 
 export function DialogHost() {
+  const t = useT();
   const [current, setCurrent] = useState<DialogOptions | null>(null);
   const [open, setOpen] = useState(false);
   const [fade] = useState(() => new Animated.Value(0));
@@ -73,7 +75,7 @@ export function DialogHost() {
   }
 
   if (!current) return null;
-  const buttons = current.buttons?.length ? current.buttons : [{ text: 'OK' }];
+  const buttons = current.buttons?.length ? current.buttons : [{ text: t('m.common.ok') }];
   const cancel = buttons.find((b) => b.style === 'cancel');
   // Tapping outside or the phone's back button means "no" when there is a
   // way out, and "OK" when it's only a notice.
@@ -82,7 +84,7 @@ export function DialogHost() {
 
   return (
     <Modal visible={open} transparent animationType="none" statusBarTranslucent navigationBarTranslucent onRequestClose={() => dismissable && dismiss()}>
-      <Card options={current} buttons={buttons} fade={fade} onChoose={(b) => close(b.onPress)} onDismiss={dismissable ? dismiss : undefined} />
+      <Card options={current} buttons={buttons} fade={fade} closeLabel={t('m.common.close')} onChoose={(b) => close(b.onPress)} onDismiss={dismissable ? dismiss : undefined} />
     </Modal>
   );
 }
@@ -91,12 +93,14 @@ function Card({
   options,
   buttons,
   fade,
+  closeLabel,
   onChoose,
   onDismiss,
 }: {
   options: DialogOptions;
   buttons: DialogButton[];
   fade: Animated.Value;
+  closeLabel: string;
   onChoose: (b: DialogButton) => void;
   onDismiss?: () => void;
 }) {
@@ -115,7 +119,7 @@ function Card({
   return (
     <View style={styles.fill}>
       <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, { opacity: fade }]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} accessibilityLabel="Close" disabled={!onDismiss} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={onDismiss} accessibilityLabel={closeLabel} disabled={!onDismiss} />
       </Animated.View>
       <Animated.View
         accessibilityViewIsModal

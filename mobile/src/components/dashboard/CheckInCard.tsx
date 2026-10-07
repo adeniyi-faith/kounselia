@@ -1,5 +1,6 @@
 import type { CheckIn, CounselorSummary } from '@kounselia/core';
 import { Pressable, Text, View } from 'react-native';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { CounselorAvatar } from '../CounselorAvatar';
 import { Card } from './Card';
@@ -10,22 +11,23 @@ import { Card } from './Card';
 export function CheckInCard(props: { checkin: CheckIn; counselor: CounselorSummary; onTell: () => void; onLater: () => void }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const { checkin, counselor, onTell, onLater } = props;
   return (
     <Card style={styles.card}>
       <View style={styles.top}>
         <CounselorAvatar icon={counselor.icon} color={counselor.color} size={52} />
         <View style={styles.meta}>
-          <Text style={styles.title}>{counselor.name} wants to check in</Text>
-          <Text style={styles.reason}>You mentioned “{checkin.event_text}”. How did it go?</Text>
+          <Text style={styles.title}>{t('m.checkin.title', { name: counselor.name })}</Text>
+          <Text style={styles.reason}>{t('m.checkin.reason', { event: checkin.event_text })}</Text>
         </View>
       </View>
       <View style={styles.actions}>
         <Pressable onPress={onTell} accessibilityRole="button" style={({ pressed }) => [styles.btn, pressed && { backgroundColor: colors.accent2 }]}>
-          <Text style={styles.btnText}>Tell them</Text>
+          <Text style={styles.btnText}>{t('m.checkin.tell')}</Text>
         </Pressable>
         <Pressable onPress={onLater} accessibilityRole="button" hitSlop={8} style={styles.later}>
-          <Text style={styles.laterText}>Not now</Text>
+          <Text style={styles.laterText}>{t('m.common.not_now')}</Text>
         </Pressable>
       </View>
     </Card>
