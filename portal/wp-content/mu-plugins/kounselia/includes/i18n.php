@@ -60,7 +60,7 @@ function kounselia_i18n_dictionary( $lang ) {
     static $cache = array();
     $lang = kounselia_language_normalize( $lang );
     if ( ! isset( $cache[ $lang ] ) ) {
-        $file = dirname( KOUNSELIA_CORE_DIR, 3 ) . '/packages/core/src/locales/' . $lang . '.json';
+        $file = dirname( KOUNSELIA_CORE_DIR, 4 ) . '/packages/core/src/locales/' . $lang . '.json';
         $data = is_readable( $file ) ? json_decode( (string) file_get_contents( $file ), true ) : null;
         $cache[ $lang ] = is_array( $data ) ? $data : array();
     }
