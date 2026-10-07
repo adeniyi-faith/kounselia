@@ -7,7 +7,6 @@ import {
   changePassword,
   fetchAccount,
   LANGUAGES,
-  makeT,
   saveEmailPrefs,
   setLanguage,
   updateName,
@@ -34,22 +33,31 @@ import { Sheet } from '@/components/Sheet';
 import { TablerIcon } from '@/components/TablerIcon';
 import { TextField } from '@/components/TextField';
 import { pushState, turnOffPush, turnOnPush, type PushState } from '@/notifications';
+import { useLanguage, useT } from '@/language';
 import { useSession } from '@/session';
 import { type Appearance, counselorColors, fonts, makeStyles, radius, shadows, useColors, useTheme } from '@/theme';
 import { showDialog } from '@/components/Dialog';
 
 const APPEARANCES: { key: Appearance; label: string; icon: string }[] = [
-  { key: 'light', label: 'Light', icon: 'sun' },
-  { key: 'dark', label: 'Dark', icon: 'moon' },
-  { key: 'system', label: 'Device', icon: 'device-mobile' },
+  { key: 'light', label: 'm.settings.light', icon: 'sun' },
+  { key: 'dark', label: 'm.settings.dark', icon: 'moon' },
+  { key: 'system', label: 'm.settings.device', icon: 'device-mobile' },
 ];
+
+// The "lock after" choices, by how many seconds they wait (words from the app's own list).
+const LOCK_AFTER_KEYS: Record<number, { label: string; a11y: string }> = {
+  0: { label: 'm.settings.lock_now', a11y: 'm.settings.lock_a11y_now' },
+  60: { label: 'm.settings.lock_1', a11y: 'm.settings.lock_a11y_1' },
+  300: { label: 'm.settings.lock_5', a11y: 'm.settings.lock_a11y_5' },
+};
 
 export default function Settings() {
   const styles = useStyles();
   const colors = useColors();
   const { user, config, signOut, updateUser, deleteAccount } = useSession();
+  const { language, t, setLanguage: setAppLanguage } = useLanguage();
   const { appearance, setAppearance, scheme } = useTheme();
-  const appearanceNote = appearance === 'system' ? `Matches your phone, which is using ${scheme} mode now.` : undefined;
+  const appearanceNote = appearance === 'system' ? t(scheme === 'dark' ? 'm.settings.matches_dark' : 'm.settings.matches_light') : undefined;
   const { openInApp } = useBrowser();
   const toast = useToast();
   const [account, setAccount] = useState<Account | null>(null);
@@ -102,9 +110,9 @@ export default function Settings() {
       }
       setAccount((a) => (a ? { ...a, user: { ...a.user, avatar: res.data.avatar } } : a));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-      toast.show('Photo updated');
+      toast.show(t('m.settings.photo_updated'));
     } catch {
-      toast.show("Couldn't use that photo. Please try another one.");
+      toast.show(t('m.settings.photo_failed'));
     } finally {
       setPhotoBusy(false);
     }
@@ -127,28 +135,27 @@ export default function Settings() {
       const method = await unlockMethodName();
       if (!method) {
         showDialog({
-          title: 'Set a screen lock first',
-          message: 'App lock uses your phone’s own Face ID, fingerprint or passcode. Set one up in your phone’s settings, then come back here.',
+          title: t('m.settings.lock_needed_title'),
+          message: t('m.settings.lock_needed_body'),
           icon: 'lock',
         });
         return;
       }
-      const res = await confirmOwner('Turn on app lock');
+      const res = await confirmOwner(t('m.settings.lock_turn_on'));
       if (!res.ok) return;
       await lock.setAfter(0);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-      toast.show('App lock is on');
+      toast.show(t('m.settings.lock_is_on'));
     } else {
-      const res = await confirmOwner('Turn off app lock');
+      const res = await confirmOwner(t('m.settings.lock_turn_off'));
       if (!res.ok) return;
       await lock.setAfter(null);
-      toast.show('App lock is off');
+      toast.show(t('m.settings.lock_is_off'));
     }
   }
 
   // Language: counselors, growth plans and reminders write in it; screens follow as they are translated.
   function chooseLanguage() {
-    const t = makeT(account?.language ?? 'en');
     showDialog({
       title: t('lang.choose'),
       message: t('lang.note'),
@@ -162,6 +169,7 @@ export default function Settings() {
               toast.show(res.message);
               return;
             }
+            setAppLanguage(res.data.language);
             setAccount((a) => (a ? { ...a, language: res.data.language } : a));
             toast.show(res.data.message);
           },
@@ -173,12 +181,12 @@ export default function Settings() {
 
   function notificationsBlocked() {
     showDialog({
-      title: 'Notifications are off',
-      message: 'Notifications for Kounselia are turned off in your phone’s settings. Turn them on there to get session reminders and replies.',
+      title: t('m.settings.notif_off_title'),
+      message: t('m.settings.notif_off_body'),
       icon: 'bell-off',
       buttons: [
-        { text: 'Not now', style: 'cancel' },
-        { text: 'Open settings', onPress: () => Linking.openSettings().catch(() => undefined) },
+        { text: t('m.common.not_now'), style: 'cancel' },
+        { text: t('m.settings.open_settings'), onPress: () => Linking.openSettings().catch(() => undefined) },
       ],
     });
   }
@@ -197,17 +205,17 @@ export default function Settings() {
 
   function confirmSignOut() {
     showDialog({
-      title: 'Sign out?',
-      message: "You'll need your email and password to sign back in.",
+      title: t('m.common.sign_out_q'),
+      message: t('m.settings.signout_body'),
       icon: 'logout',
       buttons: [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+        { text: t('lang.cancel'), style: 'cancel' },
+        { text: t('m.common.sign_out'), style: 'destructive', onPress: () => signOut() },
       ],
     });
   }
 
-  const name = account?.user.name || user?.name || 'Your account';
+  const name = account?.user.name || user?.name || t('m.settings.your_account');
   const email = account?.user.email || user?.email || '';
   const initial = (name || email || '?').trim().charAt(0).toUpperCase();
   const plan = account?.plan;
@@ -221,7 +229,7 @@ export default function Settings() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
       >
         <Text style={styles.title} accessibilityRole="header">
-          Settings
+          {t('m.tabs.settings')}
         </Text>
 
         {/* Profile */}
@@ -230,7 +238,7 @@ export default function Settings() {
             onPress={changePhoto}
             disabled={photoBusy}
             accessibilityRole="button"
-            accessibilityLabel="Change profile photo"
+            accessibilityLabel={t('m.settings.change_photo_a11y')}
             style={styles.avatarWrap}
           >
             <View style={styles.avatar}>
@@ -261,10 +269,10 @@ export default function Settings() {
             {plan && (
               <View style={[styles.pill, plan.is_pro ? styles.pillPro : styles.pillFree]}>
                 <TablerIcon name={plan.is_pro ? 'sparkles' : 'leaf'} size={13} color={plan.is_pro ? colors.gold : colors.sage} />
-                <Text style={[styles.pillText, { color: plan.is_pro ? colors.gold : colors.sage }]}>{plan.is_pro ? 'Pro member' : 'Free plan'}</Text>
+                <Text style={[styles.pillText, { color: plan.is_pro ? colors.gold : colors.sage }]}>{plan.is_pro ? t('m.settings.pro_member') : t('m.settings.free_plan')}</Text>
               </View>
             )}
-            {account?.user.member_since ? <Text style={styles.since}>Member since {account.user.member_since}</Text> : null}
+            {account?.user.member_since ? <Text style={styles.since}>{t('m.settings.member_since', { date: account.user.member_since })}</Text> : null}
           </View>
         </View>
 
@@ -272,21 +280,21 @@ export default function Settings() {
         <Pressable
           onPress={openSafetyResources}
           accessibilityRole="link"
-          accessibilityHint="Opens emergency numbers and crisis lines"
+          accessibilityHint={t('m.settings.help_hint')}
           style={({ pressed }) => [styles.help, pressed && { opacity: 0.85 }]}
         >
           <View style={styles.helpIcon}>
             <TablerIcon name="lifebuoy" size={20} color={colors.rose} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.helpTitle}>Get help now</Text>
-            <Text style={styles.helpText}>If you’re in danger or thinking about ending your life, reach people who can help right away.</Text>
+            <Text style={styles.helpTitle}>{t('m.settings.get_help')}</Text>
+            <Text style={styles.helpText}>{t('m.settings.get_help_text')}</Text>
           </View>
           <TablerIcon name="chevron-right" size={18} color={colors.text3} />
         </Pressable>
 
         {plan && (
-          <Group title="Your plan">
+          <Group title={t('m.settings.g_plan')}>
             <Row
               icon={plan.is_pro ? 'sparkles' : 'leaf'}
               tint={plan.is_pro ? 'gold' : 'sage'}
@@ -298,7 +306,7 @@ export default function Settings() {
           </Group>
         )}
 
-        <Group title="Appearance" note={appearanceNote}>
+        <Group title={t('m.settings.g_appearance')} note={appearanceNote}>
           <View style={styles.segment} accessibilityRole="radiogroup">
             {APPEARANCES.map((a) => {
               const on = appearance === a.key;
@@ -312,44 +320,44 @@ export default function Settings() {
                   accessibilityRole="radio"
                   accessibilityState={{ checked: on }}
                   aria-checked={on}
-                  accessibilityLabel={a.label}
+                  accessibilityLabel={t(a.label)}
                   style={[styles.segmentItem, on && styles.segmentOn]}
                 >
                   <TablerIcon name={a.icon} size={20} color={on ? colors.accentText : colors.text3} />
-                  <Text style={[styles.segmentText, on && styles.segmentTextOn]}>{a.label}</Text>
+                  <Text style={[styles.segmentText, on && styles.segmentTextOn]}>{t(a.label)}</Text>
                 </Pressable>
               );
             })}
           </View>
         </Group>
 
-        <Group title="Account">
-          <Row icon="user" label="Name" value={name} onPress={() => setSheet('name')} />
-          <Row icon="mail" label="Email" value={email} />
-          <Row icon="camera" label="Profile photo" value={account?.user.avatar ? 'Change' : 'Add'} onPress={changePhoto} />
-          <Row icon="message-language" label={makeT(account?.language ?? 'en')('lang.setting')} value={LANGUAGES.find((l) => l.code === account?.language)?.name ?? 'English'} onPress={chooseLanguage} />
-          <Row icon="key" label="Password" value="Change" onPress={() => setSheet('password')} last />
+        <Group title={t('m.settings.g_account')}>
+          <Row icon="user" label={t('m.settings.name')} value={name} onPress={() => setSheet('name')} />
+          <Row icon="mail" label={t('m.auth.email')} value={email} />
+          <Row icon="camera" label={t('m.settings.profile_photo')} value={account?.user.avatar ? t('m.settings.change') : t('m.settings.add')} onPress={changePhoto} />
+          <Row icon="message-language" label={t('lang.setting')} value={LANGUAGES.find((l) => l.code === language)?.name ?? 'English'} onPress={chooseLanguage} />
+          <Row icon="key" label={t('m.auth.password')} value={t('m.settings.change')} onPress={() => setSheet('password')} last />
         </Group>
 
-        <Group title="Privacy and security" note={lock.after !== null && lock.after !== undefined ? 'Kounselia also hides its screen in your phone’s list of open apps.' : undefined}>
+        <Group title={t('m.settings.g_privacy')} note={lock.after !== null && lock.after !== undefined ? t('m.settings.privacy_note') : undefined}>
           <Row
             icon="lock"
             tint="plum"
-            label="App lock"
-            sub={unlockWith ? `Ask for ${unlockWith} to open Kounselia` : 'Ask for Face ID, fingerprint or passcode to open Kounselia'}
+            label={t('m.settings.app_lock')}
+            sub={unlockWith ? t('m.settings.ask_for_method', { method: unlockWith }) : t('m.settings.ask_for_default')}
             right={
               <Switch
                 value={lock.after !== null && lock.after !== undefined}
                 disabled={lock.after === undefined}
                 onValueChange={toggleLock}
                 trackColor={{ true: colors.accent, false: colors.surface3 }}
-                accessibilityLabel="App lock"
+                accessibilityLabel={t('m.settings.app_lock')}
               />
             }
             last={push === 'unavailable' && (lock.after === null || lock.after === undefined)}
           />
           {lock.after !== null && lock.after !== undefined ? (
-            <View style={[styles.segment, push !== 'unavailable' && styles.rowBorder]} accessibilityRole="radiogroup" accessibilityLabel="When to lock">
+            <View style={[styles.segment, push !== 'unavailable' && styles.rowBorder]} accessibilityRole="radiogroup" accessibilityLabel={t('m.settings.when_to_lock')}>
               {LOCK_AFTER_CHOICES.map((c) => {
                 const on = lock.after === c.value;
                 return (
@@ -362,28 +370,28 @@ export default function Settings() {
                     accessibilityRole="radio"
                     accessibilityState={{ checked: on }}
                     aria-checked={on}
-                    accessibilityLabel={`Lock ${c.label.toLowerCase()}`}
+                    accessibilityLabel={LOCK_AFTER_KEYS[c.value] ? t(LOCK_AFTER_KEYS[c.value].a11y) : c.label}
                     style={[styles.segmentItem, styles.segmentItemSmall, on && styles.segmentOn]}
                   >
-                    <Text style={[styles.segmentText, on && styles.segmentTextOn]}>{c.label}</Text>
+                    <Text style={[styles.segmentText, on && styles.segmentTextOn]}>{LOCK_AFTER_KEYS[c.value] ? t(LOCK_AFTER_KEYS[c.value].label) : c.label}</Text>
                   </Pressable>
                 );
               })}
             </View>
           ) : null}
           {push === 'blocked' ? (
-            <Row icon="bell-off" label="Notifications" sub="Turned off in your phone’s settings" onPress={notificationsBlocked} last />
+            <Row icon="bell-off" label={t('m.settings.notifications')} sub={t('m.settings.notif_blocked_sub')} onPress={notificationsBlocked} last />
           ) : push !== 'unavailable' ? (
             <Row
               icon="bell"
-              label="Notifications"
-              sub="Session reminders, booking changes and replies"
+              label={t('m.settings.notifications')}
+              sub={t('m.settings.notif_sub')}
               right={
                 <Switch
                   value={push === 'on'}
                   onValueChange={togglePush}
                   trackColor={{ true: colors.accent, false: colors.surface3 }}
-                  accessibilityLabel="Notifications"
+                  accessibilityLabel={t('m.settings.notifications')}
                 />
               }
               last
@@ -391,81 +399,81 @@ export default function Settings() {
           ) : null}
         </Group>
 
-        <Group title="Your counselors" note="What they remember helps them know you">
+        <Group title={t('m.settings.g_counselors')} note={t('m.settings.counselors_note')}>
           <Row
             icon="brain"
             tint="plum"
-            label="Memory profile"
-            sub={memory ? 'Your story, goals and what matters to you' : 'Not set up yet. Tell your counselors about you'}
+            label={t('m.settings.memory')}
+            sub={memory ? t('m.settings.memory_sub_set') : t('m.settings.memory_sub_unset')}
             onPress={() => router.push('/memory')}
             last
           />
         </Group>
 
-        <Group title="Reading and reflection">
-          <Row icon="notebook" tint="sage" label="My journal" sub="Today’s reflection and every earlier day" onPress={() => router.push('/journal')} />
-          <Row icon="news" tint="gold" label="Articles" sub="From The Kounselia Journal" onPress={() => router.push('/articles')} last />
+        <Group title={t('m.settings.g_reading')}>
+          <Row icon="notebook" tint="sage" label={t('m.settings.journal')} sub={t('m.settings.journal_sub')} onPress={() => router.push('/journal')} />
+          <Row icon="news" tint="gold" label={t('m.settings.articles')} sub={t('m.settings.articles_sub')} onPress={() => router.push('/articles')} last />
         </Group>
 
-        <Group title="Emails" note="Account emails, like booking confirmations, always arrive">
+        <Group title={t('m.settings.g_emails')} note={t('m.settings.emails_note')}>
           <Row
             icon="mail"
-            label="Newsletter"
-            sub="Occasional ideas for looking after your mind"
+            label={t('m.settings.newsletter')}
+            sub={t('m.settings.newsletter_sub')}
             right={
               <Switch
                 value={!!account?.emails.newsletter}
                 disabled={!account}
                 onValueChange={(on) => toggleEmail('newsletter', on)}
                 trackColor={{ true: colors.accent, false: colors.surface3 }}
-                accessibilityLabel="Newsletter emails"
+                accessibilityLabel={t('m.settings.newsletter_a11y')}
               />
             }
           />
           <Row
             icon="feather"
-            label="New articles"
-            sub="A short email when a new story is published"
+            label={t('m.settings.new_articles')}
+            sub={t('m.settings.new_articles_sub')}
             right={
               <Switch
                 value={!!account?.emails.blog}
                 disabled={!account}
                 onValueChange={(on) => toggleEmail('blog', on)}
                 trackColor={{ true: colors.accent, false: colors.surface3 }}
-                accessibilityLabel="New article emails"
+                accessibilityLabel={t('m.settings.new_articles_a11y')}
               />
             }
             last
           />
         </Group>
 
-        <Group title="Help and about">
-          <Row icon="lifebuoy" tint="rose" label="Safety resources" onPress={openSafetyResources} />
+        <Group title={t('m.settings.g_help')}>
+          <Row icon="lifebuoy" tint="rose" label={t('m.settings.safety')} onPress={openSafetyResources} />
           <Row
             icon="message-circle"
-            label="Contact us"
+            label={t('m.settings.contact')}
             value={links?.email}
             onPress={() => Linking.openURL(`mailto:${links?.email ?? 'hello@kounselia.com'}`).catch(() => undefined)}
           />
-          {links?.mission ? <Row icon="heart-handshake" label="Our mission" onPress={() => openInApp(links.mission!)} /> : null}
-          {links?.privacy ? <Row icon="shield-lock" label="Privacy policy" onPress={() => openInApp(links.privacy!)} /> : null}
-          {links?.terms ? <Row icon="file-text" label="Terms of service" onPress={() => openInApp(links.terms!)} /> : null}
-          <Row icon="info-circle" label="App version" value={Constants.expoConfig?.version ?? ''} last />
+          {links?.mission ? <Row icon="heart-handshake" label={t('m.settings.mission')} onPress={() => openInApp(links.mission!)} /> : null}
+          {links?.privacy ? <Row icon="shield-lock" label={t('m.settings.privacy_policy')} onPress={() => openInApp(links.privacy!)} /> : null}
+          {links?.terms ? <Row icon="file-text" label={t('m.settings.terms')} onPress={() => openInApp(links.terms!)} /> : null}
+          <Row icon="info-circle" label={t('m.settings.app_version')} value={Constants.expoConfig?.version ?? ''} last />
         </Group>
 
-        <Group title="Your data">
+        <Group title={t('m.settings.g_data')}>
           <Row
             icon="trash"
             tint="rose"
-            label="Delete account"
-            sub="Permanently erase your account, conversations and journal"
+            label={t('m.settings.delete_account')}
+            sub={t('m.settings.delete_sub')}
             onPress={() => setSheet('delete')}
             last
           />
         </Group>
 
-        <Button title="Sign out" variant="ghost" onPress={confirmSignOut} style={styles.signOut} />
-        <Text style={styles.footer}>Made with care by Kounselia</Text>
+        <Button title={t('m.common.sign_out')} variant="ghost" onPress={confirmSignOut} style={styles.signOut} />
+        <Text style={styles.footer}>{t('m.settings.footer')}</Text>
       </ScrollView>
 
       <NameSheet
@@ -478,7 +486,7 @@ export default function Settings() {
           updateUser({ name: res.data.name });
           setAccount((a) => (a ? { ...a, user: { ...a.user, name: res.data.name } } : a));
           setSheet(null);
-          toast.show('Name updated');
+          toast.show(t('m.settings.name_updated'));
           return null;
         }}
       />
@@ -490,7 +498,7 @@ export default function Settings() {
           if (!res.ok) return res.message;
           setSheet(null);
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-          toast.show('Password changed. Other phones have been signed out.');
+          toast.show(t('m.settings.password_changed'));
           return null;
         }}
       />
@@ -502,8 +510,8 @@ export default function Settings() {
           if (problem) return problem;
           // Signed out already: the welcome screen is showing underneath.
           showDialog({
-            title: 'Your account has been deleted',
-            message: 'Your conversations, mood check-ins, journal and everything your counselors remembered have been erased. Take care of yourself. You’re always welcome back.',
+            title: t('m.settings.deleted_title'),
+            message: t('m.settings.deleted_body'),
             icon: 'heart',
           });
           return null;
@@ -595,6 +603,7 @@ function NameSheet({
   onSave: (name: string) => Promise<string | null>;
 }) {
   const styles = useStyles();
+  const t = useT();
   const [name, setName] = useState(current);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -610,7 +619,7 @@ function NameSheet({
 
   async function save() {
     if (!name.trim()) {
-      setError('Please enter your name.');
+      setError(t('m.settings.enter_name'));
       return;
     }
     setBusy(true);
@@ -620,11 +629,11 @@ function NameSheet({
   }
 
   return (
-    <Sheet visible={visible} title="Your name" onClose={onClose}>
-      <Text style={styles.sheetText}>This is how your counselors and professionals will greet you.</Text>
-      <TextField label="Full name" value={name} onChangeText={setName} autoFocus autoCapitalize="words" autoComplete="name" returnKeyType="done" onSubmitEditing={save} />
+    <Sheet visible={visible} title={t('m.auth.your_name')} onClose={onClose}>
+      <Text style={styles.sheetText}>{t('m.settings.name_sheet_text')}</Text>
+      <TextField label={t('m.settings.full_name')} value={name} onChangeText={setName} autoFocus autoCapitalize="words" autoComplete="name" returnKeyType="done" onSubmitEditing={save} />
       {error ? <FormMessage tone="error" text={error} /> : null}
-      <Button title="Save" onPress={save} busy={busy} style={styles.sheetButton} />
+      <Button title={t('m.common.save')} onPress={save} busy={busy} style={styles.sheetButton} />
     </Sheet>
   );
 }
@@ -639,6 +648,7 @@ function PasswordSheet({
   onSave: (current: string, next: string) => Promise<string | null>;
 }) {
   const styles = useStyles();
+  const t = useT();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -656,9 +666,9 @@ function PasswordSheet({
   }
 
   async function save() {
-    if (!current || !next) return setError('Please fill in both password fields.');
-    if (next.length < 8) return setError('Your new password needs at least 8 characters.');
-    if (next !== confirm) return setError('The new passwords don’t match.');
+    if (!current || !next) return setError(t('m.settings.fill_both'));
+    if (next.length < 8) return setError(t('m.settings.new_pw_short'));
+    if (next !== confirm) return setError(t('m.settings.pw_mismatch'));
     setBusy(true);
     const problem = await onSave(current, next);
     setBusy(false);
@@ -666,13 +676,13 @@ function PasswordSheet({
   }
 
   return (
-    <Sheet visible={visible} title="Change password" onClose={onClose}>
-      <Text style={styles.sheetText}>You’ll stay signed in on this phone. Other phones will need the new password.</Text>
-      <TextField label="Current password" password value={current} onChangeText={setCurrent} autoComplete="current-password" autoFocus />
-      <TextField label="New password" password value={next} onChangeText={setNext} autoComplete="new-password" placeholder="At least 8 characters" />
-      <TextField label="Confirm new password" password value={confirm} onChangeText={setConfirm} autoComplete="new-password" onSubmitEditing={save} />
+    <Sheet visible={visible} title={t('m.settings.change_password')} onClose={onClose}>
+      <Text style={styles.sheetText}>{t('m.settings.pw_sheet_text')}</Text>
+      <TextField label={t('m.settings.current_pw')} password value={current} onChangeText={setCurrent} autoComplete="current-password" autoFocus />
+      <TextField label={t('m.settings.new_pw')} password value={next} onChangeText={setNext} autoComplete="new-password" placeholder={t('m.auth.pw_placeholder')} />
+      <TextField label={t('m.settings.confirm_pw')} password value={confirm} onChangeText={setConfirm} autoComplete="new-password" onSubmitEditing={save} />
       {error ? <FormMessage tone="error" text={error} /> : null}
-      <Button title="Update password" onPress={save} busy={busy} style={styles.sheetButton} />
+      <Button title={t('m.settings.update_pw')} onPress={save} busy={busy} style={styles.sheetButton} />
     </Sheet>
   );
 }
@@ -688,6 +698,7 @@ function DeleteAccountSheet({
 }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const [password, setPassword] = useState('');
   const [sure, setSure] = useState(false);
   const [error, setError] = useState('');
@@ -703,8 +714,8 @@ function DeleteAccountSheet({
   }
 
   async function remove() {
-    if (!password) return setError('Please enter your password.');
-    if (!sure) return setError('Please confirm you understand this can’t be undone.');
+    if (!password) return setError(t('m.settings.enter_pw'));
+    if (!sure) return setError(t('m.settings.confirm_understand'));
     setBusy(true);
     const problem = await onDelete(password);
     setBusy(false);
@@ -712,26 +723,21 @@ function DeleteAccountSheet({
   }
 
   return (
-    <Sheet visible={visible} title="Delete your account" onClose={onClose}>
-      <Text style={styles.sheetText}>
-        This permanently erases your account and everything in it: your conversations with counselors, mood check-ins, journal, what your counselors
-        remember about you, and your comments. If you’re on a paid plan, it ends and you won’t be charged again.
-      </Text>
-      <Text style={styles.sheetText}>
-        Records of sessions you had with professionals and payments you made are kept for their records and ours, with your name removed.
-      </Text>
-      <TextField label="Your password" password value={password} onChangeText={setPassword} autoComplete="current-password" />
+    <Sheet visible={visible} title={t('m.settings.delete_your_account')} onClose={onClose}>
+      <Text style={styles.sheetText}>{t('m.settings.delete_text1')}</Text>
+      <Text style={styles.sheetText}>{t('m.settings.delete_text2')}</Text>
+      <TextField label={t('m.settings.your_password')} password value={password} onChangeText={setPassword} autoComplete="current-password" />
       <View style={styles.sureRow}>
         <Switch
           value={sure}
           onValueChange={setSure}
           trackColor={{ true: colors.rose, false: colors.surface3 }}
-          accessibilityLabel="I understand this can’t be undone"
+          accessibilityLabel={t('m.settings.understand')}
         />
-        <Text style={styles.sureText}>I understand this can’t be undone</Text>
+        <Text style={styles.sureText}>{t('m.settings.understand')}</Text>
       </View>
       {error ? <FormMessage tone="error" text={error} /> : null}
-      <Button title="Delete my account" variant="danger" onPress={remove} busy={busy} style={styles.sheetButton} />
+      <Button title={t('m.settings.delete_my')} variant="danger" onPress={remove} busy={busy} style={styles.sheetButton} />
     </Sheet>
   );
 }

@@ -1,32 +1,32 @@
 
-<div class="screen" id="chat" onclick="closeChatMenu()">
+<div class="screen" id="chat" <?php echo $kounselia_chat_attrs; ?> onclick="closeChatMenu()">
   <div class="chat-nav">
-    <button class="back-btn" onclick="goBack()" aria-label="Go back"><i class="ti ti-arrow-left"></i></button>
+    <button class="back-btn" onclick="goBack()" aria-label="<?php echo esc_attr( $kounselia_chat_t( 'c.chat.go_back' ) ); ?>"><i class="ti ti-arrow-left"></i></button>
     <div class="chat-av-sm" id="chat-avatar"></div>
     <div class="chat-info">
       <h3 id="chat-name-wrap">
         <span id="chat-name">—</span>
-        <span class="trust-badge" title="Verified Counselor"><i class="ti ti-check"></i></span>
+        <span class="trust-badge" title="<?php echo esc_attr( $kounselia_chat_t( 'c.chat.verified' ) ); ?>"><i class="ti ti-check"></i></span>
       </h3>
       <p id="chat-spec">—</p>
     </div>
     
     <div class="nav-actions">
-      <button class="icon-btn action-call" id="voice-call-btn" onclick="startVoiceCall()" title="Start voice conversation" style="display:none"><i class="ti ti-phone"></i></button>
-      <button class="icon-btn" title="Load Chat History" onclick="fetchAndDisplayHistory(event)"><i class="ti ti-history"></i></button>
-      <button class="icon-btn" title="More options" onclick="toggleChatMenu(event)"><i class="ti ti-dots-vertical"></i></button>
+      <button class="icon-btn action-call" id="voice-call-btn" onclick="startVoiceCall()" title="<?php echo esc_attr( $kounselia_chat_t( 'c.chat.start_voice' ) ); ?>" style="display:none"><i class="ti ti-phone"></i></button>
+      <button class="icon-btn" title="<?php echo esc_attr( $kounselia_chat_t( 'c.chat.load_history' ) ); ?>" onclick="fetchAndDisplayHistory(event)"><i class="ti ti-history"></i></button>
+      <button class="icon-btn" title="<?php echo esc_attr( $kounselia_chat_t( 'c.chat.more_options' ) ); ?>" onclick="toggleChatMenu(event)"><i class="ti ti-dots-vertical"></i></button>
     </div>
   </div>
   
   <div class="chat-dropdown" id="chat-dropdown">
     <div class="chat-dropdown-item" onclick="exportChat(event)">
-      <i class="ti ti-download"></i> Export chat
+      <i class="ti ti-download"></i> <?php echo esc_html( $kounselia_chat_t( 'c.menu.export' ) ); ?>
     </div>
     <div class="chat-dropdown-item" style="color: var(--rose);" onclick="clearCurrentChat(event)">
-      <i class="ti ti-trash" style="color: inherit;"></i> Clear chat
+      <i class="ti ti-trash" style="color: inherit;"></i> <?php echo esc_html( $kounselia_chat_t( 'c.menu.clear' ) ); ?>
     </div>
     <div class="chat-dropdown-item" style="border-top: 1px solid var(--border);" onclick="goToUpgrade(event)">
-      <i class="ti ti-sparkles" style="color: var(--gold);"></i> Upgrade
+      <i class="ti ti-sparkles" style="color: var(--gold);"></i> <?php echo esc_html( $kounselia_chat_t( 'c.menu.upgrade' ) ); ?>
     </div>
   </div>
   
@@ -37,19 +37,19 @@
     
     <div class="upgraded-input-area">
       <div class="input-pill">
-        <button class="pill-icon" title="Expressions" onclick="showChatToast('Emoji picker coming soon')"><i class="ti ti-mood-smile"></i></button>
-        <textarea class="chat-input" id="chat-input" rows="1" placeholder="Message" onkeydown="handleKey(event)" oninput="handleInputStyling(this)"></textarea>
+        <button class="pill-icon" title="<?php echo esc_attr( $kounselia_chat_t( 'c.composer.expressions' ) ); ?>" onclick="showChatToast(kT('c.composer.emoji_soon'))"><i class="ti ti-mood-smile"></i></button>
+        <textarea class="chat-input" id="chat-input" rows="1" placeholder="<?php echo esc_attr( $kounselia_chat_t( 'c.composer.placeholder' ) ); ?>" onkeydown="handleKey(event)" oninput="handleInputStyling(this)"></textarea>
       </div>
       
-      <button class="dynamic-fab" id="dynamic-fab" onclick="handleDynamicAction()" aria-label="Voice or Send">
+      <button class="dynamic-fab" id="dynamic-fab" onclick="handleDynamicAction()" aria-label="<?php echo esc_attr( $kounselia_chat_t( 'c.composer.voice_or_send' ) ); ?>">
         <i class="ti ti-microphone" id="dynamic-fab-icon"></i>
       </button>
     </div>
   </div>
 
   <div class="call-overlay" id="call-overlay">
-    <button class="call-close" id="call-close-btn" onclick="endVoiceCall()" aria-label="End call"><i class="ti ti-x"></i></button>
-    <div class="call-status" id="call-status">Connecting…</div>
+    <button class="call-close" id="call-close-btn" onclick="endVoiceCall()" aria-label="<?php echo esc_attr( $kounselia_chat_t( 'c.call.end' ) ); ?>"><i class="ti ti-x"></i></button>
+    <div class="call-status" id="call-status"><?php echo esc_html( $kounselia_chat_t( 'c.call.connecting' ) ); ?></div>
     <div class="call-avatar-wrap">
       <div class="call-avatar" id="call-avatar"></div>
       <div class="call-ring" id="call-ring"></div>
@@ -58,17 +58,17 @@
     <div class="call-timer" id="call-timer">00:00</div>
     <div class="call-caption" id="call-caption"></div>
     <div class="call-controls">
-      <button class="call-ctrl-btn" id="call-mute-btn" onclick="toggleVoiceMute()" aria-label="Mute"><i class="ti ti-microphone"></i></button>
-      <button class="call-ctrl-btn end" onclick="endVoiceCall()" aria-label="End call"><i class="ti ti-phone-x"></i></button>
+      <button class="call-ctrl-btn" id="call-mute-btn" onclick="toggleVoiceMute()" aria-label="<?php echo esc_attr( $kounselia_chat_t( 'c.call.mute' ) ); ?>"><i class="ti ti-microphone"></i></button>
+      <button class="call-ctrl-btn end" onclick="endVoiceCall()" aria-label="<?php echo esc_attr( $kounselia_chat_t( 'c.call.end' ) ); ?>"><i class="ti ti-phone-x"></i></button>
     </div>
     <p class="call-plan-note" id="call-plan-note"></p>
   </div>
 </div>
 
-<div class="modal-overlay" id="modal-overlay" onclick="outsideClose(event)">
+<div class="modal-overlay" id="modal-overlay" <?php echo $kounselia_chat_attrs; ?> onclick="outsideClose(event)">
   <div class="modal" id="modal-box">
     <div class="modal-handle"></div>
-    <button class="modal-close" onclick="closeModal()"><i class="ti ti-x"></i></button>
+    <button class="modal-close" onclick="closeModal()" aria-label="<?php echo esc_attr( $kounselia_chat_t( 'c.auth.close' ) ); ?>"><i class="ti ti-x"></i></button>
     <div id="modal-content"></div>
   </div>
 </div>

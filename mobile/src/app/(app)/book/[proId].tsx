@@ -10,6 +10,7 @@ import { ProfessionalAvatar } from '@/components/dashboard/ProfessionalAvatar';
 import { RatingLine, ReviewsSection } from '@/components/dashboard/ProfessionalReviews';
 import { FormMessage } from '@/components/FormMessage';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useLanguage } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, useColors } from '@/theme';
 import { showDialog } from '@/components/Dialog';
@@ -39,6 +40,7 @@ function dayKey(d: Date) {
 export default function BookProfessional() {
   const styles = useStyles();
   const colors = useColors();
+  const { language, t } = useLanguage();
   const { proId, reschedule, pro: proParam } = useLocalSearchParams<{ proId: string; reschedule?: string; pro?: string }>();
   const professionalId = Number(proId);
   const rescheduleId = reschedule ? Number(reschedule) : undefined;
@@ -95,7 +97,7 @@ export default function BookProfessional() {
     const dayGroup = (at: Date) => {
       const key = dayKey(at);
       if (!groups.has(key)) {
-        groups.set(key, { date: at, label: at.toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' }), slots: [] });
+        groups.set(key, { date: at, label: at.toLocaleDateString(language, { weekday: 'short', day: 'numeric', month: 'short' }), slots: [] });
       }
       return groups.get(key)!;
     };
@@ -110,7 +112,7 @@ export default function BookProfessional() {
     return [...groups.values()]
       .sort((a, b) => a.date.getTime() - b.date.getTime())
       .map(({ date, ...g }) => ({ key: dayKey(date), ...g }));
-  }, [slots]);
+  }, [slots, language]);
 
   const currentDay = days.find((d) => d.key === day) ?? days[0];
 
@@ -128,8 +130,10 @@ export default function BookProfessional() {
       }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       showDialog({
-        title: 'Session moved',
-        message: `Your session is now on ${picked.at.toLocaleString([], { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })}.`,
+        title: t('m.b.book.session_moved'),
+        message: t('m.b.book.session_moved_body', {
+          when: picked.at.toLocaleString(language, { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }),
+        }),
         icon: 'calendar-check',
         tone: 'success',
       });
@@ -148,8 +152,10 @@ export default function BookProfessional() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
       showBookedDialog(
         config,
-        "You're booked in",
-        `Your free session is on ${picked.at.toLocaleString([], { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' })}.`,
+        t('m.b.book.booked_in'),
+        t('m.b.book.free_booked_body', {
+          when: picked.at.toLocaleString(language, { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }),
+        }),
       );
       router.back();
       return;
@@ -163,7 +169,7 @@ export default function BookProfessional() {
   // Paystack's page opens inside the app. When Paystack sends them back to
   // our "payment received" page, it closes by itself and we check at once.
   async function openPayment(url: string) {
-    await openInApp(url, { title: 'Secure payment', closeWhen: (u) => u.includes('booking-payment-callback') });
+    await openInApp(url, { title: t('m.b.book.secure_payment'), closeWhen: (u) => u.includes('booking-payment-callback') });
     checkRef.current();
   }
 
@@ -179,20 +185,20 @@ export default function BookProfessional() {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
         showBookedDialog(
           config,
-          "You're booked",
-          `Your session with ${pro?.name ?? 'your professional'} is confirmed. You'll find it under Book, with a Join button 10 minutes before it starts.`,
+          t('m.b.book.booked'),
+          t('m.b.book.confirmed_body', { name: pro?.name ?? t('m.b.book.your_professional') }),
         );
         router.back();
       } else if (!res.ok && !res.offline) {
         // The hold ran out before payment arrived; the time was released.
         done.current = true;
         setWaiting(null);
-        setError('This booking expired before the payment came through, so no money was taken. Please choose a time again.');
+        setError(t('m.b.book.expired'));
       } else if (fromButton) {
-        setError("We haven't received the payment yet. If you've just paid, give it a moment and check again.");
+        setError(t('m.b.book.not_received'));
       }
     },
-    [config, pro, waiting],
+    [config, pro, waiting, t],
   );
   useEffect(() => {
     checkRef.current = () => checkPayment();
@@ -219,8 +225,8 @@ export default function BookProfessional() {
   if (failed !== null) {
     return (
       <SafeAreaView style={[styles.safe, styles.center]}>
-        <Text style={styles.notice}>{failed || "We couldn't load this professional's times. Please check your internet connection."}</Text>
-        <Button title="Back" variant="ghost" onPress={() => router.back()} />
+        <Text style={styles.notice}>{failed || t('m.b.book.load_failed')}</Text>
+        <Button title={t('m.b.common.back')} variant="ghost" onPress={() => router.back()} />
       </SafeAreaView>
     );
   }
@@ -238,10 +244,10 @@ export default function BookProfessional() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.nav}>
-        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back" style={styles.back} hitSlop={6}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={t('m.b.common.back')} style={styles.back} hitSlop={6}>
           <TablerIcon name="arrow-left" size={20} color={colors.text} />
         </Pressable>
-        <Text style={styles.navTitle}>{rescheduleId ? 'Choose a new time' : 'Book a session'}</Text>
+        <Text style={styles.navTitle}>{rescheduleId ? t('m.b.book.choose_new_time') : t('m.b.book.book_a_session')}</Text>
       </View>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         {pro && (
@@ -256,11 +262,11 @@ export default function BookProfessional() {
                 </Text>
                 {!rescheduleId ? <RatingLine average={pro.rating} count={pro.review_count} /> : null}
                 {pro.video_provider && !rescheduleId ? (
-                  <Text style={styles.proSpec}>Sessions are on {pro.video_provider}. You join from here when it&apos;s time.</Text>
+                  <Text style={styles.proSpec}>{t('m.b.book.sessions_on', { provider: pro.video_provider })}</Text>
                 ) : null}
                 {pro.price && !rescheduleId ? (
                   <Text style={styles.price}>
-                    {pro.price} / {slots.session_minutes}-minute session
+                    {t('m.b.book.price_line', { price: pro.price, minutes: slots.session_minutes })}
                   </Text>
                 ) : null}
               </View>
@@ -277,10 +283,10 @@ export default function BookProfessional() {
         )}
 
         {days.length === 0 ? (
-          <Text style={[styles.notice, { marginTop: 24 }]}>No free times in the next few weeks. Please check back soon, or choose another professional.</Text>
+          <Text style={[styles.notice, { marginTop: 24 }]}>{t('m.b.book.no_times')}</Text>
         ) : (
           <>
-            <Text style={styles.label}>Day</Text>
+            <Text style={styles.label}>{t('m.b.book.day')}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.days}>
               {days.map((d) => {
                 const on = d.key === currentDay?.key;
@@ -302,7 +308,7 @@ export default function BookProfessional() {
               })}
             </ScrollView>
 
-            <Text style={styles.label}>Time</Text>
+            <Text style={styles.label}>{t('m.b.book.time')}</Text>
             {currentDay?.note && currentDay.slots.length === 0 ? (
               <Text style={styles.notice}>{currentDay.note}</Text>
             ) : (
@@ -320,7 +326,7 @@ export default function BookProfessional() {
                       accessibilityState={{ selected: on }}
                       style={[styles.time, on && styles.chipOn]}
                     >
-                      <Text style={[styles.chipText, on && styles.chipTextOn]}>{s.at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</Text>
+                      <Text style={[styles.chipText, on && styles.chipTextOn]}>{s.at.toLocaleTimeString(language, { hour: 'numeric', minute: '2-digit' })}</Text>
                     </Pressable>
                   );
                 })}
@@ -329,13 +335,13 @@ export default function BookProfessional() {
 
             {!rescheduleId && (
               <>
-                <Text style={styles.label}>Anything they should know first? (optional)</Text>
+                <Text style={styles.label}>{t('m.b.book.note_label')}</Text>
                 <TextInput
                   value={note}
                   onChangeText={setNote}
                   multiline
                   maxLength={500}
-                  placeholder="A line or two about what you'd like to talk about."
+                  placeholder={t('m.b.book.note_placeholder')}
                   placeholderTextColor={colors.text3}
                   style={styles.note}
                   textAlignVertical="top"
@@ -343,10 +349,10 @@ export default function BookProfessional() {
                 {!isFree && (
                   <View style={styles.weeklyRow}>
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.weeklyTitle}>Make it weekly</Text>
-                      <Text style={styles.weeklySub}>Same day and time every week. You pay for each session as it comes.</Text>
+                      <Text style={styles.weeklyTitle}>{t('m.b.book.weekly')}</Text>
+                      <Text style={styles.weeklySub}>{t('m.b.book.weekly_sub')}</Text>
                     </View>
-                    <Switch value={weekly} onValueChange={setWeekly} trackColor={{ true: colors.accent, false: colors.border }} accessibilityLabel="Make it weekly" />
+                    <Switch value={weekly} onValueChange={setWeekly} trackColor={{ true: colors.accent, false: colors.border }} accessibilityLabel={t('m.b.book.weekly')} />
                   </View>
                 )}
               </>
@@ -359,15 +365,15 @@ export default function BookProfessional() {
         <View style={[styles.footer, { gap: 10 }]}>
           <View style={styles.waitRow} accessibilityLiveRegion="polite">
             <ActivityIndicator color={colors.accentText} />
-            <Text style={styles.waitText}>Waiting for your payment… This updates by itself once Paystack confirms it.</Text>
+            <Text style={styles.waitText}>{t('m.b.book.waiting')}</Text>
           </View>
-          <Button title="I've paid. Check now" onPress={() => checkPayment(true)} busy={checking} />
-          <Button title="Open the payment page again" variant="ghost" onPress={() => openPayment(waiting.url)} />
+          <Button title={t('m.b.book.paid_check')} onPress={() => checkPayment(true)} busy={checking} />
+          <Button title={t('m.b.book.open_again')} variant="ghost" onPress={() => openPayment(waiting.url)} />
         </View>
       ) : days.length > 0 ? (
         <View style={styles.footer}>
           <Button
-            title={rescheduleId ? 'Move my session' : isFree ? 'Book my free session' : 'Continue to payment'}
+            title={rescheduleId ? t('m.b.book.move') : isFree ? t('m.b.book.book_free') : t('m.b.book.continue_payment')}
             onPress={confirm}
             busy={busy}
             disabled={!picked}

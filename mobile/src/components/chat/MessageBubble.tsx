@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { memo } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import type { AppMessage } from '@/chat/useChat';
+import { useLanguage } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { CounselorAvatar } from '../CounselorAvatar';
 import { TablerIcon } from '../TablerIcon';
@@ -52,13 +53,14 @@ function FormattedText({ text }: { text: string }) {
 export const MessageBubble = memo(function MessageBubble({ message, counselor, onRate, onRetry, onNotify, playPhase, onListen }: Props) {
   const styles = useStyles();
   const colors = useColors();
+  const { language, t } = useLanguage();
   async function copy() {
     try {
       await Clipboard.setStringAsync(message.text);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
-      onNotify('Copied');
+      onNotify(t('m.b.common.copied'));
     } catch {
-      onNotify("Couldn't copy the text.");
+      onNotify(t('m.b.msg.copy_failed'));
     }
   }
 
@@ -68,7 +70,7 @@ export const MessageBubble = memo(function MessageBubble({ message, counselor, o
         <Pressable
           onLongPress={copy}
           onPress={message.failed ? () => onRetry(message) : undefined}
-          accessibilityHint={message.failed ? 'Not sent. Double tap to try again.' : 'Long press to copy'}
+          accessibilityHint={message.failed ? t('m.b.msg.failed_hint') : t('m.b.msg.copy_hint')}
           style={({ pressed }) => [styles.userWrap, pressed && { opacity: 0.85 }]}
         >
           <LinearGradient
@@ -84,10 +86,10 @@ export const MessageBubble = memo(function MessageBubble({ message, counselor, o
           {message.failed ? (
             <View style={styles.failedRow}>
               <TablerIcon name="alert-circle" size={13} color={colors.rose} />
-              <Text style={styles.failedText}>Not sent. Tap to try again.</Text>
+              <Text style={styles.failedText}>{t('m.b.msg.failed')}</Text>
             </View>
           ) : (
-            <Text style={[styles.time, styles.timeRight]}>{formatTime(message.createdAt)}</Text>
+            <Text style={[styles.time, styles.timeRight]}>{formatTime(message.createdAt, language)}</Text>
           )}
         </Pressable>
       </View>
@@ -104,23 +106,23 @@ export const MessageBubble = memo(function MessageBubble({ message, counselor, o
         {message.consulted && message.consulted.length > 0 && (
           <View style={styles.consulted}>
             <TablerIcon name="users" size={11} color={colors.gold} />
-            <Text style={styles.consultedText}>Consulted {message.consulted.join(' & ')}</Text>
+            <Text style={styles.consultedText}>{t('m.b.msg.consulted', { names: message.consulted.join(' & ') })}</Text>
           </View>
         )}
-        <Pressable onLongPress={copy} accessibilityHint="Long press to copy">
+        <Pressable onLongPress={copy} accessibilityHint={t('m.b.msg.copy_hint')}>
           <View style={[styles.bubble, styles.aiBubble]}>
             <FormattedText text={message.text} />
           </View>
         </Pressable>
         <View style={styles.aiFooter}>
           <View style={styles.timeRow}>
-            <Text style={styles.time}>{formatTime(message.createdAt)}</Text>
+            <Text style={styles.time}>{formatTime(message.createdAt, language)}</Text>
             {canRate && (
               <Pressable
                 onPress={() => onListen(message)}
                 hitSlop={8}
                 accessibilityRole="button"
-                accessibilityLabel={playPhase === 'playing' ? 'Stop listening' : 'Listen'}
+                accessibilityLabel={playPhase === 'playing' ? t('m.b.msg.stop_listening') : t('m.b.msg.listen')}
                 style={styles.listen}
               >
                 {playPhase === 'loading' ? (
@@ -132,18 +134,18 @@ export const MessageBubble = memo(function MessageBubble({ message, counselor, o
             )}
           </View>
           <View style={styles.actions}>
-            <ActionButton icon="copy" label="Copy" onPress={copy} />
+            <ActionButton icon="copy" label={t('m.b.msg.copy')} onPress={copy} />
             {canRate && (
               <>
                 <ActionButton
                   icon={message.rating === 'up' ? 'thumb-up-filled' : 'thumb-up'}
-                  label="Helpful"
+                  label={t('m.b.msg.helpful')}
                   color={message.rating === 'up' ? colors.sage : undefined}
                   onPress={() => onRate(message, 'up')}
                 />
                 <ActionButton
                   icon={message.rating === 'down' ? 'thumb-down-filled' : 'thumb-down'}
-                  label="Not helpful"
+                  label={t('m.b.msg.not_helpful')}
                   color={message.rating === 'down' ? colors.rose : undefined}
                   onPress={() => onRate(message, 'down')}
                 />

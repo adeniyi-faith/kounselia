@@ -4,6 +4,7 @@
 import { saveJournal, type KounseliaConfig } from '@kounselia/core';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { Card } from './Card';
 
@@ -12,6 +13,7 @@ const AUTOSAVE_MS = 1800;
 export function JournalCard({ config, initial }: { config: KounseliaConfig; initial: string }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const [text, setText] = useState(initial);
   const [focused, setFocused] = useState(false);
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
@@ -71,17 +73,17 @@ export function JournalCard({ config, initial }: { config: KounseliaConfig; init
           setFocused(false);
           save(text);
         }}
-        placeholder="What's on your mind today? This stays just between you and this page."
+        placeholder={t('m.journal.placeholder')}
         placeholderTextColor={colors.text3}
         multiline
         maxLength={5000}
         textAlignVertical="top"
-        accessibilityLabel="Today's reflection"
+        accessibilityLabel={t('m.home.todays_reflection')}
         style={[styles.input, focused && styles.inputFocused]}
       />
       <View style={styles.foot}>
         <Text style={[styles.status, status === 'error' && { color: colors.rose }]}>
-          {status === 'saved' ? 'Saved' : status === 'error' ? "Couldn't save. Check your connection." : ''}
+          {status === 'saved' ? t('m.common.saved') : status === 'error' ? t('m.journal.save_failed') : ''}
         </Text>
         <Pressable
           onPress={() => save(text)}
@@ -89,7 +91,7 @@ export function JournalCard({ config, initial }: { config: KounseliaConfig; init
           disabled={status === 'saving'}
           style={({ pressed }) => [styles.btn, pressed && { opacity: 0.85 }]}
         >
-          {status === 'saving' ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.btnText}>Save reflection</Text>}
+          {status === 'saving' ? <ActivityIndicator color="#fff" size="small" /> : <Text style={styles.btnText}>{t('m.journal.save')}</Text>}
         </Pressable>
       </View>
     </Card>

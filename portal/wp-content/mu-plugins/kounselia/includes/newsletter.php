@@ -204,7 +204,12 @@ function kounselia_newsletter_subscribe_public( $email, $name = '', $source = 'w
     return array( 'status' => 'subscribed', 'message' => "You're subscribed. Welcome — we're glad you're here." );
 }
 
-function kounselia_newsletter_first_name( $sub ) {
+/** The language to write to a newsletter contact in: their account's, else this request's. */
+function kounselia_newsletter_lang( $sub ) {
+    return ! empty( $sub->user_id ) ? kounselia_mail_lang( (int) $sub->user_id, true ) : kounselia_mail_lang( (string) $sub->email );
+}
+
+function kounselia_newsletter_first_name( $sub, $lang = null ) {
     $name = '';
     // Members: their account is the up-to-date source (the contact row
     // was created mid-registration, before the name was filled in).
@@ -217,7 +222,7 @@ function kounselia_newsletter_first_name( $sub ) {
     }
     $first = trim( explode( ' ', trim( $name ) )[0] );
     // Never greet someone by their email address.
-    return ( '' !== $first && false === strpos( $first, '@' ) ) ? $first : 'there';
+    return ( '' !== $first && false === strpos( $first, '@' ) ) ? $first : ( null === $lang ? 'there' : kounselia_t( 'mail.news.there', array(), $lang ) );
 }
 
 function kounselia_newsletter_manage_url( $sub, $action = 'preferences' ) {
@@ -225,8 +230,9 @@ function kounselia_newsletter_manage_url( $sub, $action = 'preferences' ) {
 }
 
 function kounselia_newsletter_send_confirmation( $sub ) {
-    $content = '<p style="margin-bottom:18px;">Hi ' . esc_html( kounselia_newsletter_first_name( $sub ) ) . ', please confirm you would like to receive emails from Kounselia. If you did not sign up, you can safely ignore this message.</p>';
-    return kounselia_send_html_email( $sub->email, 'Please confirm your subscription', 'One quick step', $content, 'Yes, subscribe me', kounselia_newsletter_manage_url( $sub, 'confirm' ), array( 'headers' => array( 'X-Kounselia-Channel: newsletter' ) ) );
+    $lang    = kounselia_newsletter_lang( $sub );
+    $content = '<p style="margin-bottom:18px;">' . esc_html( kounselia_t( 'mail.news.confirm_body', array( 'name' => kounselia_newsletter_first_name( $sub, $lang ) ), $lang ) ) . '</p>';
+    return kounselia_send_html_email( $sub->email, kounselia_t( 'mail.news.confirm_subject', array(), $lang ), kounselia_t( 'mail.news.confirm_headline', array(), $lang ), $content, kounselia_t( 'mail.news.confirm_button', array(), $lang ), kounselia_newsletter_manage_url( $sub, 'confirm' ), array( 'lang' => $lang, 'headers' => array( 'X-Kounselia-Channel: newsletter' ) ) );
 }
 
 function kounselia_newsletter_send_welcome( $sub ) {
@@ -239,9 +245,9 @@ function kounselia_newsletter_send_welcome( $sub ) {
     return kounselia_send_html_email(
         $sub->email,
         $settings['welcome_subject'],
-        'Welcome, ' . esc_html( kounselia_newsletter_first_name( $sub ) ),
+        esc_html( kounselia_t( 'mail.news.welcome_headline', array( 'name' => kounselia_newsletter_first_name( $sub, kounselia_newsletter_lang( $sub ) ) ), kounselia_newsletter_lang( $sub ) ) ),
         $content,
-        'Read the journal',
+        kounselia_t( 'mail.news.welcome_button', array(), kounselia_newsletter_lang( $sub ) ),
         kounselia_blog_url( '', true ),
         kounselia_newsletter_email_opts( $sub )
     );
@@ -253,12 +259,14 @@ function kounselia_newsletter_send_welcome( $sub ) {
 function kounselia_newsletter_email_opts( $sub, $extra = array() ) {
     $settings = kounselia_newsletter_settings();
     $unsub    = kounselia_newsletter_manage_url( $sub, 'unsubscribe' );
-    $footer   = '<span style="font-size:11px;color:#A8A49A;">You are receiving this because you subscribed to Kounselia updates.<br>'
-        . '<a href="' . esc_url( kounselia_newsletter_manage_url( $sub ) ) . '" style="color:#8B3A52;">Email preferences</a> &middot; '
-        . '<a href="' . esc_url( $unsub ) . '" style="color:#8B3A52;">Unsubscribe</a>'
+    $lang     = kounselia_newsletter_lang( $sub );
+    $footer   = '<span style="font-size:11px;color:#A8A49A;">' . esc_html( kounselia_t( 'mail.news.footer_reason', array(), $lang ) ) . '<br>'
+        . '<a href="' . esc_url( kounselia_newsletter_manage_url( $sub ) ) . '" style="color:#8B3A52;">' . esc_html( kounselia_t( 'mail.news.footer_prefs', array(), $lang ) ) . '</a> &middot; '
+        . '<a href="' . esc_url( $unsub ) . '" style="color:#8B3A52;">' . esc_html( kounselia_t( 'mail.news.footer_unsub', array(), $lang ) ) . '</a>'
         . ( $settings['footer_address'] ? '<br>' . esc_html( $settings['footer_address'] ) : '' ) . '</span>';
     return array_merge( array(
         'footer_html' => $footer,
+        'lang'        => $lang,
         'headers'     => array(
             'X-Kounselia-Channel: newsletter', // Routing hint for mail-delivery.php; stripped before sending.
             'List-Unsubscribe: <' . $unsub . '>',

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchVoiceToken, logVoiceTurn } from '@kounselia/core';
 import type { KounseliaConfig } from '@kounselia/core';
+import { useT } from '../i18n';
 
 // Talks directly to Gemini's realtime voice websocket from the browser,
 // using a short-lived token the backend hands out. This whole hook is
@@ -79,6 +80,9 @@ interface UseVoiceCallOptions {
 }
 
 export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId }: UseVoiceCallOptions) {
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [status, setStatus] = useState<CallStatus>('idle');
   const [statusText, setStatusText] = useState('');
   const [timerText, setTimerText] = useState('00:00');
@@ -242,7 +246,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
       secondsLeftRef.current -= 1;
       setTimerText(formatTimer(secondsLeftRef.current));
       if (secondsLeftRef.current <= 0) {
-        setStatusText("Time's up");
+        setStatusText(tRef.current('c.call.times_up'));
         endCall();
       }
     }, 1000);
@@ -272,7 +276,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
           if (msg.setupComplete) {
             activeRef.current = true;
             setStatus('listening');
-            setStatusText('Listening…');
+            setStatusText(tRef.current('c.call.listening'));
             startTimer();
             resolve();
             return;
@@ -298,7 +302,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
               if (!userFlushedRef.current) flushUserTranscript();
               botUtteranceRef.current += sc.outputTranscription.text;
               setStatus('speaking');
-              setStatusText('Speaking…');
+              setStatusText(tRef.current('c.call.speaking'));
               setCaption(botUtteranceRef.current);
             }
             if (sc.modelTurn?.parts) {
@@ -310,12 +314,12 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
             if (sc.turnComplete) {
               flushBotTranscript();
               setStatus('listening');
-              setStatusText('Listening…');
+              setStatusText(tRef.current('c.call.listening'));
             }
           }
 
           if (msg.goAway) {
-            setStatusText('Call ending…');
+            setStatusText(tRef.current('c.call.ending'));
             setTimeout(() => {
               if (wsRef.current === ws) endCall();
             }, 1200);
@@ -351,14 +355,14 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
 
     if (!navigator.mediaDevices?.getUserMedia || !window.AudioWorklet || !window.WebSocket) {
       setStatus('connecting');
-      setStatusText('Voice calls need a modern browser (Chrome, Edge, or Safari) with microphone support.');
+      setStatusText(tRef.current('c.call.unsupported'));
       setTimeout(endCall, 3000);
       return;
     }
 
     connectingRef.current = true;
     setStatus('connecting');
-    setStatusText('Connecting…');
+    setStatusText(tRef.current('c.call.connecting'));
 
     const micCtx = newAudioContext();
     const playbackCtx = newAudioContext();
@@ -383,7 +387,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
         audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
     } catch {
-      if (!hungUp()) giveUp('Microphone access is blocked. Allow it in your browser’s site settings, then try again.', 3000);
+      if (!hungUp()) giveUp(tRef.current('c.call.mic_blocked'), 3000);
       return;
     }
     if (hungUp()) {
@@ -395,7 +399,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
     try {
       await startMicCapture(micCtx, stream);
     } catch {
-      if (!hungUp()) giveUp("Couldn't use your microphone, please try again.");
+      if (!hungUp()) giveUp(tRef.current('c.call.mic_failed'));
       return;
     }
     if (hungUp()) return;
@@ -404,7 +408,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
     const tokenRes = await fetchVoiceToken(cfg, slug, getId());
     if (hungUp()) return;
     if (!tokenRes.success || !tokenRes.token || !tokenRes.model) {
-      giveUp(tokenRes.message || "Voice isn't available right now.");
+      giveUp(tokenRes.message || tRef.current('c.call.unavailable'));
       return;
     }
 
@@ -420,7 +424,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
       await connectLiveSession(tokenRes.token, tokenRes.model);
       connectingRef.current = false;
     } catch {
-      if (!hungUp()) giveUp("Couldn't start the call, please try again.", 1800);
+      if (!hungUp()) giveUp(tRef.current('c.call.start_failed'), 1800);
     }
   }, [connectLiveSession, endCall, startMicCapture, teardown]);
 

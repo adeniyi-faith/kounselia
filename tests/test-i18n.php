@@ -106,4 +106,31 @@ class Test_I18n extends WP_Ajax_UnitTestCase {
         $saved = kounselia_growth_format_plan( kounselia_growth_active_plan( $user ) );
         $this->assertSame( 'pt', $saved['language'] );
     }
+    function test_every_translation_key_used_in_the_code_exists() {
+        $root    = dirname( KOUNSELIA_CORE_DIR, 4 );
+        $english = json_decode( file_get_contents( $this->locale_path( 'en' ) ), true );
+        $files   = array();
+        foreach ( array( 'mobile/src', 'chat-app/src', 'inc', 'portal/wp-content/mu-plugins', 'packages/core/src' ) as $dir ) {
+            $it = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $root . '/' . $dir, FilesystemIterator::SKIP_DOTS ) );
+            foreach ( $it as $file ) {
+                if ( preg_match( '/\.(php|tsx?)$/', $file->getFilename() ) && false === strpos( $file->getPathname(), 'node_modules' ) ) {
+                    $files[] = $file->getPathname();
+                }
+            }
+        }
+        foreach ( array( 'dashboard.php', 'index.php', 'talk.php', 'apply.php' ) as $page ) {
+            $files[] = $root . '/' . $page;
+        }
+        $missing = array();
+        foreach ( $files as $file ) {
+            if ( preg_match_all( '/(?:\bt|\btr|kounselia_t)\(\s*[\'"]([a-z0-9_]+(?:\.[a-z0-9_]+)+)[\'"]/', file_get_contents( $file ), $m ) ) {
+                foreach ( $m[1] as $key ) {
+                    if ( '_' !== substr( $key, -1 ) && ! isset( $english[ $key ] ) ) { // A trailing _ is a prefix completed in code.
+                        $missing[] = basename( $file ) . ': ' . $key;
+                    }
+                }
+            }
+        }
+        $this->assertSame( array(), array_values( array_unique( $missing ) ), 'Keys used in code but missing from the translation files' );
+    }
 }

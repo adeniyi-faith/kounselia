@@ -2,7 +2,7 @@
 // few questions, and follow a 30 day plan of one small task a day. The
 // phone version of the website's "Growth plan" tab; both use the same
 // server actions.
-import { createGrowthPlan, deviceLanguage, endGrowthPlan, fetchGrowth, isRtl, makeT, markGrowthDay, reviewGrowthWeek, setGrowthReminder, type GrowthArea, type GrowthOverview, type GrowthPlan } from '@kounselia/core';
+import { createGrowthPlan, endGrowthPlan, fetchGrowth, markGrowthDay, reviewGrowthWeek, setGrowthReminder, type GrowthArea, type GrowthOverview, type GrowthPlan } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -15,6 +15,7 @@ import { showDialog } from '@/components/Dialog';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { DetailSkeleton } from '@/components/Skeleton';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useLanguage } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors } from '@/theme';
 
@@ -40,9 +41,7 @@ export default function Growth() {
   const [busy, setBusy] = useState(false);
   const [openDay, setOpenDay] = useState<number | null>(null);
   // The member's language, from the server once it answers (their phone's until then).
-  const lang = data?.language ?? deviceLanguage();
-  const t = makeT(lang);
-  const rtl = isRtl(lang);
+  const { t } = useLanguage();
 
   const load = useCallback(async () => {
     const res = await fetchGrowth(config);
@@ -355,7 +354,7 @@ export default function Growth() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScreenHeader title={t('growth.title')} />
-      <ScrollView contentContainerStyle={[styles.content, rtl && { direction: 'rtl' }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         {body()}
       </ScrollView>
       <Toast note={toast.note} />

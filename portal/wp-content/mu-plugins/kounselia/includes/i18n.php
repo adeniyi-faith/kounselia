@@ -113,6 +113,12 @@ function kounselia_current_language( $user_id = null ) {
     if ( ! empty( $_POST['language'] ) ) {
         return kounselia_language_normalize( sanitize_text_field( wp_unslash( $_POST['language'] ) ) );
     }
+    if ( ! empty( $_COOKIE['kounselia_lang'] ) ) {
+        $from_cookie = strtolower( sanitize_text_field( wp_unslash( $_COOKIE['kounselia_lang'] ) ) );
+        if ( isset( kounselia_languages()[ $from_cookie ] ) ) {
+            return $from_cookie;
+        }
+    }
     if ( ! empty( $_SERVER['HTTP_ACCEPT_LANGUAGE'] ) ) {
         foreach ( explode( ',', (string) $_SERVER['HTTP_ACCEPT_LANGUAGE'] ) as $part ) {
             $code = strtolower( preg_split( '/[-_;]/', trim( $part ) )[0] );
@@ -153,16 +159,28 @@ function kounselia_language_instruction( $lang ) {
  * ---------------------------------------------------------------------- */
 
 function kounselia_ajax_set_language() {
-    kounselia_verify_nonce();
-    if ( ! is_user_logged_in() ) {
-        wp_send_json_error( array( 'message' => 'Please sign in again.', 'signed_out' => true ), 401 );
-    }
+    // No sign-in or security token needed: this only changes the language
+    // shown to whoever asks, so visitors on the public pages can use it too.
     $raw = isset( $_POST['language'] ) ? strtolower( sanitize_text_field( wp_unslash( $_POST['language'] ) ) ) : '';
     if ( ! isset( kounselia_languages()[ $raw ] ) ) {
         wp_send_json_error( array( 'message' => 'That language is not available yet.' ), 400 );
     }
-    update_user_meta( get_current_user_id(), 'kounselia_language', $raw );
+    if ( is_user_logged_in() ) {
+        update_user_meta( get_current_user_id(), 'kounselia_language', $raw );
+    }
+    // The browser remembers it too, for the public pages and for visitors who are not signed in.
+    if ( ! headers_sent() ) {
+        setcookie( 'kounselia_lang', $raw, time() + YEAR_IN_SECONDS, '/', '', is_ssl(), false );
+    }
     wp_send_json_success( array( 'language' => $raw, 'rtl' => kounselia_language_is_rtl( $raw ), 'message' => kounselia_t( 'lang.saved', array(), $raw ) ) );
 }
 add_action( 'wp_ajax_kounselia_set_language', 'kounselia_ajax_set_language' );
 add_action( 'wp_ajax_nopriv_kounselia_set_language', 'kounselia_ajax_set_language' );
+
+/**
+ * The lang and dir attributes for a page's <html> tag, in the visitor's language.
+ */
+function kounselia_html_attrs( $lang = null ) {
+    $lang = $lang ? kounselia_language_normalize( $lang ) : kounselia_current_language();
+    return 'lang="' . esc_attr( $lang ) . '" dir="' . ( kounselia_language_is_rtl( $lang ) ? 'rtl' : 'ltr' ) . '"';
+}
