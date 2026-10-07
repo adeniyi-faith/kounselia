@@ -7,4 +7,5 @@ export * from './voiceCall';
 export * from './transcription';
 export * from './dashboard';
 export * from './content';
+export * from './professional';
 export * from './i18n';

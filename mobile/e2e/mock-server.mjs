@@ -77,15 +77,64 @@ for (const d of [1, 2, 3]) {
   }
 }
 
-function answer(p) {
+// A professional's dashboard (includes/app-professional.php). Signing in
+// with an email that starts with "pro" signs in as a verified professional.
+const PRO_USER = { id: 8, name: 'Amaka Eze', email: 'pro@example.com', professional: { id: 3, status: 'verified' } };
+const proDashboard = () => ({
+  user: { name: 'Amaka Eze', first_name: 'Amaka', avatar: null },
+  application: { id: 3, status: 'verified', title: 'Clinical Psychologist', specialty: 'Anxiety, trauma, relationships', years_experience: 8, bio: 'I help adults through anxiety, grief and big life changes, with warmth and practical tools.', rate_amount: 18000, free_sessions_per_client: 1, all_free: false, license_number: 'MDCN-12345', rejection_reason: null, suspended_reason: null },
+  rating: { average: 4.9, count: 23 },
+  reviews: [
+    { rating: 5, comment: 'Kind, patient and very practical. I left every session with something to try.', client_name: 'Tolu', date_utc: iso(-6 * 864e5) },
+    { rating: 5, comment: 'She really listened.', client_name: 'Chidi', date_utc: iso(-20 * 864e5) },
+  ],
+  free_options: [{ value: 0, label: 'None' }, { value: 1, label: 'First session free' }, { value: 2, label: 'First 2 sessions free' }, { value: -1, label: 'Every session free (pro bono)' }],
+  rate_usd_hint: 'About $12 per session',
+  public_profile: { available: true, on: true, url: 'https://kounselia.com/professional/amaka-eze' },
+  video: { shown: true, allowed: true, mode: 'kounselia', link: '' },
+  documents: [{ id: 1, name: 'mdcn-licence.pdf', type_label: 'License' }, { id: 2, name: 'national-id.jpg', type_label: 'Government ID' }],
+  availability: [1, 2, 3, 4].map((d) => ({ day: d, start: '09:00', end: '17:00' })).concat([{ day: 6, start: '10:00', end: '13:00' }]),
+  bookings: [
+    { id: 51, client_name: 'Samson', client_note: 'Struggling with sleep since starting night shifts.', start_local: 'x', start_utc: iso(5 * 60e3), join_opens_utc: iso(-5 * 60e3), join_closes_utc: iso(55 * 60e3), joinable: true, series_id: 0, is_free: false, video_provider: null, video_link: '' },
+    { id: 52, client_name: 'Ifeoma', client_note: null, start_local: 'x', start_utc: iso(2 * 864e5), join_opens_utc: null, join_closes_utc: null, joinable: false, series_id: 9, is_free: true, video_provider: null, video_link: '' },
+  ],
+  session_minutes: 50,
+  articles: {
+    enabled: true, show_tab: true,
+    access: { allowed: true, mode: 'reviewed', message: '' },
+    followers: 42, totals: { views: 1280, loves: 96, comments: 14 },
+    items: [
+      { ...posts[1], state: 'live', state_label: 'Live', live: true, in_review: false, date_utc: posts[1].published_utc, views: 1180, loves: 90, comments: 12, review_note: null, cover: null },
+      { id: 3, title: 'When anxiety shows up at work', slug: 'anxiety-at-work', cover: null, state: 'changes', state_label: 'Changes asked', live: false, in_review: false, date_utc: iso(-864e5), views: 0, loves: 0, comments: 0, review_note: 'Lovely piece. Could you add one practical exercise near the end?', url: 'https://kounselia.com/blog/anxiety-at-work' },
+    ],
+  },
+  earnings: {
+    available: 54000, total_earned: 342000, paid_out: 288000, commission_percent: 15,
+    account: { account_name: 'AMAKA EZE', bank_name: 'GTBank', last4: '4821' },
+    history: [
+      { id: 7, amount: 96000, status: 'paid', status_label: 'Paid', date_utc: iso(-10 * 864e5), failure_reason: null },
+      { id: 6, amount: 192000, status: 'paid', status_label: 'Paid', date_utc: iso(-40 * 864e5), failure_reason: null },
+    ],
+  },
+});
+
+function answer(p, token) {
   const ok = (data) => ({ success: true, data });
   const err = (message) => ({ success: false, data: { message } });
   switch (p.action) {
     case 'kounselia_app_login':
     case 'kounselia_app_register':
+      if (String(p.email ?? '').startsWith('pro')) return ok({ token: 'e2e-pro-token', user: PRO_USER });
       return ok({ token: 'e2e-token', user: { id: 7, name: 'Samson', email: 'samson@example.com' } });
     case 'kounselia_app_me':
+      if (token === 'e2e-pro-token') return ok({ user: PRO_USER });
       return ok({ user: { id: 7, name: 'Samson', email: 'samson@example.com' } });
+    case 'kounselia_app_pro_dashboard':
+      return ok(proDashboard());
+    case 'kounselia_get_unread_notification_count':
+      return ok({ count: 1 });
+    case 'kounselia_get_notifications':
+      return ok({ notifications: [{ id: 1, title: 'New booking', body: 'Samson booked a session with you.', url: 'https://kounselia.com/pro-dashboard.php?tab=bookings', created_at: '2026-10-01 09:00:00', unread: true }] });
     case 'kounselia_get_counselors':
       return ok({ counselors });
     case 'kounselia_app_home':
@@ -181,7 +230,7 @@ createServer((req, res) => {
   req.on('data', (chunk) => (body += chunk));
   req.on('end', () => {
     const params = Object.fromEntries(new URLSearchParams(body));
-    const reply = answer(params);
+    const reply = answer(params, req.headers['x-kounselia-token']);
     console.log(`${new Date().toISOString()} ${params.action ?? req.url} -> ${reply.success ? 'ok' : 'error'}`);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(reply));

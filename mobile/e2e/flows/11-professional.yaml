@@ -1,0 +1,60 @@
+# A professional: signing in as one (the stand-in server treats an email
+# starting with "pro" as a verified professional) opens the professional
+# view. Then each of its tabs: Overview, Bookings, Articles, Earnings,
+# Profile.
+appId: com.kounselia.app
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "I already have an account"
+    timeout: 90000
+- tapOn: "I already have an account"
+- extendedWaitUntil:
+    visible: "Welcome back"
+    timeout: 10000
+- tapOn: "you@example.com"
+- inputText: "pro@example.com"
+- tapOn: "••••••••"
+- inputText: "test-password"
+- hideKeyboard
+- tapOn: "Sign in"
+- extendedWaitUntil:
+    visible: "Welcome back, .*"
+    timeout: 20000
+- waitForAnimationToEnd
+- takeScreenshot: ${P}40-pro-overview
+- scroll
+- takeScreenshot: ${P}41-pro-overview-2
+- scroll
+- takeScreenshot: ${P}42-pro-overview-3
+- tapOn: "Notifications.*"
+- waitForAnimationToEnd
+- takeScreenshot: ${P}43-pro-notifications
+- back
+- tapOn: "Bookings"
+- waitForAnimationToEnd
+- takeScreenshot: ${P}44-pro-bookings
+- scroll
+- takeScreenshot: ${P}45-pro-bookings-2
+- scroll
+- takeScreenshot: ${P}46-pro-bookings-3
+- tapOn: "Articles"
+- waitForAnimationToEnd
+- takeScreenshot: ${P}47-pro-articles
+- scroll
+- takeScreenshot: ${P}48-pro-articles-2
+- tapOn: "Earnings"
+- waitForAnimationToEnd
+- takeScreenshot: ${P}49-pro-earnings
+- scroll
+- takeScreenshot: ${P}50-pro-earnings-2
+- tapOn: "Profile"
+- waitForAnimationToEnd
+- takeScreenshot: ${P}51-pro-profile
+- scroll
+- takeScreenshot: ${P}52-pro-profile-2
+- scroll
+- takeScreenshot: ${P}53-pro-profile-3
+- scroll
+- takeScreenshot: ${P}54-pro-profile-4
