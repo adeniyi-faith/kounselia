@@ -6,7 +6,7 @@
 class Test_I18n extends WP_Ajax_UnitTestCase {
 
     private function locale_path( $code ) {
-        return dirname( KOUNSELIA_CORE_DIR, 3 ) . '/packages/core/src/locales/' . $code . '.json';
+        return dirname( KOUNSELIA_CORE_DIR, 4 ) . '/packages/core/src/locales/' . $code . '.json';
     }
 
     private function ajax( $action, $params = array() ) {
