@@ -427,7 +427,10 @@ function kounselia_notify_admins_refund_needs_review( $booking_id, $payment_id )
             $email,
             'A cancelled booking needs a manual refund review',
             'Refund needs review',
-            '<p>Booking #' . (int) $booking_id . ' (payment #' . (int) $payment_id . ') was cancelled after payment, but could not be refunded automatically — please check it in Paystack and refund the client directly if appropriate.</p>'
+            '<p>Booking #' . (int) $booking_id . ' (payment #' . (int) $payment_id . ') was cancelled after payment, but could not be refunded automatically — please check it in Paystack and refund the client directly if appropriate.</p>',
+            null,
+            null,
+            array( 'lang' => 'en' ) // Staff alert: always English.
         );
     }
 }
@@ -443,7 +446,10 @@ function kounselia_notify_admins_booking_conflict( $booking_id ) {
             $email,
             'Booking payment conflict needs attention',
             'Payment conflict',
-            '<p>A client\'s payment for booking #' . (int) $booking_id . ' was captured after that time slot had already been booked by someone else. The charge was not refunded automatically — please review and reschedule or refund the client.</p>'
+            '<p>A client\'s payment for booking #' . (int) $booking_id . ' was captured after that time slot had already been booked by someone else. The charge was not refunded automatically — please review and reschedule or refund the client.</p>',
+            null,
+            null,
+            array( 'lang' => 'en' ) // Staff alert: always English.
         );
     }
 }

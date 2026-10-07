@@ -42,13 +42,23 @@
 $kounselia_chat_engine_dir = __DIR__ . '/kounselia-chat-engine';
 $kounselia_use_react_chat  = ! empty( $kounselia_use_react_chat );
 $kounselia_assets_dir      = $kounselia_chat_engine_dir . '/assets' . ( $kounselia_use_react_chat ? '/react' : '' );
+
+// The visitor's/member's language: shown in the chat's own wording and used
+// for lang/dir on the chat root (Arabic reads right to left).
+$kounselia_chat_lang  = function_exists( 'kounselia_current_language' ) ? kounselia_current_language() : 'en';
+$kounselia_chat_attrs = function_exists( 'kounselia_html_attrs' ) ? kounselia_html_attrs( $kounselia_chat_lang ) : 'lang="en" dir="ltr"';
+$kounselia_chat_dict  = function_exists( 'kounselia_i18n_subset' ) ? kounselia_i18n_subset( $kounselia_chat_lang, 'c.' ) : array();
+// A sentence of the chat's own wording, for the markup in templates/chat-markup.html.
+$kounselia_chat_t = function ( $key ) use ( $kounselia_chat_dict ) {
+    return isset( $kounselia_chat_dict[ $key ] ) ? $kounselia_chat_dict[ $key ] : $key;
+};
 ?>
 <style>
 <?php readfile( $kounselia_assets_dir . '/kounselia-chat.css' ); ?>
 </style>
 
 <?php if ( $kounselia_use_react_chat ) : ?>
-<div id="kounselia-chat-root"></div>
+<div id="kounselia-chat-root" <?php echo $kounselia_chat_attrs; // phpcs:ignore WordPress.Security.EscapeOutput -- built and escaped by kounselia_html_attrs() ?>></div>
 <?php else : ?>
 <?php require $kounselia_chat_engine_dir . '/templates/chat-markup.html'; ?>
 <?php endif; ?>
@@ -59,7 +69,9 @@ $kounselia_assets_dir      = $kounselia_chat_engine_dir . '/assets' . ( $kounsel
 window.KOUNSELIA = {
   ajaxUrl: <?php echo wp_json_encode( $kounselia_ajax_url ); ?>,
   nonce: <?php echo wp_json_encode( $kounselia_nonce ); ?>,
-  loggedIn: <?php echo $kounselia_is_logged_in ? 'true' : 'false'; ?>
+  loggedIn: <?php echo $kounselia_is_logged_in ? 'true' : 'false'; ?>,
+  language: <?php echo wp_json_encode( $kounselia_chat_lang ); ?>,
+  i18n: <?php echo wp_json_encode( $kounselia_chat_dict ); ?>
 };
 
 // Expose the dynamically managed Database UI values into the global C object.

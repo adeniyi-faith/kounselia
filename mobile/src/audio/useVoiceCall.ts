@@ -8,6 +8,7 @@
 // (kounselia_log_voice_turn) so it shows up in the chat history too.
 import { fetchVoiceToken, logVoiceTurn, type KounseliaConfig } from '@kounselia/core';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useT } from '@/language';
 import { AudioContext, AudioRecorder, type AudioBufferSourceNode } from 'react-native-audio-api';
 import { floatToPcm16Base64, utf8Decode } from './bytes';
 import { micAllowed, releaseSound, setSoundMode } from './session';
@@ -37,6 +38,11 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
   const [muted, setMuted] = useState(false);
   const [freeCallMinutes, setFreeCallMinutes] = useState<number | null>(null);
 
+  const t = useT();
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  });
   const ws = useRef<WebSocket | null>(null);
   const recorder = useRef<AudioRecorder | null>(null);
   const playback = useRef<AudioContext | null>(null);
@@ -160,7 +166,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
       secondsLeft.current -= 1;
       setTimerText(formatTimer(secondsLeft.current));
       if (secondsLeft.current <= 0) {
-        setStatusText("Time's up");
+        setStatusText(tRef.current('m.b.voice.times_up'));
         endCall();
       }
     }, 1000);
@@ -193,7 +199,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
             }
             active.current = true;
             setStatus('listening');
-            setStatusText('Listening…');
+            setStatusText(tRef.current('m.b.voice.listening'));
             startTimer();
             resolve();
             return;
@@ -218,7 +224,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
               if (!userFlushed.current) flushUser();
               botSaid.current += sc.outputTranscription.text;
               setStatus('speaking');
-              setStatusText('Speaking…');
+              setStatusText(tRef.current('m.b.voice.speaking'));
               setCaption(botSaid.current);
             }
             if (sc.modelTurn?.parts) {
@@ -230,12 +236,12 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
             if (sc.turnComplete) {
               flushBot();
               setStatus('listening');
-              setStatusText('Listening…');
+              setStatusText(tRef.current('m.b.voice.listening'));
             }
           }
 
           if (msg.goAway) {
-            setStatusText('Call ending…');
+            setStatusText(tRef.current('m.b.voice.ending'));
             setTimeout(endCall, 1200);
           }
         };
@@ -255,7 +261,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
     if (active.current || connecting.current) return;
     connecting.current = true;
     setStatus('connecting');
-    setStatusText('Connecting…');
+    setStatusText(tRef.current('m.b.voice.connecting'));
     setCaption('');
     setTimerText('00:00');
     setFreeCallMinutes(null);
@@ -269,14 +275,14 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
     };
 
     if (!(await micAllowed())) {
-      giveUp('Microphone access is off. You can allow it in your phone’s Settings.');
+      giveUp(tRef.current('m.b.voice.mic_off'));
       return;
     }
 
     const { config: cfg, counselorSlug: slug, getSessionId: getId, onSessionId: setId } = latest.current;
     const pass = await fetchVoiceToken(cfg, slug, getId());
     if (!pass.success || !pass.token || !pass.model) {
-      giveUp(pass.message || "Voice isn't available right now.");
+      giveUp(pass.message || tRef.current('m.b.voice.unavailable'));
       return;
     }
     if (!connecting.current) return; // Hung up while connecting.
@@ -292,7 +298,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
       await connect(pass.token, pass.model);
       connecting.current = false;
     } catch {
-      giveUp("Couldn't start the call, please try again.");
+      giveUp(tRef.current('m.b.voice.call_failed'));
     }
   }, [connect, endCall]);
 

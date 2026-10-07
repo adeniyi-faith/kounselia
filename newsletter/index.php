@@ -72,7 +72,10 @@ if ( ! $sub ) {
 }
 
 $self = '/newsletter/?t=' . rawurlencode( $token );
-kounselia_public_head( array( 'title' => 'Email preferences — Kounselia', 'noindex' => true ) );
+$nl = function ( $key, $vars = array() ) {
+    return esc_html( kounselia_t( $key, $vars ) );
+};
+kounselia_public_head( array( 'title' => kounselia_t( 's.nl.title' ), 'noindex' => true ) );
 ?>
 <body class="k-site">
 <?php require dirname( __DIR__ ) . '/inc/kounselia-site-nav.php'; ?>
@@ -80,48 +83,48 @@ kounselia_public_head( array( 'title' => 'Email preferences — Kounselia', 'noi
 
 <?php if ( 'invalid' === $state ) : ?>
   <div class="k-status warn"><i class="ti ti-link-off"></i></div>
-  <h1>This link has expired</h1>
-  <p>We couldn't find your subscription from this link. If you'd like to change what you receive, use the link at the bottom of the most recent email we sent you.</p>
-  <a class="k-btn outline" href="/">Go to the homepage</a>
+  <h1><?php echo $nl( 's.nl.expired_h1' ); ?></h1>
+  <p><?php echo $nl( 's.nl.expired_p' ); ?></p>
+  <a class="k-btn outline" href="/"><?php echo $nl( 's.notfound.home' ); ?></a>
 
 <?php elseif ( 'confirmed' === $state ) : ?>
   <div class="k-status"><i class="ti ti-circle-check"></i></div>
-  <h1>You're subscribed</h1>
-  <p>Thank you for confirming, <?php echo esc_html( kounselia_newsletter_first_name( $sub ) ); ?>. We'll be in touch — gently, and not too often.</p>
-  <a class="k-btn" href="/blog/">Read the journal</a>
+  <h1><?php echo $nl( 's.nl.subscribed_h1' ); ?></h1>
+  <p><?php echo $nl( 's.nl.subscribed_p', array( 'name' => kounselia_newsletter_first_name( $sub ) ) ); ?></p>
+  <a class="k-btn" href="/blog/"><?php echo $nl( 's.page.read_journal' ); ?></a>
 
 <?php elseif ( 'unsubscribed' === $state ) : ?>
   <div class="k-status"><i class="ti ti-mail-off"></i></div>
-  <h1>You've been unsubscribed</h1>
-  <p><?php echo esc_html( $sub->email ); ?> won't receive newsletters or blog emails from us any more. If you have an account, important account emails (like booking confirmations) will still arrive.</p>
+  <h1><?php echo $nl( 's.nl.unsubscribed_h1' ); ?></h1>
+  <p><?php echo $nl( 's.nl.unsubscribed_p', array( 'email' => $sub->email ) ); ?></p>
   <form method="post" action="<?php echo esc_url( $self . '&a=preferences' ); ?>">
     <input type="hidden" name="lists[]" value="newsletter">
     <input type="hidden" name="lists[]" value="blog">
-    <button class="k-btn outline" type="submit">That was a mistake — resubscribe me</button>
+    <button class="k-btn outline" type="submit"><?php echo $nl( 's.nl.resubscribe' ); ?></button>
   </form>
 
 <?php elseif ( 'unsubscribe' === $action ) : ?>
   <div class="k-status warn"><i class="ti ti-mail-off"></i></div>
-  <h1>Unsubscribe?</h1>
-  <p>We're sorry to see you go. You can stop everything, or just choose the emails you'd still like below.</p>
+  <h1><?php echo $nl( 's.nl.unsub_h1' ); ?></h1>
+  <p><?php echo $nl( 's.nl.unsub_p' ); ?></p>
   <form method="post" action="<?php echo esc_url( $self . '&a=unsubscribe' ); ?>">
-    <button class="k-btn" type="submit">Unsubscribe <?php echo esc_html( $sub->email ); ?></button>
+    <button class="k-btn" type="submit"><?php echo $nl( 's.nl.unsub_btn', array( 'email' => $sub->email ) ); ?></button>
   </form>
-  <p style="margin-top:18px"><a href="<?php echo esc_url( $self . '&a=preferences' ); ?>">Choose which emails to keep instead</a></p>
+  <p style="margin-top:18px"><a href="<?php echo esc_url( $self . '&a=preferences' ); ?>"><?php echo $nl( 's.nl.keep_instead' ); ?></a></p>
 
 <?php else : ?>
-  <div class="k-eyebrow">Email preferences</div>
-  <h1>What would you like to receive?</h1>
-  <?php if ( 'saved' === $state ) : ?><p style="color:var(--sage)"><i class="ti ti-check"></i> Your preferences are saved.</p><?php else : ?><p>Choose the emails you'd like at <?php echo esc_html( $sub->email ); ?>.</p><?php endif; ?>
+  <div class="k-eyebrow"><?php echo $nl( 's.nl.prefs_eyebrow' ); ?></div>
+  <h1><?php echo $nl( 's.nl.prefs_h1' ); ?></h1>
+  <?php if ( 'saved' === $state ) : ?><p style="color:var(--sage)"><i class="ti ti-check"></i> <?php echo $nl( 's.nl.prefs_saved' ); ?></p><?php else : ?><p><?php echo $nl( 's.nl.prefs_choose', array( 'email' => $sub->email ) ); ?></p><?php endif; ?>
   <form method="post" action="<?php echo esc_url( $self . '&a=preferences' ); ?>">
     <div class="k-panel">
       <?php $on = 'subscribed' === $sub->status; ?>
-      <label class="k-check"><input type="checkbox" name="lists[]" value="newsletter" <?php checked( $on && $sub->list_newsletter ); ?>><div><b>Newsletter</b><span>Occasional ideas for looking after your mind, and news from Kounselia.</span></div></label>
-      <label class="k-check"><input type="checkbox" name="lists[]" value="blog" <?php checked( $on && $sub->list_blog ); ?>><div><b>New blog posts</b><span>A short email when we publish a new story on the journal.</span></div></label>
+      <label class="k-check"><input type="checkbox" name="lists[]" value="newsletter" <?php checked( $on && $sub->list_newsletter ); ?>><div><b><?php echo $nl( 's.nl.list_newsletter' ); ?></b><span><?php echo $nl( 's.nl.list_newsletter_d' ); ?></span></div></label>
+      <label class="k-check"><input type="checkbox" name="lists[]" value="blog" <?php checked( $on && $sub->list_blog ); ?>><div><b><?php echo $nl( 's.nl.list_blog' ); ?></b><span><?php echo $nl( 's.nl.list_blog_d' ); ?></span></div></label>
     </div>
-    <button class="k-btn" type="submit">Save preferences</button>
+    <button class="k-btn" type="submit"><?php echo $nl( 's.nl.save_prefs' ); ?></button>
   </form>
-  <form method="post" action="<?php echo esc_url( $self . '&a=unsubscribe' ); ?>"><button class="k-link-btn" type="submit">Unsubscribe from everything</button></form>
+  <form method="post" action="<?php echo esc_url( $self . '&a=unsubscribe' ); ?>"><button class="k-link-btn" type="submit"><?php echo $nl( 's.nl.unsub_all' ); ?></button></form>
 <?php endif; ?>
 
 </main>

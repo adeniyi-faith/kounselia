@@ -45,14 +45,33 @@ $kounselia_avatar_url     = ( $kounselia_is_logged_in && function_exists( 'kouns
 // redirect rule kicks in.
 $kounselia_ajax_url       = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
+// Words on this page come from the language files (see kounselia_t()).
+$kl  = kounselia_current_language();
+$st  = function ( $key, $vars = array() ) use ( $kl ) {
+    return esc_html( kounselia_t( $key, $vars, $kl ) );
+};
+// Same, but lets the sentence hold a few trusted HTML pieces: $tokens = array( 'name' => '<b>..</b>' ).
+$sth = function ( $key, $tokens ) use ( $kl ) {
+    $vars = array();
+    foreach ( $tokens as $n => $h ) {
+        $vars[ $n ] = '@@' . $n . '@@';
+    }
+    $txt = esc_html( kounselia_t( $key, $vars, $kl ) );
+    foreach ( $tokens as $n => $h ) {
+        $txt = str_replace( '@@' . $n . '@@', $h, $txt );
+    }
+    return $txt;
+};
+$kounselia_title = kounselia_t( 's.home.title', array(), $kl );
+$kounselia_desc  = kounselia_t( 's.home.meta_desc', array(), $kl );
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html <?php echo function_exists( 'kounselia_html_attrs' ) ? kounselia_html_attrs() : 'lang="en"'; ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Kounselia — Someone to Talk To, Anytime</title>
-<meta name="description" content="Kounselia gives you a private space to talk through what you're carrying. Real conversations with specialist counselors, available anytime, anywhere.">
+<title><?php echo esc_html( $kounselia_title ); ?></title>
+<meta name="description" content="<?php echo esc_attr( $kounselia_desc ); ?>">
 
 <!-- Favicon -->
 <link rel="icon" type="image/png" href="https://kounselia.com/img/fv.png">
@@ -61,15 +80,15 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
 <!-- Open Graph / Social Media -->
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://kounselia.com/">
-<meta property="og:title" content="Kounselia — Someone to Talk To, Anytime">
-<meta property="og:description" content="Kounselia gives you a private space to talk through what you're carrying. Real conversations with specialist counselors, available anytime, anywhere.">
+<meta property="og:title" content="<?php echo esc_attr( $kounselia_title ); ?>">
+<meta property="og:description" content="<?php echo esc_attr( $kounselia_desc ); ?>">
 <meta property="og:image" content="https://kounselia.com/img/Kounselia_Banner_02_16_9.png">
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:url" content="https://kounselia.com/">
-<meta name="twitter:title" content="Kounselia — Someone to Talk To, Anytime">
-<meta name="twitter:description" content="Kounselia gives you a private space to talk through what you're carrying. Real conversations with specialist counselors, available anytime, anywhere.">
+<meta name="twitter:title" content="<?php echo esc_attr( $kounselia_title ); ?>">
+<meta name="twitter:description" content="<?php echo esc_attr( $kounselia_desc ); ?>">
 <meta name="twitter:image" content="https://kounselia.com/img/Kounselia_Banner_02_16_9.png">
 
 <!-- PRELOAD CRITICAL BRANDING -->
@@ -98,12 +117,12 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
               <div class="user-av"><?php echo $kounselia_avatar_url ? '<img src="' . esc_url( $kounselia_avatar_url ) . '" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">' : esc_html( mb_strtoupper( mb_substr( $kounselia_display_name, 0, 1 ) ) ); ?></div>
               <span class="user-name"><?php echo esc_html( $kounselia_display_name ); ?></span>
             </a>
-            <button class="btn-ghost" onclick="logout()" style="padding: 7px 16px;">Sign out</button>
+            <button class="btn-ghost" onclick="logout()" style="padding: 7px 16px;"><?php echo $st( 's.home.sign_out' ); ?></button>
           </div>
         <?php else : ?>
-          <a class="btn-ghost k-nav-btn k-hide-xs" href="/blog/" style="border-color:transparent">Journal</a>
-          <button class="btn-ghost" onclick="openModal('login')">Sign in</button>
-          <button class="btn-nav-primary" onclick="openModal('register')">Start free</button>
+          <a class="btn-ghost k-nav-btn k-hide-xs" href="/blog/" style="border-color:transparent"><?php echo $st( 's.nav.journal' ); ?></a>
+          <button class="btn-ghost" onclick="openModal('login')"><?php echo $st( 's.nav.sign_in' ); ?></button>
+          <button class="btn-nav-primary" onclick="openModal('register')"><?php echo $st( 's.nav.start_free' ); ?></button>
         <?php endif; ?>
       </div>
     </div>
@@ -111,50 +130,50 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
 
   <!-- HERO -->
   <div class="hero container">
-    <div class="hero-tag"><i class="ti ti-lock" style="font-size:14px"></i> Private and confidential</div>
-    <h1>You deserve someone <em>to talk to</em></h1>
-    <p>Sometimes the hardest part is finding a safe place to say what you're actually feeling. Kounselia gives you that space, anytime you need it.</p>
+    <div class="hero-tag"><i class="ti ti-lock" style="font-size:14px"></i> <?php echo $st( 's.home.hero_tag' ); ?></div>
+    <h1><?php echo $sth( 's.home.hero_title', array( 'em' => '<em>' . $st( 's.home.hero_title_em' ) . '</em>' ) ); ?></h1>
+    <p><?php echo $st( 's.home.hero_p' ); ?></p>
     <div class="hero-cta">
-      <button class="btn-lg primary" onclick="smoothTo('counselors-anchor')">Talk to someone now</button>
-      <button class="btn-lg outline" onclick="openModal('register')">Create free account</button>
+      <button class="btn-lg primary" onclick="smoothTo('counselors-anchor')"><?php echo $st( 's.home.hero_cta_talk' ); ?></button>
+      <button class="btn-lg outline" onclick="openModal('register')"><?php echo $st( 's.home.hero_cta_account' ); ?></button>
     </div>
   </div>
 
   <div class="trust-row">
     <div class="container" style="display: flex; justify-content: center; flex-wrap: wrap; gap: 16px;">
-      <div class="trust-item"><i class="ti ti-globe"></i><span>Available worldwide</span></div>
-      <div class="trust-item"><i class="ti ti-lock"></i><span>Fully private</span></div>
-      <div class="trust-item"><i class="ti ti-clock"></i><span>24 hours a day</span></div>
-      <div class="trust-item"><i class="ti ti-user-check"></i><span>No appointment</span></div>
+      <div class="trust-item"><i class="ti ti-globe"></i><span><?php echo $st( 's.home.trust_worldwide' ); ?></span></div>
+      <div class="trust-item"><i class="ti ti-lock"></i><span><?php echo $st( 's.home.trust_private' ); ?></span></div>
+      <div class="trust-item"><i class="ti ti-clock"></i><span><?php echo $st( 's.home.trust_24h' ); ?></span></div>
+      <div class="trust-item"><i class="ti ti-user-check"></i><span><?php echo $st( 's.home.trust_no_appt' ); ?></span></div>
     </div>
   </div>
 
   <!-- HOW IT FEELS -->
   <div class="feels-section">
     <div class="container">
-      <div class="section-eyebrow">What to expect</div>
-      <h2 class="section-title">A conversation worth having</h2>
-      <p class="section-body">Think of it like walking into a private clinic and being connected with the right specialist for what you are going through. Not a general assistant. A real conversation with someone who understands your specific situation.</p>
+      <div class="section-eyebrow"><?php echo $st( 's.home.feels_eyebrow' ); ?></div>
+      <h2 class="section-title"><?php echo $st( 's.home.feels_title' ); ?></h2>
+      <p class="section-body"><?php echo $st( 's.home.feels_body' ); ?></p>
       <div class="feels-cards">
         <div class="feels-card">
           <div class="feels-icon ic-rose"><i class="ti ti-user-heart"></i></div>
           <div>
-            <h4>The right person for you</h4>
-            <p>Each counselor is built around one area. You are not talking to a generic tool. You are talking to someone who has spent everything on understanding exactly what you are going through.</p>
+            <h4><?php echo $st( 's.home.feels1_title' ); ?></h4>
+            <p><?php echo $st( 's.home.feels1_body' ); ?></p>
           </div>
         </div>
         <div class="feels-card">
           <div class="feels-icon ic-sage"><i class="ti ti-history"></i></div>
           <div>
-            <h4>They remember your story</h4>
-            <p>Every time you come back, your counselor already knows where you are. No starting over. No repeating yourself. The conversation picks up like a good therapist who reviewed your notes before you arrived.</p>
+            <h4><?php echo $st( 's.home.feels2_title' ); ?></h4>
+            <p><?php echo $st( 's.home.feels2_body' ); ?></p>
           </div>
         </div>
         <div class="feels-card">
           <div class="feels-icon ic-blue"><i class="ti ti-shield-heart"></i></div>
           <div>
-            <h4>Built with your safety in mind</h4>
-            <p>If things get serious, you will never be left alone. The platform is designed to recognise distress and connect you with real human support when you need it most.</p>
+            <h4><?php echo $st( 's.home.feels3_title' ); ?></h4>
+            <p><?php echo $st( 's.home.feels3_body' ); ?></p>
           </div>
         </div>
       </div>
@@ -165,10 +184,10 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
   <div class="counselors-section" id="counselors-anchor">
     <div class="container">
       <div class="counselors-head">
-        <div class="section-eyebrow">Our counselors</div>
-        <h2 class="section-title">Who would you like to talk to?</h2>
+        <div class="section-eyebrow"><?php echo $st( 's.home.counselors_eyebrow' ); ?></div>
+        <h2 class="section-title"><?php echo $st( 's.home.counselors_title' ); ?></h2>
       </div>
-      <p class="counselors-sub">No account needed. Just pick the person who feels right for what you are carrying today.</p>
+      <p class="counselors-sub"><?php echo $st( 's.home.counselors_sub' ); ?></p>
 
       <div class="counselors-list">
 
@@ -176,100 +195,100 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
           <div class="card-top">
             <div class="card-av ic-rose"><i class="ti ti-heart"></i></div>
             <div class="card-meta">
-              <div class="card-spec spec-rose">Emotional healing</div>
+              <div class="card-spec spec-rose"><?php echo $st( 's.home.c_serena_spec' ); ?></div>
               <div class="card-name">Serena</div>
             </div>
           </div>
-          <div class="card-desc">Serena is the person you talk to when the feeling is hard to name. She never rushes. She never judges. She just listens and helps you find your way through.</div>
-          <button class="start-btn sb-rose">Talk to Serena</button>
+          <div class="card-desc"><?php echo $st( 's.home.c_serena_desc' ); ?></div>
+          <button class="start-btn sb-rose"><?php echo $st( 's.home.talk_to', array( 'name' => 'Serena' ) ); ?></button>
         </div>
 
         <div class="counselor-card" onclick="startChat('marcus')">
           <div class="card-top">
             <div class="card-av ic-blue"><i class="ti ti-briefcase"></i></div>
             <div class="card-meta">
-              <div class="card-spec spec-blue">Career and purpose</div>
+              <div class="card-spec spec-blue"><?php echo $st( 's.home.c_marcus_spec' ); ?></div>
               <div class="card-name">Marcus</div>
             </div>
           </div>
-          <div class="card-desc">Marcus is for the person standing at a crossroads. If your career no longer feels right or you are searching for what your work is supposed to mean, he will help you think it through clearly.</div>
-          <button class="start-btn sb-blue">Talk to Marcus</button>
+          <div class="card-desc"><?php echo $st( 's.home.c_marcus_desc' ); ?></div>
+          <button class="start-btn sb-blue"><?php echo $st( 's.home.talk_to', array( 'name' => 'Marcus' ) ); ?></button>
         </div>
 
         <div class="counselor-card" onclick="startChat('noa')">
           <div class="card-top">
             <div class="card-av ic-sage"><i class="ti ti-leaf"></i></div>
             <div class="card-meta">
-              <div class="card-spec spec-sage">Personal growth</div>
+              <div class="card-spec spec-sage"><?php echo $st( 's.home.c_noa_spec' ); ?></div>
               <div class="card-name">Noa</div>
             </div>
           </div>
-          <div class="card-desc">Noa is for the person who knows something needs to change but cannot quite name what. She helps you look at the patterns, the inherited beliefs, and the version of yourself that is trying to emerge.</div>
-          <button class="start-btn sb-sage">Talk to Noa</button>
+          <div class="card-desc"><?php echo $st( 's.home.c_noa_desc' ); ?></div>
+          <button class="start-btn sb-sage"><?php echo $st( 's.home.talk_to', array( 'name' => 'Noa' ) ); ?></button>
         </div>
 
         <div class="counselor-card" onclick="startChat('eli')">
           <div class="card-top">
             <div class="card-av ic-gold"><i class="ti ti-users"></i></div>
             <div class="card-meta">
-              <div class="card-spec spec-gold">Relationships</div>
+              <div class="card-spec spec-gold"><?php echo $st( 's.home.c_eli_spec' ); ?></div>
               <div class="card-name">Eli</div>
             </div>
           </div>
-          <div class="card-desc">Eli is for when your relationships are hurting. Whether it is a pattern you keep repeating, a conversation you keep avoiding, or love that is causing more pain than joy, Eli helps you see it clearly.</div>
-          <button class="start-btn sb-gold">Talk to Eli</button>
+          <div class="card-desc"><?php echo $st( 's.home.c_eli_desc' ); ?></div>
+          <button class="start-btn sb-gold"><?php echo $st( 's.home.talk_to', array( 'name' => 'Eli' ) ); ?></button>
         </div>
 
         <div class="counselor-card" onclick="startChat('dr_lena')">
           <div class="card-top">
             <div class="card-av ic-teal"><i class="ti ti-stethoscope"></i></div>
             <div class="card-meta">
-              <div class="card-spec spec-teal">Trauma and PTSD</div>
+              <div class="card-spec spec-teal"><?php echo $st( 's.home.c_dr_lena_spec' ); ?></div>
               <div class="card-name">Dr. Lena</div>
             </div>
           </div>
-          <div class="card-desc">Dr. Lena is for those carrying the weight of things that happened in the past. She moves at your pace, never pushes, and understands that healing from trauma takes its own kind of time.</div>
-          <button class="start-btn sb-teal">Talk to Dr. Lena</button>
+          <div class="card-desc"><?php echo $st( 's.home.c_dr_lena_desc' ); ?></div>
+          <button class="start-btn sb-teal"><?php echo $st( 's.home.talk_to', array( 'name' => 'Dr. Lena' ) ); ?></button>
         </div>
 
         <div class="counselor-card" onclick="startChat('james')">
           <div class="card-top">
             <div class="card-av ic-navy"><i class="ti ti-shield"></i></div>
             <div class="card-meta">
-              <div class="card-spec spec-navy">Men's mental health</div>
+              <div class="card-spec spec-navy"><?php echo $st( 's.home.c_james_spec' ); ?></div>
               <div class="card-name">James</div>
             </div>
           </div>
-          <div class="card-desc">James is for men who were never given real space to talk. No performance, no judgement, no pressure to have it together. Just an honest conversation with someone who gets it.</div>
-          <button class="start-btn sb-navy">Talk to James</button>
+          <div class="card-desc"><?php echo $st( 's.home.c_james_desc' ); ?></div>
+          <button class="start-btn sb-navy"><?php echo $st( 's.home.talk_to', array( 'name' => 'James' ) ); ?></button>
         </div>
 
         <div class="counselor-card" onclick="startChat('theo')">
           <div class="card-top">
             <div class="card-av ic-plum"><i class="ti ti-candle"></i></div>
             <div class="card-meta">
-              <div class="card-spec spec-plum">Grief and loss</div>
+              <div class="card-spec spec-plum"><?php echo $st( 's.home.c_theo_spec' ); ?></div>
               <div class="card-name">Theo</div>
             </div>
           </div>
-          <div class="card-desc">Theo is for anyone who has lost something that mattered. A person, a relationship, a version of your life you had imagined. He holds space for grief with no timeline and no rush to feel better.</div>
-          <button class="start-btn sb-plum">Talk to Theo</button>
+          <div class="card-desc"><?php echo $st( 's.home.c_theo_desc' ); ?></div>
+          <button class="start-btn sb-plum"><?php echo $st( 's.home.talk_to', array( 'name' => 'Theo' ) ); ?></button>
         </div>
 
         <div class="counselor-card" onclick="startChat('priya')">
           <div class="card-top">
             <div class="card-av ic-sienna"><i class="ti ti-battery-charging"></i></div>
             <div class="card-meta">
-              <div class="card-spec spec-sienna">Burnout and balance</div>
+              <div class="card-spec spec-sienna"><?php echo $st( 's.home.c_priya_spec' ); ?></div>
               <div class="card-name">Priya</div>
             </div>
           </div>
-          <div class="card-desc">Priya is for the person who has been running on empty for too long. If you are exhausted in a way that sleep does not fix and meaning has drained out of things that used to matter, talk to Priya.</div>
-          <button class="start-btn sb-sienna">Talk to Priya</button>
+          <div class="card-desc"><?php echo $st( 's.home.c_priya_desc' ); ?></div>
+          <button class="start-btn sb-sienna"><?php echo $st( 's.home.talk_to', array( 'name' => 'Priya' ) ); ?></button>
         </div>
 
       </div>
-      <p class="guest-note" id="guest-note" <?php echo $kounselia_is_logged_in ? 'style="display:none"' : ''; ?>>No account needed to start. <a onclick="openModal('register')">Register free</a> to save your sessions and return anytime.</p>
+      <p class="guest-note" id="guest-note" <?php echo $kounselia_is_logged_in ? 'style="display:none"' : ''; ?>><?php echo $sth( 's.home.guest_note', array( 'link' => '<a onclick="openModal(\'register\')">' . $st( 's.home.guest_register' ) . '</a>' ) ); ?></p>
     </div>
   </div>
 
@@ -279,9 +298,9 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
     <div class="container">
       <div class="pros-head">
         <div>
-          <div class="section-eyebrow">Licensed professionals</div>
-          <h2 class="section-title">When you want a person in the room</h2>
-          <p>Our AI counselors are there any time. When you're ready for more, book a private video session with a licensed psychologist, counsellor or therapist — every one verified by our team.</p>
+          <div class="section-eyebrow"><?php echo $st( 's.home.pros_eyebrow' ); ?></div>
+          <h2 class="section-title"><?php echo $st( 's.home.pros_title' ); ?></h2>
+          <p><?php echo $st( 's.home.pros_p' ); ?></p>
         </div>
       </div>
       <?php if ( $kounselia_home_pros ) : ?>
@@ -290,14 +309,14 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
         </div>
       <?php else : ?>
         <div class="pros-empty">
-          <div><i class="ti ti-discount-check"></i><b>Licences verified</b>We check every professional's credentials with the body that issued them.</div>
-          <div><i class="ti ti-video"></i><b>Private video sessions</b>Book a time that suits you and meet from your dashboard.</div>
-          <div><i class="ti ti-star"></i><b>Real reviews</b>Rated by clients after real sessions — anonymously.</div>
+          <div><i class="ti ti-discount-check"></i><b><?php echo $st( 's.home.pros_e1_title' ); ?></b><?php echo $st( 's.home.pros_e1_body' ); ?></div>
+          <div><i class="ti ti-video"></i><b><?php echo $st( 's.home.pros_e2_title' ); ?></b><?php echo $st( 's.home.pros_e2_body' ); ?></div>
+          <div><i class="ti ti-star"></i><b><?php echo $st( 's.home.pros_e3_title' ); ?></b><?php echo $st( 's.home.pros_e3_body' ); ?></div>
         </div>
       <?php endif; ?>
       <div class="pros-actions">
-        <a class="k-btn" href="/professionals/">Meet our professionals</a>
-        <a class="k-btn outline" href="/professionals/join">Are you a professional? Join us</a>
+        <a class="k-btn" href="/professionals/"><?php echo $st( 's.home.pros_meet' ); ?></a>
+        <a class="k-btn outline" href="/professionals/join"><?php echo $st( 's.home.pros_join' ); ?></a>
       </div>
     </div>
   </div>
@@ -306,29 +325,29 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
   <div class="voices-section">
     <div class="container">
       <div class="voices-head">
-        <div class="section-eyebrow">Real conversations</div>
-        <h2 class="section-title">What people are saying</h2>
+        <div class="section-eyebrow"><?php echo $st( 's.home.voices_eyebrow' ); ?></div>
+        <h2 class="section-title"><?php echo $st( 's.home.voices_title' ); ?></h2>
       </div>
       <div class="voices-list">
         <div class="voice-card">
-          <div class="voice-quote">"I have known for two years that I needed to talk to someone. The cost, the waiting, the fear of being judged kept stopping me. This was the first time I actually said what I have been carrying."</div>
+          <div class="voice-quote">"<?php echo $st( 's.home.voice1_quote' ); ?>"</div>
           <div class="voice-meta">
             <div class="voice-av" style="background:var(--rose-light);color:var(--rose)">A</div>
-            <div class="voice-info"><strong>Adaeze, 31</strong>Lagos, Nigeria. Talked to Serena.</div>
+            <div class="voice-info"><strong>Adaeze, 31</strong><?php echo $st( 's.home.voice1_meta' ); ?></div>
           </div>
         </div>
         <div class="voice-card">
-          <div class="voice-quote">"Marcus asked me one question that completely changed how I see my career. I have been stuck in the wrong conversation with myself for three years."</div>
+          <div class="voice-quote">"<?php echo $st( 's.home.voice2_quote' ); ?>"</div>
           <div class="voice-meta">
             <div class="voice-av" style="background:var(--accent-light);color:var(--accent)">R</div>
-            <div class="voice-info"><strong>Ravi, 28</strong>Bengaluru, India. Talked to Marcus.</div>
+            <div class="voice-info"><strong>Ravi, 28</strong><?php echo $st( 's.home.voice2_meta' ); ?></div>
           </div>
         </div>
         <div class="voice-card">
-          <div class="voice-quote">"I did not expect to cry. James did not make me feel like something was wrong with me. He just listened and asked the right things."</div>
+          <div class="voice-quote">"<?php echo $st( 's.home.voice3_quote' ); ?>"</div>
           <div class="voice-meta">
             <div class="voice-av" style="background:var(--navy-light);color:var(--navy)">T</div>
-            <div class="voice-info"><strong>Thomas, 34</strong>Manchester, UK. Talked to James.</div>
+            <div class="voice-info"><strong>Thomas, 34</strong><?php echo $st( 's.home.voice3_meta' ); ?></div>
           </div>
         </div>
       </div>
@@ -339,17 +358,17 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
   <div class="why-section" style="display: block;">
     <div class="container" style="display: flex; flex-wrap: wrap; gap: 64px; align-items: center; justify-content: space-between;">
       <div class="why-content" style="flex: 1; min-width: 320px;">
-        <div class="why-eyebrow">Why Kounselia exists</div>
-        <h2 class="why-title">Most people who need support never get it</h2>
-        <p class="why-body">Not because they do not want help. But because therapy is expensive, waiting lists are long, and for many people around the world, <strong>a trained professional is simply not accessible.</strong> We built Kounselia because we believe that should change.</p>
+        <div class="why-eyebrow"><?php echo $st( 's.home.why_eyebrow' ); ?></div>
+        <h2 class="why-title"><?php echo $st( 's.home.why_title' ); ?></h2>
+        <p class="why-body"><?php echo $sth( 's.home.why_body', array( 'strong' => '<strong>' . $st( 's.home.why_body_strong' ) . '</strong>' ) ); ?></p>
         <div class="why-stats">
           <div class="why-stat">
             <div class="why-stat-num">1B<sup>+</sup></div>
-            <div class="why-stat-label">People living with a mental health condition worldwide</div>
+            <div class="why-stat-label"><?php echo $st( 's.home.why_stat1' ); ?></div>
           </div>
           <div class="why-stat">
             <div class="why-stat-num">75<sup>%</sup></div>
-            <div class="why-stat-label">In lower income countries receive no support at all</div>
+            <div class="why-stat-label"><?php echo $st( 's.home.why_stat2' ); ?></div>
           </div>
         </div>
       </div>
@@ -357,22 +376,22 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
         <div class="why-pillar">
           <i class="ti ti-certificate"></i>
           <div>
-            <h4>Evidence informed design</h4>
-            <p>Every counselor conversation is built around established therapeutic frameworks including CBT, motivational interviewing, and trauma informed care.</p>
+            <h4><?php echo $st( 's.home.pillar1_title' ); ?></h4>
+            <p><?php echo $st( 's.home.pillar1_body' ); ?></p>
           </div>
         </div>
         <div class="why-pillar">
           <i class="ti ti-microscope"></i>
           <div>
-            <h4>Backed by research</h4>
-            <p>We publish our approach openly and partner with researchers who study what actually works in digital mental health support.</p>
+            <h4><?php echo $st( 's.home.pillar2_title' ); ?></h4>
+            <p><?php echo $st( 's.home.pillar2_body' ); ?></p>
           </div>
         </div>
         <div class="why-pillar">
           <i class="ti ti-heart-handshake"></i>
           <div>
-            <h4>Free at the core</h4>
-            <p>The free tier never expires and never compromises on quality. Everyone deserves access regardless of income or location.</p>
+            <h4><?php echo $st( 's.home.pillar3_title' ); ?></h4>
+            <p><?php echo $st( 's.home.pillar3_body' ); ?></p>
           </div>
         </div>
       </div>
@@ -383,20 +402,20 @@ $kounselia_nonce          = wp_create_nonce( 'kounselia_auth' );
   <div class="partners-section" style="display: block;">
     <div class="container" style="display: flex; flex-wrap: wrap; gap: 64px; align-items: flex-start; justify-content: space-between;">
       <div class="partners-content" style="flex: 1; min-width: 320px;">
-        <div class="section-eyebrow">Partnerships and funding</div>
-        <h2 class="section-title">Working with people who share our values</h2>
-        <p class="partners-body">Kounselia is a <strong>social initiative</strong> as much as a platform. We are actively building relationships with foundations, health organisations, and impact investors who believe mental health access is a fundamental right.</p>
+        <div class="section-eyebrow"><?php echo $st( 's.home.partners_eyebrow' ); ?></div>
+        <h2 class="section-title"><?php echo $st( 's.home.partners_title' ); ?></h2>
+        <p class="partners-body"><?php echo $sth( 's.home.partners_body', array( 'strong' => '<strong>' . $st( 's.home.partners_body_strong' ) . '</strong>' ) ); ?></p>
       </div>
       <div class="partners-grid-wrap" style="flex: 1; min-width: 320px;">
         <div class="partners-grid">
-          <div class="partner-cell"><div class="org">WHO Foundation</div><div class="type">Prospective partner</div></div>
-          <div class="partner-cell"><div class="org">Gates Foundation</div><div class="type">Aligned mission</div></div>
-          <div class="partner-cell"><div class="org">Wellcome Trust</div><div class="type">Health equity</div></div>
-          <div class="partner-cell"><div class="org">Open Society</div><div class="type">Access and inclusion</div></div>
+          <div class="partner-cell"><div class="org">WHO Foundation</div><div class="type"><?php echo $st( 's.home.partner_t1' ); ?></div></div>
+          <div class="partner-cell"><div class="org">Gates Foundation</div><div class="type"><?php echo $st( 's.home.partner_t2' ); ?></div></div>
+          <div class="partner-cell"><div class="org">Wellcome Trust</div><div class="type"><?php echo $st( 's.home.partner_t3' ); ?></div></div>
+          <div class="partner-cell"><div class="org">Open Society</div><div class="type"><?php echo $st( 's.home.partner_t4' ); ?></div></div>
         </div>
         <div class="contact-cta" style="margin-top: 24px;">
-          <p>If you represent a foundation, research institution, or public health body and would like to explore what we are building, we would love to hear from you.</p>
-          <button onclick="openModal('register')">Get in touch</button>
+          <p><?php echo $st( 's.home.contact_p' ); ?></p>
+          <button onclick="openModal('register')"><?php echo $st( 's.home.contact_btn' ); ?></button>
         </div>
       </div>
     </div>

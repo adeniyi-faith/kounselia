@@ -598,36 +598,50 @@ function kounselia_notify_booking_created( $booking_id ) {
 
     $professional_user = get_userdata( $booking->professional_user_id );
     $client_user        = get_userdata( $booking->client_user_id );
-    $when                = date_i18n( 'l, F j, Y \a\t g:i A', strtotime( $booking->scheduled_start ) );
+    $start_ts            = strtotime( $booking->scheduled_start );
     $site_url            = rtrim( home_url(), '/' );
 
     if ( $professional_user ) {
+        $lang        = kounselia_mail_lang( $professional_user );
+        $when        = kounselia_mail_datetime( $start_ts, $lang );
+        $client_name = $client_user ? $client_user->display_name : kounselia_t( 'mail.booking.a_client', array(), $lang );
+        $title       = kounselia_t( 'mail.booking.new_title', array(), $lang );
         kounselia_notify_user(
             $booking->professional_user_id,
             'booking_created',
-            'New session booked',
-            ( $client_user ? $client_user->display_name : 'A client' ) . ' booked a session for ' . $when . '.',
+            $title,
+            kounselia_t( 'mail.booking.new_body', array( 'name' => $client_name, 'when' => $when ), $lang ),
             '/pro-dashboard.php',
             array(
-                'subject'      => 'New session booked',
-                'headline'     => 'New booking',
-                'content_html' => '<p>' . esc_html( $client_user ? $client_user->display_name : 'A client' ) . ' just booked a session with you for <strong>' . esc_html( $when ) . '</strong>.</p>',
-                'btn_text'     => 'View your bookings',
+                'subject'      => $title,
+                'headline'     => kounselia_t( 'mail.booking.new_headline', array(), $lang ),
+                'content_html' => '<p>' . kounselia_t( 'mail.booking.new_content', array( 'name' => esc_html( $client_name ), 'when' => esc_html( $when ) ), $lang ) . '</p>',
+                'btn_text'     => kounselia_t( 'mail.booking.view_button', array(), $lang ),
                 'btn_url'      => $site_url . '/pro-dashboard.php',
             )
         );
     }
     if ( $client_user ) {
+        $lang  = kounselia_mail_lang( $client_user );
+        $when  = kounselia_mail_datetime( $start_ts, $lang );
+        $title = kounselia_t( 'mail.booking.yours_title', array(), $lang );
+        if ( $professional_user ) {
+            $body    = kounselia_t( 'mail.booking.yours_body_with', array( 'when' => $when, 'name' => $professional_user->display_name ), $lang );
+            $content = kounselia_t( 'mail.booking.yours_content_with', array( 'when' => esc_html( $when ), 'name' => esc_html( $professional_user->display_name ) ), $lang );
+        } else {
+            $body    = kounselia_t( 'mail.booking.yours_body', array( 'when' => $when ), $lang );
+            $content = kounselia_t( 'mail.booking.yours_content', array( 'when' => esc_html( $when ) ), $lang );
+        }
         kounselia_notify_user(
             $booking->client_user_id,
             'booking_created',
-            'Your session is booked',
-            'Confirmed for ' . $when . ( $professional_user ? ' with ' . $professional_user->display_name : '' ) . '.',
+            $title,
+            $body,
             '/dashboard.php#professionals',
             array(
-                'subject'      => 'Your session is booked',
-                'headline'     => 'Booking confirmed',
-                'content_html' => '<p>Your session is confirmed for <strong>' . esc_html( $when ) . '</strong>' . ( $professional_user ? ' with ' . esc_html( $professional_user->display_name ) : '' ) . '.</p>',
+                'subject'      => $title,
+                'headline'     => kounselia_t( 'mail.booking.yours_headline', array(), $lang ),
+                'content_html' => '<p>' . $content . '</p>',
             )
         );
     }
@@ -649,7 +663,7 @@ function kounselia_notify_booking_cancelled( $booking_id, $cancelled_by_user_id 
         return;
     }
 
-    $when             = date_i18n( 'l, F j, Y \a\t g:i A', strtotime( $booking->scheduled_start ) );
+    $start_ts         = strtotime( $booking->scheduled_start );
     $cancelled_by_pro = ( (int) $cancelled_by_user_id === (int) $booking->professional_user_id );
     $cancelled_by_client = ( (int) $cancelled_by_user_id === (int) $booking->client_user_id );
 
@@ -666,16 +680,19 @@ function kounselia_notify_booking_cancelled( $booking_id, $cancelled_by_user_id 
 
     foreach ( $notify_ids as $notify_user_id ) {
         $notify_is_pro = ( (int) $notify_user_id === (int) $booking->professional_user_id );
+        $lang          = kounselia_mail_lang( $notify_user_id );
+        $when          = kounselia_mail_datetime( $start_ts, $lang );
+        $title         = kounselia_t( 'mail.booking.cancelled_title', array(), $lang );
         kounselia_notify_user(
             $notify_user_id,
             'booking_cancelled',
-            'A session was cancelled',
-            'The session scheduled for ' . $when . ' has been cancelled.',
+            $title,
+            kounselia_t( 'mail.booking.cancelled_body', array( 'when' => $when ), $lang ),
             $notify_is_pro ? '/pro-dashboard.php#bookings' : '/dashboard.php#professionals',
             array(
-                'subject'      => 'A session was cancelled',
-                'headline'     => 'Booking cancelled',
-                'content_html' => '<p>The session scheduled for <strong>' . esc_html( $when ) . '</strong> has been cancelled.</p>',
+                'subject'      => $title,
+                'headline'     => kounselia_t( 'mail.booking.cancelled_headline', array(), $lang ),
+                'content_html' => '<p>' . kounselia_t( 'mail.booking.cancelled_content', array( 'when' => esc_html( $when ) ), $lang ) . '</p>',
             )
         );
     }
@@ -701,22 +718,24 @@ function kounselia_notify_booking_rescheduled( $booking_id, $acting_user_id, $ol
         return;
     }
 
-    $old_when = date_i18n( 'l, F j, Y \a\t g:i A', strtotime( $old_start_mysql ) );
-    $new_when = date_i18n( 'l, F j, Y \a\t g:i A', strtotime( $booking->scheduled_start ) );
-
     $acted_by_pro   = ( (int) $acting_user_id === (int) $booking->professional_user_id );
     $notify_user_id = $acted_by_pro ? $booking->client_user_id : $booking->professional_user_id;
+
+    $lang     = kounselia_mail_lang( $notify_user_id );
+    $old_when = kounselia_mail_datetime( strtotime( $old_start_mysql ), $lang );
+    $new_when = kounselia_mail_datetime( strtotime( $booking->scheduled_start ), $lang );
+    $title    = kounselia_t( 'mail.booking.rescheduled_title', array(), $lang );
 
     kounselia_notify_user(
         $notify_user_id,
         'booking_rescheduled',
-        'A session was rescheduled',
-        'Moved from ' . $old_when . ' to ' . $new_when . '.',
+        $title,
+        kounselia_t( 'mail.booking.rescheduled_body', array( 'old' => $old_when, 'new' => $new_when ), $lang ),
         $acted_by_pro ? '/dashboard.php#professionals' : '/pro-dashboard.php#bookings',
         array(
-            'subject'      => 'A session was rescheduled',
-            'headline'     => 'Booking rescheduled',
-            'content_html' => '<p>A session originally scheduled for <strong>' . esc_html( $old_when ) . '</strong> has been moved to <strong>' . esc_html( $new_when ) . '</strong>.</p>',
+            'subject'      => $title,
+            'headline'     => kounselia_t( 'mail.booking.rescheduled_headline', array(), $lang ),
+            'content_html' => '<p>' . kounselia_t( 'mail.booking.rescheduled_content', array( 'old' => esc_html( $old_when ), 'new' => esc_html( $new_when ) ), $lang ) . '</p>',
         )
     );
 }
@@ -1147,19 +1166,20 @@ function kounselia_notify_booking_message( $booking, $sender_user_id, $content )
         : $booking->client_user_id;
 
     $sender = get_userdata( $sender_user_id );
-    $sender_name = $sender ? $sender->display_name : 'The other person on your booking';
+    $lang = kounselia_mail_lang( $recipient_user_id );
+    $sender_name = $sender ? $sender->display_name : kounselia_t( 'mail.booking.other_person', array(), $lang );
     $recipient_is_pro = ( (int) $recipient_user_id === (int) $booking->professional_user_id );
 
     kounselia_notify_user(
         $recipient_user_id,
         'booking_message',
-        'New message from ' . $sender_name,
+        kounselia_t( 'mail.booking.message_title', array( 'name' => $sender_name ), $lang ),
         wp_trim_words( $content, 20, '…' ),
         $recipient_is_pro ? '/pro-dashboard.php#bookings' : '/dashboard.php#professionals',
         array(
-            'subject'      => 'New message about your upcoming session',
-            'headline'     => 'New message',
-            'content_html' => '<p>' . esc_html( $sender_name ) . ' sent you a message: </p><blockquote style="margin:0;padding:12px 16px;border-left:3px solid #ccc;color:#444">' . esc_html( $content ) . '</blockquote>',
+            'subject'      => kounselia_t( 'mail.booking.message_subject', array(), $lang ),
+            'headline'     => kounselia_t( 'mail.booking.message_headline', array(), $lang ),
+            'content_html' => '<p>' . esc_html( kounselia_t( 'mail.booking.message_content', array( 'name' => $sender_name ), $lang ) ) . ' </p><blockquote style="margin:0;padding:12px 16px;border-left:3px solid #ccc;color:#444">' . esc_html( $content ) . '</blockquote>',
         )
     );
 }

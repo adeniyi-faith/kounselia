@@ -4,14 +4,15 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, Text, View } from 'react-native';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 
-function greeting(): string {
+function greetingKey(): string {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning,';
-  if (hour < 17) return 'Good afternoon,';
-  return 'Good evening,';
+  if (hour < 12) return 'm.welcome_banner.morning';
+  if (hour < 17) return 'm.welcome_banner.afternoon';
+  return 'm.welcome_banner.evening';
 }
 
 const GLOW = [300, 250, 200, 150, 100, 60];
@@ -25,6 +26,7 @@ interface Props {
 export function WelcomeBanner({ firstName, onTalk, onSessions }: Props) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const [breathe] = useState(() => new Animated.Value(0));
   useEffect(() => {
     let loop: Animated.CompositeAnimation | undefined;
@@ -53,21 +55,21 @@ export function WelcomeBanner({ firstName, onTalk, onSessions }: Props) {
           <View key={size} style={[styles.glow, { width: size, height: size, borderRadius: size / 2 }]} />
         ))}
       </Animated.View>
-      <Text style={styles.eyebrow}>Your space</Text>
+      <Text style={styles.eyebrow}>{t('m.welcome_banner.eyebrow')}</Text>
       <Text style={styles.h1} accessibilityRole="header">
-        {greeting()} {firstName ? <Text style={styles.name}>{firstName}</Text> : null}.
+        {t(greetingKey())} {firstName ? <Text style={styles.name}>{firstName}</Text> : null}.
       </Text>
       <Text style={styles.body}>
-        This is where everything you bring to Kounselia lives, your conversations, your people, your pace. Nothing here is urgent.
+        {t('m.welcome_banner.body')}
       </Text>
       <View style={styles.actions}>
         <Pressable onPress={onTalk} accessibilityRole="button" style={({ pressed }) => [styles.btn, styles.btnPrimary, pressed && styles.pressed]}>
           <TablerIcon name="message-2-plus" size={16} color={colors.navyFill} />
-          <Text style={[styles.btnText, { color: colors.navyFill }]}>Talk to someone now</Text>
+          <Text style={[styles.btnText, { color: colors.navyFill }]}>{t('m.welcome_banner.talk')}</Text>
         </Pressable>
         <Pressable onPress={onSessions} accessibilityRole="button" style={({ pressed }) => [styles.btn, styles.btnGhost, pressed && styles.pressed]}>
           <TablerIcon name="history" size={16} color="#fff" />
-          <Text style={[styles.btnText, { color: '#fff' }]}>Your sessions</Text>
+          <Text style={[styles.btnText, { color: '#fff' }]}>{t('m.welcome_banner.sessions')}</Text>
         </Pressable>
       </View>
     </LinearGradient>

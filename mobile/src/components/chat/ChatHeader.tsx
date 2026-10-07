@@ -5,6 +5,7 @@ import type { CounselorSummary } from '@kounselia/core';
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { openSafetyResources } from '../openSafety';
 import { CounselorAvatar } from '../CounselorAvatar';
@@ -22,6 +23,7 @@ interface Props {
 export function ChatHeader({ counselor, onBack, onShare, onClear, onCall }: Props) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const insets = useSafeAreaInsets();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -32,7 +34,7 @@ export function ChatHeader({ counselor, onBack, onShare, onClear, onCall }: Prop
 
   return (
     <View style={[styles.nav, { paddingTop: insets.top + 10 }]}>
-      <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel="Back" style={styles.back} hitSlop={6}>
+      <Pressable onPress={onBack} accessibilityRole="button" accessibilityLabel={t('m.b.common.back')} style={styles.back} hitSlop={6}>
         <TablerIcon name="arrow-left" size={20} color={colors.text} />
       </Pressable>
       <CounselorAvatar icon={counselor.icon} color={counselor.color} size={42} />
@@ -50,14 +52,14 @@ export function ChatHeader({ counselor, onBack, onShare, onClear, onCall }: Prop
         </Text>
       </View>
       {onCall && (
-        <Pressable onPress={onCall} accessibilityRole="button" accessibilityLabel={`Voice call with ${counselor.name}`} style={[styles.iconBtn, styles.call]} hitSlop={6}>
+        <Pressable onPress={onCall} accessibilityRole="button" accessibilityLabel={t('m.b.chath.call', { name: counselor.name })} style={[styles.iconBtn, styles.call]} hitSlop={6}>
           <TablerIcon name="phone" size={19} color="#00A884" />
         </Pressable>
       )}
       <Pressable
         onPress={() => setMenuOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel="More options"
+        accessibilityLabel={t('m.b.chath.more')}
         style={styles.iconBtn}
         hitSlop={6}
       >
@@ -65,11 +67,11 @@ export function ChatHeader({ counselor, onBack, onShare, onClear, onCall }: Prop
       </Pressable>
 
       <Modal visible={menuOpen} transparent animationType="fade" onRequestClose={() => setMenuOpen(false)}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuOpen(false)} accessibilityLabel="Close menu">
+        <Pressable style={StyleSheet.absoluteFill} onPress={() => setMenuOpen(false)} accessibilityLabel={t('m.b.chath.close_menu')}>
           <View style={[styles.menu, { top: insets.top + 62 }]}>
-            <MenuItem icon="share" label="Share conversation" onPress={choose(onShare)} />
-            <MenuItem icon="trash" label="Clear chat" color={colors.rose} onPress={choose(onClear)} />
-            <MenuItem icon="lifebuoy" label="Get urgent help" onPress={choose(openSafetyResources)} last />
+            <MenuItem icon="share" label={t('m.b.chath.share')} onPress={choose(onShare)} />
+            <MenuItem icon="trash" label={t('m.b.chath.clear')} color={colors.rose} onPress={choose(onClear)} />
+            <MenuItem icon="lifebuoy" label={t('m.b.chath.urgent')} onPress={choose(openSafetyResources)} last />
           </View>
         </Pressable>
       </Modal>

@@ -6,24 +6,26 @@ import type { BlogCard } from '@kounselia/core';
 import { Image } from 'expo-image';
 import { Pressable, Text, View } from 'react-native';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useLanguage } from '@/language';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 
-export function articleDate(iso: string | null) {
+export function articleDate(iso: string | null, language?: string) {
   if (!iso) return '';
   const d = new Date(iso);
   const sameYear = d.getFullYear() === new Date().getFullYear();
-  return d.toLocaleDateString([], { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) });
+  return d.toLocaleDateString(language ?? [], { day: 'numeric', month: 'short', ...(sameYear ? {} : { year: 'numeric' }) });
 }
 
 export function ArticleCard({ post, onPress, compact }: { post: BlogCard; onPress: () => void; compact?: boolean }) {
   const styles = useStyles();
   const colors = useColors();
+  const { language, t } = useLanguage();
   const topic = post.tags[0]?.name;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="link"
-      accessibilityLabel={`${post.title}. ${post.reading_minutes} minute read`}
+      accessibilityLabel={t('m.b.card.label', { title: post.title, minutes: post.reading_minutes })}
       style={({ pressed }) => [styles.card, compact && styles.compact, pressed && { opacity: 0.92 }]}
     >
       {post.cover ? (
@@ -47,17 +49,17 @@ export function ArticleCard({ post, onPress, compact }: { post: BlogCard; onPres
           {!compact && <Text style={styles.metaText}>{post.author.name}</Text>}
           {!compact && post.author.is_professional ? <TablerIcon name="discount-check-filled" size={14} color={colors.sage} /> : null}
           {!compact && <View style={styles.dot} />}
-          <Text style={styles.metaText}>{articleDate(post.published_utc)}</Text>
+          <Text style={styles.metaText}>{articleDate(post.published_utc, language)}</Text>
           <View style={styles.dot} />
-          <Text style={styles.metaText}>{post.reading_minutes} min read</Text>
+          <Text style={styles.metaText}>{t('m.b.card.min_read', { minutes: post.reading_minutes })}</Text>
           {!compact && post.love_count > 0 ? (
-            <View style={styles.count} accessibilityLabel={`${post.love_count} loves`}>
+            <View style={styles.count} accessibilityLabel={post.love_count === 1 ? t('m.b.actions.loves_one') : t('m.b.actions.loves_other', { n: post.love_count })}>
               <TablerIcon name="heart" size={13} color={colors.text3} />
               <Text style={styles.metaText}>{post.love_count}</Text>
             </View>
           ) : null}
           {!compact && post.comment_count > 0 ? (
-            <View style={styles.count} accessibilityLabel={`${post.comment_count} comments`}>
+            <View style={styles.count} accessibilityLabel={post.comment_count === 1 ? t('m.b.actions.comments_one') : t('m.b.actions.comments_other', { n: post.comment_count })}>
               <TablerIcon name="message-circle" size={13} color={colors.text3} />
               <Text style={styles.metaText}>{post.comment_count}</Text>
             </View>

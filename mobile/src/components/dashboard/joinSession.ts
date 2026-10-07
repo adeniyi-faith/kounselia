@@ -1,4 +1,4 @@
-import { fetchBookingRoom, type KounseliaConfig } from '@kounselia/core';
+import { deviceLanguage, fetchBookingRoom, makeT, type KounseliaConfig, type Translate } from '@kounselia/core';
 import * as Linking from 'expo-linking';
 import { openVideoCall } from '@/browser/VideoCallProvider';
 
@@ -8,7 +8,7 @@ import { openVideoCall } from '@/browser/VideoCallProvider';
 // link opens in that app instead (or the browser, if it isn't installed):
 // those still need a real browser/app, since they aren't ours to embed.
 // Resolves with an error message to show, or null if it opened.
-export async function joinSession(config: KounseliaConfig, bookingId: number): Promise<string | null> {
+export async function joinSession(config: KounseliaConfig, bookingId: number, t: Translate = makeT(deviceLanguage())): Promise<string | null> {
   const res = await fetchBookingRoom(config, bookingId);
   if (!res.ok) return res.message;
   if (res.data.external) {
@@ -16,7 +16,7 @@ export async function joinSession(config: KounseliaConfig, bookingId: number): P
       await Linking.openURL(res.data.url);
       return null;
     } catch {
-      return `We couldn't open ${res.data.provider}. Please try again, or message your professional.`;
+      return t('m.join.cant_open', { provider: res.data.provider });
     }
   }
   await openVideoCall(res.data.url);

@@ -4,6 +4,7 @@
 import type { CounselorSummary } from '@kounselia/core';
 import { useEffect, useState } from 'react';
 import { Animated, Easing, Text, View } from 'react-native';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { CounselorAvatar } from '../CounselorAvatar';
 import { TablerIcon } from '../TablerIcon';
@@ -31,6 +32,7 @@ function Dot({ delay, color }: { delay: number; color: string }) {
 export function TypingIndicator({ counselor }: { counselor: CounselorSummary }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const [consulting, setConsulting] = useState(false);
   useEffect(() => {
     const timer = setTimeout(() => setConsulting(true), 3500);
@@ -39,13 +41,13 @@ export function TypingIndicator({ counselor }: { counselor: CounselorSummary }) 
 
   const dotColor = consulting ? colors.gold : colors.text3;
   return (
-    <View style={styles.row} accessibilityLiveRegion="polite" accessibilityLabel={`${counselor.name} is typing`}>
+    <View style={styles.row} accessibilityLiveRegion="polite" accessibilityLabel={t('m.b.typing.typing', { name: counselor.name })}>
       <CounselorAvatar icon={counselor.icon} color={counselor.color} size={32} />
       <View style={styles.bubble}>
         {consulting && (
           <>
             <TablerIcon name="users" size={12} color={colors.gold} />
-            <Text style={styles.consulting}>Consulting team</Text>
+            <Text style={styles.consulting}>{t('m.b.typing.consulting')}</Text>
           </>
         )}
         <Dot delay={0} color={dotColor} />

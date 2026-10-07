@@ -10,6 +10,7 @@ import { ArticleCard } from '@/components/articles/ArticleCard';
 import { Button } from '@/components/Button';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useT } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, useColors } from '@/theme';
 import { ArticlesSkeleton } from '@/components/Skeleton';
@@ -17,9 +18,10 @@ import { ArticlesSkeleton } from '@/components/Skeleton';
 export default function Articles() {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const { config } = useSession();
   const [posts, setPosts] = useState<BlogCard[] | null>(null);
-  const [title, setTitle] = useState('The Kounselia Journal');
+  const [title, setTitle] = useState('');
   const [tagline, setTagline] = useState('');
   const [tags, setTags] = useState<BlogTag[]>([]);
   const [tag, setTag] = useState('');
@@ -60,8 +62,8 @@ export default function Articles() {
 
   // Search a moment after they stop typing.
   useEffect(() => {
-    const t = setTimeout(() => setSearch(query.trim()), 400);
-    return () => clearTimeout(t);
+    const timer = setTimeout(() => setSearch(query.trim()), 400);
+    return () => clearTimeout(timer);
   }, [query]);
 
   async function more() {
@@ -84,7 +86,7 @@ export default function Articles() {
   const header = (
     <View>
       <Text style={styles.title} accessibilityRole="header">
-        {title}
+        {title || t('m.b.articles.journal')}
       </Text>
       {tagline ? <Text style={styles.tagline}>{tagline}</Text> : null}
       <View style={styles.searchBox}>
@@ -92,29 +94,29 @@ export default function Articles() {
         <TextInput
           value={query}
           onChangeText={setQuery}
-          placeholder="Search articles"
+          placeholder={t('m.b.articles.search')}
           placeholderTextColor={colors.text3}
           returnKeyType="search"
-          accessibilityLabel="Search articles"
+          accessibilityLabel={t('m.b.articles.search')}
           style={styles.searchInput}
         />
         {query ? (
-          <Pressable onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel="Clear search" hitSlop={8}>
+          <Pressable onPress={() => setQuery('')} accessibilityRole="button" accessibilityLabel={t('m.b.articles.clear_search')} hitSlop={8}>
             <TablerIcon name="x" size={16} color={colors.text3} />
           </Pressable>
         ) : null}
       </View>
       {(tags.length > 0 || filters.professionals) && (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips} style={styles.chipRow}>
-          <Chip label="All" active={!tag && !from} onPress={() => { setTag(''); setFrom(''); }} />
+          <Chip label={t('m.b.articles.all')} active={!tag && !from} onPress={() => { setTag(''); setFrom(''); }} />
           {filters.professionals ? (
             <Chip label={filters.professionals} icon="discount-check" active={from === 'professionals'} onPress={() => { setTag(''); setFrom(from === 'professionals' ? '' : 'professionals'); }} />
           ) : null}
           {filters.following ? (
-            <Chip label="Following" icon="users" active={from === 'following'} onPress={() => { setTag(''); setFrom(from === 'following' ? '' : 'following'); }} />
+            <Chip label={t('m.b.articles.following')} icon="users" active={from === 'following'} onPress={() => { setTag(''); setFrom(from === 'following' ? '' : 'following'); }} />
           ) : null}
-          {tags.map((t) => (
-            <Chip key={t.slug} label={t.name} active={tag === t.slug} onPress={() => { setFrom(''); setTag(tag === t.slug ? '' : t.slug); }} />
+          {tags.map((tg) => (
+            <Chip key={tg.slug} label={tg.name} active={tag === tg.slug} onPress={() => { setFrom(''); setTag(tag === tg.slug ? '' : tg.slug); }} />
           ))}
         </ScrollView>
       )}
@@ -124,12 +126,12 @@ export default function Articles() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScreenHeader title="Articles" />
+      <ScreenHeader title={t('m.b.articles.title')} />
       {!posts ? (
         failed ? (
           <View style={styles.center}>
-            <Text style={styles.notice}>We couldn’t load the articles. Please check your internet connection.</Text>
-            <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+            <Text style={styles.notice}>{t('m.b.articles.load_failed')}</Text>
+            <Button title={t('m.b.common.try_again')} variant="ghost" onPress={refresh} busy={refreshing} />
           </View>
         ) : (
           <View style={styles.skeleton}>
@@ -153,10 +155,10 @@ export default function Articles() {
               <TablerIcon name="news" size={28} color={colors.text3} />
               <Text style={styles.notice}>
                 {from === 'following'
-                  ? 'Nothing here yet. Tap Follow under an article by a professional, and their new writing will show up here.'
+                  ? t('m.b.articles.empty_following')
                   : search || tag || from
-                    ? 'No articles match that. Try another word or topic.'
-                    : 'No articles yet. Check back soon.'}
+                    ? t('m.b.articles.empty_search')
+                    : t('m.b.articles.empty')}
               </Text>
             </View>
           }
