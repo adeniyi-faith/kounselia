@@ -1,11 +1,11 @@
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { FlatList, Image, useWindowDimensions, View, type ImageSourcePropType, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
+import { FlatList, Image, Text, useWindowDimensions, View, type ImageSourcePropType, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { useT } from '@/language';
-import { makeStyles, radius, shadows } from '@/theme';
+import { fonts, makeStyles, radius, shadows } from '@/theme';
 
 // The campaign posters, shown whole: each is sized to the largest it can
 // be inside the space above the buttons, so nothing is ever cropped on
@@ -94,6 +94,14 @@ export default function Welcome() {
       <View style={styles.actions}>
         <Button title={t('m.welcome.create_free')} onPress={() => router.push('/sign-up')} />
         <Button title={t('m.welcome.have_account')} variant="ghost" onPress={() => router.push('/sign-in')} />
+        {/* Professionals sign in with "I already have an account" too; this
+            is for one who hasn't joined yet (the website's apply.php). */}
+        <Text style={styles.pro}>
+          {t('m.welcome.pro_prompt')}{' '}
+          <Text accessibilityRole="link" style={styles.proLink} onPress={() => router.push('/apply')}>
+            {t('m.welcome.pro_join')}
+          </Text>
+        </Text>
       </View>
     </SafeAreaView>
   );
@@ -109,4 +117,6 @@ const useStyles = makeStyles((colors) => ({
   dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.border },
   dotActive: { width: 22, backgroundColor: colors.brandNavy },
   actions: { gap: 12, paddingHorizontal: SIDE_GAP, paddingBottom: 16 },
+  pro: { textAlign: 'center', marginTop: 4, fontFamily: fonts.regular, fontSize: 14, color: colors.text2 },
+  proLink: { color: colors.accentText, fontFamily: fonts.medium },
 }));

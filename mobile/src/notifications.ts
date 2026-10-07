@@ -169,6 +169,14 @@ export function routeForLink(url: string): Href {
   if (article && article[1] !== 'tag') return { pathname: '/articles/[slug]', params: { slug: decodeURIComponent(article[1]) } };
   if (path.includes('tab=upgrade')) return '/plan';
   if (path.includes('tab=growth')) return '/growth';
+  // A professional's own news (new bookings, payouts, article reviews):
+  // the matching tab of their professional home.
+  if (path.startsWith('/pro-dashboard.php') || path.startsWith('/pro-write.php')) {
+    const tab = /[?&#](?:tab=)?([a-z]+)$/.exec(path.split('&')[0])?.[1] ?? /[?&]tab=([a-z]+)/.exec(path)?.[1];
+    if (tab === 'bookings' || tab === 'earnings' || tab === 'profile') return `/pro/${tab}`;
+    if (tab === 'articles' || path.startsWith('/pro-write.php')) return '/pro/articles';
+    return '/pro';
+  }
   if (path.startsWith('/dashboard.php#professionals') || path.includes('booking')) return '/sessions';
   return '/';
 }

@@ -29,6 +29,7 @@ import { Button } from '@/components/Button';
 import { Toast, useToast } from '@/components/chat/Toast';
 import { FormMessage } from '@/components/FormMessage';
 import { openSafetyResources } from '@/components/openSafety';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Sheet } from '@/components/Sheet';
 import { TablerIcon } from '@/components/TablerIcon';
 import { TextField } from '@/components/TextField';
@@ -51,10 +52,12 @@ const LOCK_AFTER_KEYS: Record<number, { label: string; a11y: string }> = {
   300: { label: 'm.settings.lock_5', a11y: 'm.settings.lock_a11y_5' },
 };
 
-export default function Settings() {
+// `inStack`: opened on top of a professional's own tabs (app/(app)/account.tsx)
+// rather than as the client side's Settings tab, so it gets a back button.
+export default function Settings({ inStack = false }: { inStack?: boolean }) {
   const styles = useStyles();
   const colors = useColors();
-  const { user, config, signOut, updateUser, deleteAccount } = useSession();
+  const { user, config, signOut, updateUser, deleteAccount, setViewMode } = useSession();
   const { language, t, setLanguage: setAppLanguage } = useLanguage();
   const { appearance, setAppearance, scheme } = useTheme();
   const appearanceNote = appearance === 'system' ? t(scheme === 'dark' ? 'm.settings.matches_dark' : 'm.settings.matches_light') : undefined;
@@ -223,14 +226,17 @@ export default function Settings() {
   const memory = account?.memory;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={inStack ? ['top', 'left', 'right', 'bottom'] : ['top', 'left', 'right']}>
+      {inStack && <ScreenHeader title={t('m.settings.account_settings')} />}
       <ScrollView
         contentContainerStyle={styles.content}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
       >
-        <Text style={styles.title} accessibilityRole="header">
-          {t('m.tabs.settings')}
-        </Text>
+        {!inStack && (
+          <Text style={styles.title} accessibilityRole="header">
+            {t('m.tabs.settings')}
+          </Text>
+        )}
 
         {/* Profile */}
         <View style={styles.profile}>
@@ -330,6 +336,33 @@ export default function Settings() {
             })}
           </View>
         </Group>
+
+        {/* For professionals: back to their own home. For everyone else:
+            the website's "Join as a professional" (apply.php). Left out on
+            top of a professional's own tabs, which already are that home. */}
+        {!inStack && (
+          <Group title={t('m.settings.g_pro')}>
+            {user?.professional ? (
+              <Row
+                icon="switch-horizontal"
+                tint="gold"
+                label={t('m.settings.pro_switch')}
+                sub={t('m.settings.pro_switch_sub')}
+                onPress={() => setViewMode('professional')}
+                last
+              />
+            ) : (
+              <Row
+                icon="stethoscope"
+                tint="gold"
+                label={t('m.settings.pro_join')}
+                sub={t('m.settings.pro_join_sub')}
+                onPress={() => router.push('/apply')}
+                last
+              />
+            )}
+          </Group>
+        )}
 
         <Group title={t('m.settings.g_account')}>
           <Row icon="user" label={t('m.settings.name')} value={name} onPress={() => setSheet('name')} />

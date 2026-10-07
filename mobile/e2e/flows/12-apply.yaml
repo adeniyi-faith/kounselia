@@ -1,0 +1,20 @@
+# Signed out: "Join as a professional" on the welcome screen opens the
+# application form (account, professional details, rate, documents).
+appId: com.kounselia.app
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "I already have an account"
+    timeout: 90000
+- tapOn: "Join as a professional"
+- extendedWaitUntil:
+    visible: "Bring your practice to Kounselia"
+    timeout: 10000
+- takeScreenshot: ${P}55-apply
+- scroll
+- takeScreenshot: ${P}56-apply-2
+- scroll
+- takeScreenshot: ${P}57-apply-3
+- scroll
+- takeScreenshot: ${P}58-apply-4

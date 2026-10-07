@@ -88,6 +88,7 @@ require_once KOUNSELIA_CORE_DIR . '/includes/booking-reminders.php'; // 18H. "St
 require_once KOUNSELIA_CORE_DIR . '/includes/reviews.php';           // 18I. Session ratings & reviews
 require_once KOUNSELIA_CORE_DIR . '/includes/app-dashboard.php';     // 18J. Dashboard data for the mobile app (home, sessions, bookings, video room)
 require_once KOUNSELIA_CORE_DIR . '/includes/app-content.php';       // 18K. Blog, journal history and Settings for the mobile app
+require_once KOUNSELIA_CORE_DIR . '/includes/app-professional.php';  // 18L. The professional's side of the mobile app (home, applying, documents)
 require_once KOUNSELIA_CORE_DIR . '/includes/admin-access.php';      // 19. Admin capability, staff role, audit log
 require_once KOUNSELIA_CORE_DIR . '/includes/admin-2fa.php';         // 19B. Admin two-factor authentication (TOTP)
 require_once KOUNSELIA_CORE_DIR . '/includes/content.php';           // 20. CMS: editable pages, blog, footer

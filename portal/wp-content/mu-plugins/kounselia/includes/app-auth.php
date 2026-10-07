@@ -222,9 +222,12 @@ add_action( 'deleted_user', 'kounselia_delete_app_tokens_for_deleted_user' );
  */
 function kounselia_app_user_payload( $user ) {
     return array(
-        'id'    => (int) $user->ID,
-        'name'  => $user->display_name ? $user->display_name : $user->user_login,
-        'email' => $user->user_email,
+        'id'           => (int) $user->ID,
+        'name'         => $user->display_name ? $user->display_name : $user->user_login,
+        'email'        => $user->user_email,
+        // Set for anyone who has applied as a professional, so the app can
+        // open their professional home (see app-professional.php).
+        'professional' => function_exists( 'kounselia_app_professional_summary' ) ? kounselia_app_professional_summary( $user->ID ) : null,
     );
 }
 
