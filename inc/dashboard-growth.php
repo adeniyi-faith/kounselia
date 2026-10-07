@@ -45,6 +45,9 @@ if ( ! function_exists( 'kounselia_growth_overview' ) ) {
 .gp-note{font-size:13px;color:var(--text3);margin-top:10px;line-height:1.5}
 .gp-prev{display:flex;justify-content:space-between;gap:10px;padding:12px 0;border-top:1px solid var(--border);font-size:14px}
 .gp-prev:first-of-type{border-top:none}
+.gp-review{background:var(--accent-light);border:1px solid #C8D8EC}
+.gp-review p{font-size:14.5px;line-height:1.65;color:var(--text2);margin:6px 0 12px}
+.gp-sel{padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);font-family:inherit;font-size:14px;color:var(--text)}
 .gp-link{background:none;border:none;color:var(--text3);font-size:13px;cursor:pointer;font-family:inherit;text-decoration:underline;padding:4px}
 </style>
 
@@ -146,6 +149,12 @@ if ( ! function_exists( 'kounselia_growth_overview' ) ) {
     }
     h += '<div class="gp-bar"><div style="width:' + pct + '%"></div></div><div class="gp-meta"><span>' + p.done_count + ' of ' + p.total_days + ' days done</span><span>' + (p.streak ? p.streak + '-day streak' : 'Start your streak today') + '</span></div></div>';
 
+    if(p.review_ready){
+      h += '<div class="gp-card gp-review"><div class="gp-eyebrow">Week ' + p.review_ready + ' review</div><p>You have finished a week. Want a short look back at how it went? Kounselia can also make your next days a little easier or harder to fit you.</p><button type="button" class="intake-btn" id="gp-review-btn" data-week="' + p.review_ready + '">Review my week</button></div>';
+    }
+    (p.reviews || []).slice().reverse().forEach(function(r){
+      h += '<div class="gp-card"><div class="gp-eyebrow">' + (r.week === 5 ? 'Final review' : 'Week ' + r.week + ' review') + '</div><p style="font-size:14.5px;line-height:1.65;color:var(--text2);margin-top:6px">' + esc(r.note) + '</p>' + (r.changed ? '<p class="gp-note">Your next ' + r.changed + ' days were made ' + esc(r.level) + '.</p>' : '') + '</div>';
+    });
     h += '<div class="gp-card"><div class="gp-eyebrow">All 30 days</div><div class="gp-days">';
     p.days.forEach(function(x){
       h += '<button type="button" class="gp-day ' + (x.done ? 'done ' : '') + x.state + '" data-day="' + x.day + '" ' + (x.state === 'upcoming' ? 'aria-disabled="true"' : '') + '>' + (x.done ? '<i class="ti ti-check"></i>' : x.day) + '</button>';
@@ -156,7 +165,7 @@ if ( ! function_exists( 'kounselia_growth_overview' ) ) {
       h += '<div class="gp-day-detail"><b>Day ' + open.day + (open.title ? ': ' + esc(open.title) : '') + '</b><br>' + esc(open.task) + (open.state !== 'upcoming' ? '<br><button type="button" class="gp-link" id="gp-day-toggle">' + (open.done ? 'Mark as not done' : 'Mark as done') + '</button>' : '') + '</div>';
     }
     h += '<p class="gp-note">Missed a day? That\'s fine. Your plan keeps going, and you can tick off any earlier day later.</p></div>';
-    h += '<div class="gp-card"><p style="font-size:14px;line-height:1.6;color:var(--text2)">' + esc(p.summary) + '</p><button type="button" class="gp-link" id="gp-end">End this plan</button></div>';
+    h += '<div class="gp-card"><p style="font-size:14px;line-height:1.6;color:var(--text2)">' + esc(p.summary) + '</p><div style="margin:12px 0;font-size:14px;color:var(--text2)"><label for="gp-hour">Daily reminder </label><select class="gp-sel" id="gp-hour"><option value="-1">Off</option>' + hourOptions(p.remind_hour) + '</select><div class="gp-note">Sent at the chosen time in our server time zone, as a notification in the app and on the website.</div></div><button type="button" class="gp-link" id="gp-end">End this plan</button></div>';
     h += renderPrevious(d);
     root.innerHTML = h;
 
@@ -173,6 +182,24 @@ if ( ! function_exists( 'kounselia_growth_overview' ) ) {
     });
     var dt = document.getElementById('gp-day-toggle');
     if(dt) dt.addEventListener('click', function(){ mark(open.day, !open.done); });
+    var rb = document.getElementById('gp-review-btn');
+    if(rb) rb.addEventListener('click', function(){
+      rb.disabled = true; rb.textContent = 'Writing your review…';
+      post({ action: 'kounselia_growth_review', plan_id: p.id, week: rb.dataset.week }).then(function(res){
+        if(res.success && res.data.plan){ state.data.plan = res.data.plan; render(); }
+        else { rb.disabled = false; rb.textContent = 'Review my week'; toast((res.data && res.data.message) || 'Could not write your review.', true); }
+      }).catch(function(){ rb.disabled = false; rb.textContent = 'Review my week'; toast('Connection problem, please try again.', true); });
+    });
+    var hs = document.getElementById('gp-hour');
+    if(hs){
+      hs.value = String(p.remind_hour);
+      hs.addEventListener('change', function(){
+        post({ action: 'kounselia_growth_set_reminder', plan_id: p.id, hour: hs.value }).then(function(res){
+          if(res.success && res.data.plan){ state.data.plan = res.data.plan; toast(hs.value === '-1' ? 'Reminder turned off.' : 'Reminder saved.'); }
+          else { toast((res.data && res.data.message) || 'Could not save that.', true); }
+        });
+      });
+    }
     document.getElementById('gp-end').addEventListener('click', function(){
       if(!confirm('End this plan? Your progress is kept in your history, but you cannot pick it back up.')) return;
       post({ action: 'kounselia_growth_end', plan_id: p.id }).then(function(res){
@@ -180,6 +207,15 @@ if ( ! function_exists( 'kounselia_growth_overview' ) ) {
         else { toast((res.data && res.data.message) || 'Could not end the plan.', true); }
       });
     });
+  }
+
+  function hourOptions(current){
+    var out = '';
+    for(var h = 0; h < 24; h++){
+      var label = (h % 12 === 0 ? 12 : h % 12) + ':00 ' + (h < 12 ? 'am' : 'pm');
+      out += '<option value="' + h + '">' + label + '</option>';
+    }
+    return out;
   }
 
   function renderPrevious(d){

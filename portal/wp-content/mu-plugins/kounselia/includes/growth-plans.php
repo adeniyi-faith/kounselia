@@ -16,6 +16,13 @@
  *     ('growth_plans' in membership.php, 0 = unlimited). A plan ended on
  *     the same day it was started doesn't count, so someone who changes
  *     their mind straight away gets that plan back.
+ *   - Daily reminder: a push and in-app notification with today's task
+ *     at the hour the member picks (9am unless they change it or turn it
+ *     off), sent by an hourly job. Uses the site's time zone.
+ *   - Weekly review: after each week (days 7, 14, 21, 28 and the final
+ *     day 30) the member can ask for a short review. The AI looks at what
+ *     they did, writes a few kind sentences, and can make the next days
+ *     easier or harder. One review per week; it is saved with the plan.
  *   - The counselor who goes with plans (Noa, Personal Development) is
  *     told about the member's plan in chat, so they can help with
  *     today's step.
@@ -252,6 +259,9 @@ function kounselia_growth_format_plan( $row, $with_days = true ) {
         'streak'         => kounselia_growth_streak( $current, $done ),
         'today'          => $today,
         'counselor_slug' => kounselia_growth_counselor_slug(),
+        'remind_hour'    => (int) $row->remind_hour, // 0-23 in site time, -1 = off
+        'reviews'        => array_values( kounselia_growth_reviews( $row ) ),
+        'review_ready'   => kounselia_growth_next_review( $row ),
     );
     if ( $with_days ) {
         $out['days'] = array_map( $format_day, $days );
@@ -508,6 +518,8 @@ function kounselia_growth_create_plan( $user_id, $area_key, $answers ) {
         'days'       => wp_json_encode( $plan['days'] ),
         'total_days' => count( $plan['days'] ),
         'start_date' => current_time( 'Y-m-d' ),
+        // Day 1's task is on screen right now, so the first reminder is tomorrow's.
+        'last_reminded' => current_time( 'Y-m-d' ),
         'status'     => 'active',
         'created_at' => current_time( 'mysql' ),
     ) );
@@ -548,6 +560,268 @@ function kounselia_growth_end_plan( $user_id, $plan_id ) {
         kounselia_growth_table(),
         array( 'status' => 'ended', 'ended_at' => current_time( 'mysql' ) ),
         array( 'id' => (int) $plan_id, 'user_id' => $user_id, 'status' => 'active' )
+    );
+}
+
+/* -------------------------------------------------------------------------
+ * Daily reminder
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Changes when the reminder goes out. -1 turns it off.
+ *
+ * @return true|WP_Error
+ */
+function kounselia_growth_set_reminder( $user_id, $plan_id, $hour ) {
+    $row = kounselia_growth_active_plan( $user_id );
+    if ( ! $row || (int) $row->id !== (int) $plan_id ) {
+        return new WP_Error( 'no_plan', 'This plan has finished or ended.' );
+    }
+    $hour = (int) $hour;
+    if ( $hour < -1 || $hour > 23 ) {
+        return new WP_Error( 'bad_hour', 'Please choose a time of day.' );
+    }
+    global $wpdb;
+    $wpdb->update( kounselia_growth_table(), array( 'remind_hour' => $hour ), array( 'id' => $row->id ) );
+    return true;
+}
+
+add_action( 'init', function () {
+    if ( ! wp_next_scheduled( 'kounselia_growth_send_reminders' ) ) {
+        wp_schedule_event( time(), 'hourly', 'kounselia_growth_send_reminders' );
+    }
+} );
+
+/**
+ * Hourly: sends today's task to everyone whose reminder hour has come
+ * and who has not been reminded today. Someone who already ticked off
+ * today's task is left alone. Running late (a quiet site only runs its
+ * jobs when someone visits) still sends the same day.
+ */
+function kounselia_growth_send_reminders() {
+    global $wpdb;
+    $table = kounselia_growth_table();
+    $today = current_time( 'Y-m-d' );
+    $rows  = $wpdb->get_results( $wpdb->prepare(
+        "SELECT * FROM {$table} WHERE status = 'active' AND remind_hour >= 0 AND remind_hour <= %d AND ( last_reminded IS NULL OR last_reminded < %s ) LIMIT 500",
+        (int) current_time( 'G' ),
+        $today
+    ) );
+
+    foreach ( $rows as $row ) {
+        // Marked first, so an overlapping run can never send it twice.
+        $wpdb->update( $table, array( 'last_reminded' => $today ), array( 'id' => $row->id ) );
+
+        $active = kounselia_growth_active_plan( $row->user_id );
+        if ( ! $active || (int) $active->id !== (int) $row->id ) {
+            continue; // Finished since.
+        }
+        $plan = kounselia_growth_format_plan( $active, false );
+        if ( ! $plan['today'] || $plan['today']['done'] ) {
+            continue;
+        }
+
+        $body = wp_html_excerpt( $plan['today']['task'], 140, '…' );
+        if ( $plan['review_ready'] ) {
+            $body .= ' Your week ' . (int) $plan['review_ready'] . ' review is ready too.';
+        }
+        kounselia_notify_user(
+            $row->user_id,
+            'growth_reminder',
+            'Day ' . $plan['current_day'] . ': ' . ( $plan['today']['title'] ? $plan['today']['title'] : 'today\'s step' ),
+            $body,
+            '/dashboard.php?tab=growth'
+        );
+    }
+}
+add_action( 'kounselia_growth_send_reminders', 'kounselia_growth_send_reminders' );
+
+/* -------------------------------------------------------------------------
+ * Weekly review
+ * ---------------------------------------------------------------------- */
+
+/**
+ * Reviews already written for a plan, keyed by week number (1 to 5; week
+ * 5 is just the last two days).
+ */
+function kounselia_growth_reviews( $row ) {
+    $reviews = json_decode( (string) ( $row->reviews ?? '' ), true );
+    return is_array( $reviews ) ? $reviews : array();
+}
+
+/**
+ * First week the member can review and has not yet, or null.
+ */
+function kounselia_growth_next_review( $row ) {
+    $total   = (int) $row->total_days;
+    $current = min( $total, kounselia_growth_day_number( $row ) );
+    $done    = kounselia_growth_reviews( $row );
+    for ( $n = 1; $n <= (int) ceil( $total / 7 ); $n++ ) {
+        if ( $current >= min( 7 * $n, $total ) && ! isset( $done[ $n ] ) ) {
+            return $n;
+        }
+    }
+    return null;
+}
+
+function kounselia_growth_build_review_prompt( $row, $week, $first_name ) {
+    $total = (int) $row->total_days;
+    $first = 7 * ( $week - 1 ) + 1;
+    $last  = min( 7 * $week, $total );
+    $days  = json_decode( (string) $row->days, true );
+    $done  = kounselia_growth_done_days( $row->id );
+
+    $lines = array();
+    foreach ( $days as $d ) {
+        if ( $d['day'] >= $first && $d['day'] <= $last ) {
+            $lines[] = "Day {$d['day']}: {$d['task']} [" . ( in_array( (int) $d['day'], $done, true ) ? 'DONE' : 'not done' ) . ']';
+        }
+    }
+
+    $current  = min( $total, kounselia_growth_day_number( $row ) );
+    $upcoming = kounselia_growth_review_upcoming_days( $row, $current );
+    $next     = array();
+    foreach ( $days as $d ) {
+        if ( in_array( (int) $d['day'], $upcoming, true ) ) {
+            $next[] = "Day {$d['day']}: {$d['task']}";
+        }
+    }
+
+    $out  = ( $first_name ? $first_name : 'This person' ) . " is on a {$total} day personal development plan called \"{$row->title}\" (focus: {$row->area}).\n"
+        . "Review of days {$first} to {$last}.\n\nTHEIR DAYS:\n" . implode( "\n", $lines ) . "\n\n";
+    if ( $next ) {
+        $out .= "THE NEXT DAYS AS PLANNED:\n" . implode( "\n", $next ) . "\n\n";
+    }
+    $out .= "Write a short, warm review. Say what went well, be kind about anything missed (never shame), and name one thing to focus on next.\n";
+    if ( $next ) {
+        $out .= "Then decide if the next days should be 'easier' (they struggled), 'same', or 'harder' (they found it easy), and rewrite exactly those next days to match, keeping each day's purpose. Keep any reflection days a reflection.\n";
+    }
+    $out .= "Plain everyday English, speaking to them as 'you'. No markdown, no emojis, no medical advice.\n\n"
+        . 'Return ONLY JSON: {"note": "3 to 5 sentences", "level": "easier|same|harder", "upcoming": [{"day": 8, "title": "at most 6 words", "task": "one or two sentences", "minutes": 10}]}'
+        . ( $next ? '' : ' (use an empty "upcoming" list)' );
+    return $out;
+}
+
+/**
+ * The day numbers a review may rewrite: up to 7 days after today.
+ */
+function kounselia_growth_review_upcoming_days( $row, $current ) {
+    $total = (int) $row->total_days;
+    $days  = array();
+    for ( $d = $current + 1; $d <= min( $total, $current + 7 ); $d++ ) {
+        $days[] = $d;
+    }
+    return $days;
+}
+
+/**
+ * Writes the review for a week (once), saves it, and applies any change
+ * to the next days.
+ *
+ * @return true|WP_Error
+ */
+function kounselia_growth_review_week( $user_id, $plan_id, $week ) {
+    $row = kounselia_growth_active_plan( $user_id );
+    if ( ! $row || (int) $row->id !== (int) $plan_id ) {
+        return new WP_Error( 'no_plan', 'This plan has finished or ended.' );
+    }
+    $week = (int) $week;
+    $next = kounselia_growth_next_review( $row );
+    $done = kounselia_growth_reviews( $row );
+    if ( isset( $done[ $week ] ) ) {
+        return new WP_Error( 'already', 'You already have a review for this week.' );
+    }
+    if ( null === $next || $week !== $next ) {
+        return new WP_Error( 'not_ready', 'This review is not ready yet. It opens at the end of the week.' );
+    }
+
+    $user    = get_userdata( $user_id );
+    $first   = $user ? explode( ' ', trim( $user->display_name ) )[0] : '';
+    $prompt  = kounselia_growth_build_review_prompt( $row, $week, $first );
+    $current = min( (int) $row->total_days, kounselia_growth_day_number( $row ) );
+    $allowed = kounselia_growth_review_upcoming_days( $row, $current );
+
+    $data = null;
+    for ( $attempt = 0; $attempt < 2 && ! $data; $attempt++ ) {
+        $raw = apply_filters( 'kounselia_growth_review_ai_response', null, $prompt );
+        if ( null === $raw ) {
+            $error = '';
+            $raw   = kounselia_call_gemini(
+                'You are a warm, practical personal development coach at Kounselia. You output only valid JSON. Escape all quotes inside strings.',
+                array( array( 'role' => 'user', 'parts' => array( array( 'text' => $prompt ) ) ) ),
+                'gemini-3.6-flash',
+                0.6,
+                4000,
+                $error,
+                'application/json',
+                60
+            );
+        }
+        $data = kounselia_growth_parse_review( $raw );
+    }
+    if ( ! $data ) {
+        return new WP_Error( 'ai_failed', 'We could not write your review just now. Please try again in a minute.' );
+    }
+
+    // Apply the rewritten days only when they are exactly the days asked for.
+    $changed = 0;
+    $days    = json_decode( (string) $row->days, true );
+    $given   = array();
+    foreach ( $data['upcoming'] as $u ) {
+        $given[ (int) $u['day'] ] = $u;
+    }
+    if ( $allowed && 'same' !== $data['level'] && count( $given ) === count( $allowed ) && ! array_diff( $allowed, array_keys( $given ) ) ) {
+        foreach ( $days as &$d ) {
+            if ( isset( $given[ (int) $d['day'] ] ) ) {
+                $u            = $given[ (int) $d['day'] ];
+                $d['title']   = $u['title'] ? $u['title'] : $d['title'];
+                $d['task']    = $u['task'];
+                $d['minutes'] = $u['minutes'];
+                $changed++;
+            }
+        }
+        unset( $d );
+    }
+
+    $done[ $week ] = array(
+        'week'    => $week,
+        'note'    => $data['note'],
+        'level'   => $changed ? $data['level'] : 'same',
+        'changed' => $changed,
+        'at'      => current_time( 'mysql' ),
+    );
+
+    global $wpdb;
+    $wpdb->update( kounselia_growth_table(), array( 'reviews' => wp_json_encode( $done ), 'days' => wp_json_encode( $days ) ), array( 'id' => $row->id ) );
+    return true;
+}
+
+/**
+ * @return array{note:string,level:string,upcoming:array}|null
+ */
+function kounselia_growth_parse_review( $raw ) {
+    $raw  = trim( preg_replace( '/^```(?:json)?|```$/m', '', (string) $raw ) );
+    $data = json_decode( $raw, true );
+    if ( ! is_array( $data ) || empty( $data['note'] ) ) {
+        return null;
+    }
+    $upcoming = array();
+    foreach ( (array) ( $data['upcoming'] ?? array() ) as $u ) {
+        if ( ! is_array( $u ) || empty( $u['day'] ) || empty( $u['task'] ) ) {
+            continue;
+        }
+        $upcoming[] = array(
+            'day'     => (int) $u['day'],
+            'title'   => mb_substr( trim( sanitize_text_field( (string) ( $u['title'] ?? '' ) ) ), 0, 80 ),
+            'task'    => mb_substr( trim( sanitize_textarea_field( (string) $u['task'] ) ), 0, 500 ),
+            'minutes' => max( 1, min( 120, (int) ( $u['minutes'] ?? 10 ) ) ),
+        );
+    }
+    $level = isset( $data['level'] ) ? strtolower( (string) $data['level'] ) : 'same';
+    return array(
+        'note'     => mb_substr( trim( sanitize_textarea_field( (string) $data['note'] ) ), 0, 1200 ),
+        'level'    => in_array( $level, array( 'easier', 'harder' ), true ) ? $level : 'same',
+        'upcoming' => $upcoming,
     );
 }
 
@@ -633,3 +907,30 @@ function kounselia_ajax_growth_end() {
 }
 add_action( 'wp_ajax_kounselia_growth_end', 'kounselia_ajax_growth_end' );
 add_action( 'wp_ajax_nopriv_kounselia_growth_end', 'kounselia_ajax_growth_end' );
+
+function kounselia_ajax_growth_set_reminder() {
+    $user_id = kounselia_growth_require_member();
+    $result  = kounselia_growth_set_reminder( $user_id, absint( $_POST['plan_id'] ?? 0 ), isset( $_POST['hour'] ) ? (int) $_POST['hour'] : -1 );
+    if ( is_wp_error( $result ) ) {
+        wp_send_json_error( array( 'message' => $result->get_error_message() ), 400 );
+    }
+    $row = kounselia_growth_active_plan( $user_id );
+    wp_send_json_success( array( 'plan' => $row ? kounselia_growth_format_plan( $row ) : null ) );
+}
+add_action( 'wp_ajax_kounselia_growth_set_reminder', 'kounselia_ajax_growth_set_reminder' );
+add_action( 'wp_ajax_nopriv_kounselia_growth_set_reminder', 'kounselia_ajax_growth_set_reminder' );
+
+function kounselia_ajax_growth_review() {
+    $user_id = kounselia_growth_require_member();
+    if ( kounselia_rate_limited( 'growth_review', 10, HOUR_IN_SECONDS ) ) {
+        wp_send_json_error( array( 'message' => 'Please wait a little before asking again.' ), 429 );
+    }
+    $result = kounselia_growth_review_week( $user_id, absint( $_POST['plan_id'] ?? 0 ), absint( $_POST['week'] ?? 0 ) );
+    if ( is_wp_error( $result ) ) {
+        wp_send_json_error( array( 'message' => $result->get_error_message() ), 'ai_failed' === $result->get_error_code() ? 503 : 400 );
+    }
+    $row = kounselia_growth_active_plan( $user_id );
+    wp_send_json_success( array( 'plan' => $row ? kounselia_growth_format_plan( $row ) : null ) );
+}
+add_action( 'wp_ajax_kounselia_growth_review', 'kounselia_ajax_growth_review' );
+add_action( 'wp_ajax_nopriv_kounselia_growth_review', 'kounselia_ajax_growth_review' );

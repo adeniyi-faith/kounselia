@@ -2,7 +2,7 @@
 // few questions, and follow a 30 day plan of one small task a day. The
 // phone version of the website's "Growth plan" tab; both use the same
 // server actions.
-import { createGrowthPlan, endGrowthPlan, fetchGrowth, markGrowthDay, type GrowthArea, type GrowthOverview, type GrowthPlan } from '@kounselia/core';
+import { createGrowthPlan, endGrowthPlan, fetchGrowth, markGrowthDay, reviewGrowthWeek, setGrowthReminder, type GrowthArea, type GrowthOverview, type GrowthPlan } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -17,6 +17,16 @@ import { DetailSkeleton } from '@/components/Skeleton';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors } from '@/theme';
+
+// The reminder times offered; the server accepts any hour, 0 to 23.
+const REMINDER_CHOICES = [
+  { hour: -1, label: 'Off' },
+  { hour: 7, label: '7 am' },
+  { hour: 9, label: '9 am' },
+  { hour: 12, label: '12 pm' },
+  { hour: 18, label: '6 pm' },
+  { hour: 21, label: '9 pm' },
+];
 
 export default function Growth() {
   const styles = useStyles();
@@ -74,6 +84,28 @@ export default function Growth() {
     }
     if (done) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     setData((d) => (d ? { ...d, plan: res.data.plan } : d));
+  }
+
+  async function review(plan: GrowthPlan, week: number) {
+    setBusy(true);
+    const res = await reviewGrowthWeek(config, plan.id, week);
+    setBusy(false);
+    if (!res.ok) {
+      toast.show(res.message);
+      return;
+    }
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    setData((d) => (d ? { ...d, plan: res.data.plan } : d));
+  }
+
+  async function changeReminder(plan: GrowthPlan, hour: number) {
+    const res = await setGrowthReminder(config, plan.id, hour);
+    if (!res.ok) {
+      toast.show(res.message);
+      return;
+    }
+    setData((d) => (d ? { ...d, plan: res.data.plan } : d));
+    toast.show(hour < 0 ? 'Reminder turned off.' : 'Reminder saved.');
   }
 
   function end(plan: GrowthPlan) {
@@ -240,6 +272,21 @@ export default function Growth() {
           </View>
         </Card>
 
+        {plan.review_ready != null && (
+          <Card style={{ ...styles.reviewCard, gap: 10 }}>
+            <Text style={styles.eyebrow}>{plan.review_ready === 5 ? 'Final review' : `Week ${plan.review_ready} review`}</Text>
+            <Text style={styles.detailText}>You have finished a week. Want a short look back at how it went? Kounselia can also make your next days a little easier or harder to fit you.</Text>
+            <Button title={busy ? 'Writing your review…' : 'Review my week'} onPress={() => review(plan, plan.review_ready!)} busy={busy} />
+          </Card>
+        )}
+        {[...plan.reviews].reverse().map((r) => (
+          <Card key={r.week} style={{ gap: 8, marginTop: 12 }}>
+            <Text style={styles.eyebrow}>{r.week === 5 ? 'Final review' : `Week ${r.week} review`}</Text>
+            <Text style={styles.detailText}>{r.note}</Text>
+            {r.changed > 0 && <Text style={styles.prevMeta}>Your next {r.changed} days were made {r.level}.</Text>}
+          </Card>
+        ))}
+
         <SectionHead title="All 30 days" />
         <View style={styles.grid}>
           {plan.days.map((d) => {
@@ -275,6 +322,18 @@ export default function Growth() {
 
         <Card style={{ gap: 10, marginTop: 16 }}>
           <Text style={styles.detailText}>{plan.summary}</Text>
+          <Text style={styles.qLabel}>Daily reminder</Text>
+          <View style={styles.choices}>
+            {REMINDER_CHOICES.map((c) => {
+              const on = plan.remind_hour === c.hour;
+              return (
+                <Pressable key={c.hour} onPress={() => changeReminder(plan, c.hour)} accessibilityRole="button" accessibilityState={{ selected: on }} style={[styles.choice, on && styles.choiceOn]}>
+                  <Text style={[styles.choiceText, on && { color: colors.accentText, fontFamily: fonts.medium }]}>{c.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text style={styles.prevMeta}>Sent as a notification at that time in our server time zone.</Text>
           <Pressable onPress={() => end(plan)} accessibilityRole="button" hitSlop={8}>
             <Text style={styles.link}>End this plan</Text>
           </Pressable>
@@ -347,6 +406,7 @@ const useStyles = makeStyles((colors) => ({
   dayDone: { backgroundColor: colors.sageLight, borderColor: colors.sage },
   dayToday: { borderColor: colors.accent },
   dayText: { fontFamily: fonts.regular, fontSize: 14, color: colors.text2 },
+  reviewCard: { marginTop: 16, backgroundColor: colors.accentLight },
   detail: { marginTop: 14, padding: 16, borderRadius: 14, backgroundColor: colors.surface2, gap: 6 },
   detailTitle: { fontFamily: fonts.medium, fontSize: 15, color: colors.text },
   detailText: { fontFamily: fonts.regular, fontSize: 14, lineHeight: 21, color: colors.text2 },

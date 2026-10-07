@@ -110,6 +110,17 @@ export interface GrowthPlanSummary {
   streak: number;
   today: GrowthDay | null;
   counselor_slug: string; // who to talk to about the plan
+  remind_hour: number; // 0-23 in the site's time zone, -1 = off
+  reviews: GrowthReview[];
+  review_ready: number | null; // the week that can be reviewed now (5 = the final days)
+}
+
+export interface GrowthReview {
+  week: number;
+  note: string;
+  level: 'easier' | 'same' | 'harder';
+  changed: number; // how many upcoming days were rewritten
+  at: string;
 }
 
 export interface GrowthPlan extends GrowthPlanSummary {
@@ -150,6 +161,12 @@ export const createGrowthPlan = (config: KounseliaConfig, area: string, answers:
 
 export const markGrowthDay = (config: KounseliaConfig, planId: number, day: number, done: boolean) =>
   call<{ plan: GrowthPlan | null }>(config, 'kounselia_growth_mark_day', { plan_id: planId, day, done: done ? 1 : 0 });
+
+export const setGrowthReminder = (config: KounseliaConfig, planId: number, hour: number) =>
+  call<{ plan: GrowthPlan | null }>(config, 'kounselia_growth_set_reminder', { plan_id: planId, hour });
+
+export const reviewGrowthWeek = (config: KounseliaConfig, planId: number, week: number) =>
+  call<{ plan: GrowthPlan | null }>(config, 'kounselia_growth_review', { plan_id: planId, week });
 
 export const endGrowthPlan = (config: KounseliaConfig, planId: number) =>
   call<GrowthOverview>(config, 'kounselia_growth_end', { plan_id: planId });
