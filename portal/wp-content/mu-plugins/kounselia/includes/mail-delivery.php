@@ -378,7 +378,7 @@ function kounselia_ajax_admin_mail_test() {
         kounselia_send_pure_json_error( array( 'message' => 'Save a Brevo API key and sender email first.' ), 400 );
     }
     $GLOBALS['kounselia_mail_force_provider'] = $provider;
-    $ok = kounselia_send_html_email( $to, 'Kounselia test email (' . ( 'brevo' === $provider ? 'Brevo' : 'default mail' ) . ')', 'It works', '<p>This test was delivered by <strong>' . ( 'brevo' === $provider ? 'Brevo' : "your server's default mailer" ) . '</strong>. If it landed in spam, check your domain\'s SPF and DKIM records.</p>' );
+    $ok = kounselia_send_html_email( $to, 'Kounselia test email (' . ( 'brevo' === $provider ? 'Brevo' : 'default mail' ) . ')', 'It works', '<p>This test was delivered by <strong>' . ( 'brevo' === $provider ? 'Brevo' : "your server's default mailer" ) . '</strong>. If it landed in spam, check your domain\'s SPF and DKIM records.</p>', null, null, array( 'lang' => 'en' ) );
     $GLOBALS['kounselia_mail_force_provider'] = null;
     if ( ! $ok ) {
         global $wpdb;

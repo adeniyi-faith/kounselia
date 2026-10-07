@@ -1,4 +1,4 @@
-import { fetchSessions, type SessionSummary } from '@kounselia/core';
+import { fetchSessions, type SessionSummary, type Translate } from '@kounselia/core';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, Pressable, RefreshControl, Text, View } from 'react-native';
@@ -8,26 +8,28 @@ import { CounselorAvatar } from '@/components/CounselorAvatar';
 import { EmptyState } from '@/components/dashboard/Card';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useCounselors } from '@/counselors';
+import { useT } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { ListSkeleton } from '@/components/Skeleton';
 
 // "3 hours ago", "2 days ago" — like the website's session list.
-function ago(iso: string | null): string {
+function ago(iso: string | null, t: Translate): string {
   if (!iso) return '';
   const seconds = Math.max(0, (Date.now() - Date.parse(iso)) / 1000);
   const units: [number, string][] = [[31536000, 'year'], [2592000, 'month'], [604800, 'week'], [86400, 'day'], [3600, 'hour'], [60, 'min']];
   for (const [size, name] of units) {
     const n = Math.floor(seconds / size);
-    if (n >= 1) return `${n} ${name}${n > 1 ? 's' : ''} ago`;
+    if (n >= 1) return t(`m.ago.${name}_${n === 1 ? 'one' : 'other'}`, { n });
   }
-  return 'just now';
+  return t('m.ago.just_now');
 }
 
 // The dashboard's Sessions tab: recent conversations, most recent first.
 export default function Sessions() {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const { config } = useSession();
   const { bySlug } = useCounselors();
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
@@ -58,7 +60,7 @@ export default function Sessions() {
 
   const header = (
     <Text style={styles.title} accessibilityRole="header">
-      Recent sessions
+      {t('m.sessions.recent')}
     </Text>
   );
 
@@ -69,8 +71,8 @@ export default function Sessions() {
           {header}
           {failed ? (
             <View style={styles.center}>
-              <Text style={styles.notice}>We couldn’t load your sessions. Please check your internet connection.</Text>
-              <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+              <Text style={styles.notice}>{t('m.sessions.load_failed')}</Text>
+              <Button title={t('growth.try_again')} variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
             <View style={{ marginTop: 8 }}>
@@ -88,8 +90,8 @@ export default function Sessions() {
           ListEmptyComponent={
             <EmptyState>
               <TablerIcon name="feather" size={28} color={colors.text3} />
-              <Text style={styles.notice}>Your story starts with one conversation. Nothing saved here yet.</Text>
-              <Button title="Start a session" onPress={() => router.navigate('/talk')} />
+              <Text style={styles.notice}>{t('m.sessions.empty')}</Text>
+              <Button title={t('m.sessions.start')} onPress={() => router.navigate('/talk')} />
             </EmptyState>
           }
           renderItem={({ item }) => {
@@ -99,17 +101,17 @@ export default function Sessions() {
               <Pressable
                 onPress={() => router.push({ pathname: '/chat/[slug]', params: { slug: item.counselor_slug } })}
                 accessibilityRole="button"
-                accessibilityLabel={`${name}, ${item.message_count} messages, ${ago(item.last_at)}. Continue`}
+                accessibilityLabel={t('m.sessions.a11y', { name, count: item.message_count, when: ago(item.last_at, t) })}
                 style={({ pressed }) => [styles.row, pressed && { backgroundColor: colors.surface2 }]}
               >
                 <CounselorAvatar icon={c?.icon ?? 'message-circle'} color={c?.color ?? 'blue'} size={42} />
                 <View style={styles.meta}>
                   <Text style={styles.name}>{name}</Text>
                   <Text style={styles.sub}>
-                    {item.message_count} msgs · {ago(item.last_at)}
+                    {t('m.sessions.meta', { count: item.message_count, when: ago(item.last_at, t) })}
                   </Text>
                 </View>
-                <Text style={styles.link}>Continue →</Text>
+                <Text style={styles.link}>{t('m.sessions.continue')}</Text>
               </Pressable>
             );
           }}

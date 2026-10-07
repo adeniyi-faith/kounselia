@@ -17,6 +17,7 @@ import { Toast, useToast } from '@/components/chat/Toast';
 import { TypingIndicator } from '@/components/chat/TypingIndicator';
 import { useKeyboardOpen } from '@/components/useKeyboardOpen';
 import { useCounselors } from '@/counselors';
+import { useLanguage, useT } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles } from '@/theme';
 import { showDialog } from '@/components/Dialog';
@@ -30,6 +31,7 @@ function goBack() {
 // Waits for the counselor list, then opens the conversation.
 export default function ChatRoute() {
   const styles = useStyles();
+  const t = useT();
   const { slug, checkin } = useLocalSearchParams<{ slug: string; checkin?: string }>();
   const { status, bySlug } = useCounselors();
   const counselor = bySlug(slug);
@@ -44,10 +46,10 @@ export default function ChatRoute() {
         <>
           <Text style={styles.notice}>
             {status === 'error'
-              ? "We couldn't reach Kounselia. Please check your internet connection."
-              : "This counselor isn't available right now."}
+              ? t('m.b.chat.unreachable')
+              : t('m.b.chat.unavailable')}
           </Text>
-          <Button title="Back" variant="ghost" onPress={goBack} />
+          <Button title={t('m.b.common.back')} variant="ghost" onPress={goBack} />
         </>
       )}
     </View>
@@ -56,6 +58,7 @@ export default function ChatRoute() {
 
 function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; checkinId?: number }) {
   const styles = useStyles();
+  const { language, t } = useLanguage();
   const { config } = useSession();
   const chat = useChat(config, counselor);
   const toast = useToast();
@@ -80,11 +83,11 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
   // conversation so what was said on the call appears in it.
   useEffect(() => {
     if (call.status === 'ended' && callOpen) {
-      const t = setTimeout(() => {
+      const timer = setTimeout(() => {
         setCallOpen(false);
         chat.load();
       }, 900);
-      return () => clearTimeout(t);
+      return () => clearTimeout(timer);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [call.status, callOpen]);
@@ -99,7 +102,7 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
 
   useEffect(() => {
     chat.load().then(async (ok) => {
-      if (!ok) toast.show("Couldn't load your earlier messages.");
+      if (!ok) toast.show(t('m.b.chat.load_earlier_failed'));
       // Opened from a Home check-in: the counselor opens with the question.
       if (checkinId) {
         const res = await fetchCheckinQuestion(config, checkinId);
@@ -119,7 +122,7 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
       if (message.rating === rating) return;
       Haptics.selectionAsync().catch(() => undefined);
       const ok = await chat.rate(message, rating);
-      toast.show(ok ? (rating === 'up' ? 'Thanks for the feedback!' : 'Feedback recorded.') : "Couldn't save your feedback.");
+      toast.show(ok ? (rating === 'up' ? t('m.b.chat.thanks_feedback') : t('m.b.chat.feedback_recorded')) : t('m.b.chat.feedback_failed'));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [chat.rate],
@@ -127,28 +130,28 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
 
   function share() {
     const lines = chat.messages.map(
-      (m) => `[${formatTime(m.createdAt)}] ${m.sender === 'user' ? 'You' : counselor.name}: ${m.text}`,
+      (m) => `[${formatTime(m.createdAt, language)}] ${m.sender === 'user' ? t('m.b.chat.you') : counselor.name}: ${m.text}`,
     );
     if (lines.length === 0) {
-      toast.show('No messages to share.');
+      toast.show(t('m.b.chat.nothing_to_share'));
       return;
     }
-    Share.share({ message: `Conversation with ${counselor.name} on Kounselia\n\n${lines.join('\n\n')}` }).catch(() => undefined);
+    Share.share({ message: `${t('m.b.chat.share_title', { name: counselor.name })}\n\n${lines.join('\n\n')}` }).catch(() => undefined);
   }
 
   function confirmClear() {
     showDialog({
-      title: 'Clear this conversation?',
-      message: 'It will be removed from your chat history and cannot be brought back.',
+      title: t('m.b.chat.clear_title'),
+      message: t('m.b.chat.clear_body'),
       icon: 'trash',
       buttons: [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('m.b.common.cancel'), style: 'cancel' },
         {
-          text: 'Clear',
+          text: t('m.b.chat.clear'),
           style: 'destructive',
           onPress: async () => {
             const ok = await chat.clear();
-            toast.show(ok ? 'Conversation cleared.' : "Couldn't clear the chat. Please check your connection.");
+            toast.show(ok ? t('m.b.chat.cleared') : t('m.b.chat.clear_failed'));
           },
         },
       ],
@@ -168,7 +171,7 @@ function Conversation({ counselor, checkinId }: { counselor: CounselorSummary; c
         {chat.phase === 'loading' ? (
           <View style={styles.flex}>
             <ChatSkeleton />
-            <Text style={styles.loadingText}>Connecting you with {counselor.name}…</Text>
+            <Text style={styles.loadingText}>{t('m.b.chat.connecting', { name: counselor.name })}</Text>
           </View>
         ) : (
           <FlatList

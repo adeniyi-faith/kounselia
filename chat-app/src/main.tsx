@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { isRtl, normalizeLanguage } from '@kounselia/core';
 import { App } from './App';
 import './styles.css';
 
@@ -9,9 +10,12 @@ import './styles.css';
 function mount() {
   const rootEl = document.getElementById('kounselia-chat-root');
   if (!rootEl) return;
+  const language = normalizeLanguage(window.KOUNSELIA.language);
+  rootEl.lang = language;
+  rootEl.dir = isRtl(language) ? 'rtl' : 'ltr';
   createRoot(rootEl).render(
     <StrictMode>
-      <App config={window.KOUNSELIA} counselors={window.C} />
+      <App config={window.KOUNSELIA} counselors={window.C} language={language} words={window.KOUNSELIA.i18n} />
     </StrictMode>,
   );
 }

@@ -1,3 +1,4 @@
+import { LINK_MARK, splitAtLink, useT } from '../i18n';
 import type { Counselor } from '@kounselia/core';
 import type { CallStatus } from '../hooks/useVoiceCall';
 
@@ -26,9 +27,13 @@ export function CallOverlay({
   onEnd,
   onToggleMute,
 }: Props) {
+  const t = useT();
+  const [noteBefore, noteAfter] = splitAtLink(
+    t('c.call.free_note', { minutes: freeCallMinutes ?? 0, link: LINK_MARK }),
+  );
   return (
     <div className={`call-overlay${active ? ' active' : ''}`}>
-      <button className="call-close" onClick={onEnd} aria-label="End call">
+      <button className="call-close" onClick={onEnd} aria-label={t('c.call.end')}>
         <i className="ti ti-x" />
       </button>
       <div className="call-status">{statusText}</div>
@@ -45,18 +50,19 @@ export function CallOverlay({
         <button
           className={`call-ctrl-btn${muted ? ' muted' : ''}`}
           onClick={onToggleMute}
-          aria-label="Mute"
+          aria-label={t('c.call.mute')}
         >
           <i className={`ti ${muted ? 'ti-microphone-off' : 'ti-microphone'}`} />
         </button>
-        <button className="call-ctrl-btn end" onClick={onEnd} aria-label="End call">
+        <button className="call-ctrl-btn end" onClick={onEnd} aria-label={t('c.call.end')}>
           <i className="ti ti-phone-x" />
         </button>
       </div>
       {freeCallMinutes !== null && (
         <p className="call-plan-note">
-          Free members get {freeCallMinutes} minutes per call. <a href="/dashboard.php#upgrade">Upgrade to Pro</a> for
-          longer sessions.
+          {noteBefore}
+          <a href="/dashboard.php#upgrade">{t('c.call.upgrade_link')}</a>
+          {noteAfter}
         </p>
       )}
     </div>

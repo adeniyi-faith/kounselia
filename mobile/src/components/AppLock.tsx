@@ -8,6 +8,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { AppState, Modal, Platform, StyleSheet, Text, View } from 'react-native';
 import { confirmOwner, lockPaused, readLockSetting, unlockMethodName, writeLockSetting, type LockAfter } from '@/appLockSetting';
+import { useT } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { Button } from './Button';
@@ -114,6 +115,7 @@ function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
   const styles = useStyles();
   const colors = useColors();
   const { signOut } = useSession();
+  const t = useT();
   const [method, setMethod] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
@@ -124,7 +126,7 @@ function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
     trying.current = true;
     setBusy(true);
     setNote('');
-    const res = await confirmOwner('Unlock Kounselia');
+    const res = await confirmOwner(t('m.lock.unlock_prompt'));
     trying.current = false;
     setBusy(false);
     if (res.ok) {
@@ -132,11 +134,11 @@ function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
       return;
     }
     if (res.error === 'not_enrolled' || res.error === 'passcode_not_set' || res.error === 'not_available') {
-      setNote('Your phone no longer has a screen lock, so Kounselia can’t check it’s you. Sign out and back in with your password.');
+      setNote(t('m.lock.no_screen_lock'));
     } else if (res.error === 'lockout') {
-      setNote('Too many tries. Unlock your phone with its passcode first, then try again.');
+      setNote(t('m.lock.lockout'));
     }
-  }, [onUnlocked]);
+  }, [onUnlocked, t]);
 
   useEffect(() => {
     unlockMethodName().then(setMethod);
@@ -162,12 +164,12 @@ function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
 
   function confirmSignOut() {
     showDialog({
-      title: 'Sign out?',
-      message: 'You can sign back in with your email and password. The app lock will be turned off.',
+      title: t('m.common.sign_out_q'),
+      message: t('m.lock.signout_body'),
       icon: 'logout',
       buttons: [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign out', style: 'destructive', onPress: () => signOut() },
+        { text: t('lang.cancel'), style: 'cancel' },
+        { text: t('m.common.sign_out'), style: 'destructive', onPress: () => signOut() },
       ],
     });
   }
@@ -179,14 +181,14 @@ function LockScreen({ onUnlocked }: { onUnlocked: () => void }) {
           <TablerIcon name="lock" size={34} color={colors.accentText} />
         </View>
         <Text style={styles.title} accessibilityRole="header">
-          Kounselia is locked
+          {t('m.lock.title')}
         </Text>
         <Text style={styles.text}>
-          {method ? `Use ${method} to open your conversations and journal.` : 'Unlock to open your conversations and journal.'}
+          {method ? t('m.lock.use_method', { method }) : t('m.lock.unlock_generic')}
         </Text>
         {note ? <Text style={[styles.text, { color: colors.rose }]}>{note}</Text> : null}
-        <Button title="Unlock" onPress={unlock} busy={busy} style={styles.button} />
-        <Button title="Sign out instead" variant="ghost" onPress={confirmSignOut} style={styles.button} />
+        <Button title={t('m.lock.unlock')} onPress={unlock} busy={busy} style={styles.button} />
+        <Button title={t('m.lock.signout_instead')} variant="ghost" onPress={confirmSignOut} style={styles.button} />
       </View>
     </Modal>
   );

@@ -1,18 +1,19 @@
-import { isRtl, makeT, type GrowthPlanSummary } from '@kounselia/core';
+import type { GrowthPlanSummary } from '@kounselia/core';
 import { Pressable, Text, View } from 'react-native';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 import { Card } from './Card';
 
 // "Grow with a 30 day plan" on Home: today's step when a plan is running,
 // otherwise an invitation to start one. Opens the Growth plan screen.
-export function GrowthCard({ plan, language, onOpen }: { plan: GrowthPlanSummary | null; language: string; onOpen: () => void }) {
+export function GrowthCard({ plan, onOpen }: { plan: GrowthPlanSummary | null; onOpen: () => void }) {
   const styles = useStyles();
   const colors = useColors();
   const today = plan?.today;
-  const t = makeT(language);
+  const t = useT();
   return (
-    <Card style={isRtl(language) ? { ...styles.card, direction: 'rtl' } : styles.card}>
+    <Card style={styles.card}>
       <View style={styles.top}>
         <View style={styles.icon}>
           <TablerIcon name="plant-2" size={24} color={colors.sage} />

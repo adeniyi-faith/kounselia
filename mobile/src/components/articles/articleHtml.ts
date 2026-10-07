@@ -2,7 +2,7 @@
 // topic, title, byline, cover picture, the body, the author's note and
 // "Keep reading". The body is HTML written in the website's editor and
 // cleaned by the server before it was saved.
-import type { BlogPost } from '@kounselia/core';
+import type { BlogPost, Translate } from '@kounselia/core';
 import type { Palette } from '@/theme';
 import { articleDate } from './ArticleCard';
 
@@ -10,7 +10,7 @@ function esc(text: string | null | undefined) {
   return String(text ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 }
 
-export function articleHtml(post: BlogPost, colors: Palette, dark: boolean) {
+export function articleHtml(post: BlogPost, colors: Palette, dark: boolean, t: Translate, language: string) {
   const initial = esc(post.author.name.charAt(0).toUpperCase());
   const avatar = post.author.avatar ? `<img src="${esc(post.author.avatar)}" alt="">` : initial;
   const topic = post.tags[0]?.name;
@@ -19,7 +19,7 @@ export function articleHtml(post: BlogPost, colors: Palette, dark: boolean) {
     .map(
       (r) => `<a class="rel" href="${esc(r.url)}">
         ${r.cover ? `<img src="${esc(r.cover)}" alt="">` : '<span class="rel-ph"></span>'}
-        <span><b>${esc(r.title)}</b><small>${r.reading_minutes} min read</small></span>
+        <span><b>${esc(r.title)}</b><small>${esc(t('m.b.card.min_read', { minutes: r.reading_minutes }))}</small></span>
       </a>`,
     )
     .join('');
@@ -72,11 +72,11 @@ export function articleHtml(post: BlogPost, colors: Palette, dark: boolean) {
   ${topic ? `<div class="topic">${esc(topic)}</div>` : ''}
   <h1>${esc(post.title)}</h1>
   ${post.subtitle ? `<p class="sub">${esc(post.subtitle)}</p>` : ''}
-  <div class="by"><span class="av">${avatar}</span><span><b>${esc(post.author.name)}${post.author.is_professional ? '<i class="ti ti-discount-check-filled tick" aria-label="Verified professional"></i>' : ''}</b>${post.author.title ? `${esc(post.author.title)} · ` : ''}${esc(articleDate(post.published_utc))} · ${post.reading_minutes} min read</span></div>
+  <div class="by"><span class="av">${avatar}</span><span><b>${esc(post.author.name)}${post.author.is_professional ? `<i class="ti ti-discount-check-filled tick" aria-label="${esc(t('m.b.html.verified'))}"></i>` : ''}</b>${post.author.title ? `${esc(post.author.title)} · ` : ''}${esc(articleDate(post.published_utc, language))} · ${esc(t('m.b.card.min_read', { minutes: post.reading_minutes }))}</span></div>
   ${post.cover ? `<figure><img src="${esc(post.cover)}" alt="">${post.cover_caption ? `<figcaption>${esc(post.cover_caption)}</figcaption>` : ''}</figure>` : ''}
   <div class="body">${post.html}</div>
   ${post.community?.disclaimer ? `<div class="care">${esc(post.community.disclaimer)}</div>` : ''}
   ${post.author.bio ? `<div class="bio"><span class="av">${avatar}</span><span><b>${esc(post.author.name)}</b>${esc(post.author.bio)}</span></div>` : ''}
-  ${related ? `<div class="more">Keep reading</div>${related}` : ''}
+  ${related ? `<div class="more">${esc(t('m.b.html.keep_reading'))}</div>${related}` : ''}
 </body></html>`;
 }

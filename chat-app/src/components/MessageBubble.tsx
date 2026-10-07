@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { ChatMessage, Counselor } from '@kounselia/core';
+import { useI18n } from '../i18n';
 
 interface Props {
   message: ChatMessage;
@@ -10,8 +11,8 @@ interface Props {
   onNotify: (message: string) => void;
 }
 
-function formatTime(ts: number): string {
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+function formatTime(ts: number, language: string): string {
+  return new Date(ts).toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' });
 }
 
 // Turns "**Heading**" into a heading and blank lines into paragraph
@@ -38,6 +39,7 @@ function renderFormattedText(text: string) {
 }
 
 export function MessageBubble({ message, counselor, loggedIn, onPlayVoice, onRate, onNotify }: Props) {
+  const { t, language } = useI18n();
   const [playState, setPlayState] = useState<'idle' | 'loading' | 'playing'>('idle');
   const [copied, setCopied] = useState(false);
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(message.rating ?? null);
@@ -48,8 +50,8 @@ export function MessageBubble({ message, counselor, loggedIn, onPlayVoice, onRat
       <div className="msg user">
         <div>
           <div className="msg-bubble">{message.text}</div>
-          <div className="msg-time" style={{ textAlign: 'right', marginTop: 6, marginRight: 4 }}>
-            {formatTime(message.createdAt)}
+          <div className="msg-time" style={{ textAlign: 'end', marginTop: 6, marginInlineEnd: 4 }}>
+            {formatTime(message.createdAt, language)}
           </div>
         </div>
         <div
@@ -68,7 +70,7 @@ export function MessageBubble({ message, counselor, loggedIn, onPlayVoice, onRat
     const audioUrl = await onPlayVoice(message.messageId);
     if (!audioUrl) {
       setPlayState('idle');
-      onNotify("Couldn't play this message. Please check your connection and try again.");
+      onNotify(t('c.msg.play_failed'));
       return;
     }
     const audio = new Audio(audioUrl);
@@ -77,7 +79,7 @@ export function MessageBubble({ message, counselor, loggedIn, onPlayVoice, onRat
     setPlayState('playing');
     audio.play().catch(() => {
       setPlayState('idle');
-      onNotify("Couldn't play this message.");
+      onNotify(t('c.msg.play_failed_short'));
     });
   };
 
@@ -88,7 +90,7 @@ export function MessageBubble({ message, counselor, loggedIn, onPlayVoice, onRat
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);
       })
-      .catch(() => onNotify('Failed to copy text.'));
+      .catch(() => onNotify(t('c.msg.copy_failed')));
   };
 
   const handleRate = async (rating: 'up' | 'down') => {
@@ -99,10 +101,10 @@ export function MessageBubble({ message, counselor, loggedIn, onPlayVoice, onRat
     const ok = await onRate(message.messageId, rating);
     setFeedbackSaving(false);
     if (ok) {
-      onNotify(rating === 'up' ? 'Thanks for the feedback!' : 'Feedback recorded.');
+      onNotify(rating === 'up' ? t('c.msg.thanks') : t('c.msg.recorded'));
     } else {
       setFeedback(previous);
-      onNotify("Couldn't save your feedback. Please try again.");
+      onNotify(t('c.msg.feedback_failed'));
     }
   };
 
@@ -126,15 +128,15 @@ export function MessageBubble({ message, counselor, loggedIn, onPlayVoice, onRat
               gap: 4,
             }}
           >
-            <i className="ti ti-users" /> Consulted {message.consulted.join(' & ')}
+            <i className="ti ti-users" /> {t('c.msg.consulted', { names: message.consulted.join(' & ') })}
           </div>
         )}
         <div className="msg-bubble">{renderFormattedText(message.text)}</div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div className="msg-time" style={{ marginTop: 6, marginLeft: 4 }}>
-            {formatTime(message.createdAt)}
+          <div className="msg-time" style={{ marginTop: 6, marginInlineStart: 4 }}>
+            {formatTime(message.createdAt, language)}
             {message.messageId && (
-              <button className="voice-play-btn" onClick={handlePlay} aria-label="Listen" title="Listen">
+              <button className="voice-play-btn" onClick={handlePlay} aria-label={t('c.msg.listen')} title={t('c.msg.listen')}>
                 <i
                   className={`ti ${
                     playState === 'loading' ? 'ti-loader-2' : playState === 'playing' ? 'ti-player-stop-filled' : 'ti-volume'
@@ -145,14 +147,14 @@ export function MessageBubble({ message, counselor, loggedIn, onPlayVoice, onRat
           </div>
         </div>
         <div className="msg-feedback-bar">
-          <button className="msg-fb-btn" onClick={handleCopy} title="Copy">
+          <button className="msg-fb-btn" onClick={handleCopy} title={t('c.msg.copy')}>
             <i className={`ti ${copied ? 'ti-check action-pulse' : 'ti-copy'}`} />
           </button>
           <button
             className="msg-fb-btn"
             onClick={() => handleRate('up')}
             disabled={!message.messageId}
-            title="Helpful"
+            title={t('c.msg.helpful')}
             style={feedback === 'up' ? { color: '#2E5C3E' } : undefined}
           >
             <i className={`ti ${feedback === 'up' ? 'ti-thumb-up-filled' : 'ti-thumb-up'}`} />
@@ -161,7 +163,7 @@ export function MessageBubble({ message, counselor, loggedIn, onPlayVoice, onRat
             className="msg-fb-btn"
             onClick={() => handleRate('down')}
             disabled={!message.messageId}
-            title="Not Helpful"
+            title={t('c.msg.not_helpful')}
             style={feedback === 'down' ? { color: '#8B3A52' } : undefined}
           >
             <i className={`ti ${feedback === 'down' ? 'ti-thumb-down-filled' : 'ti-thumb-down'}`} />

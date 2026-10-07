@@ -41,12 +41,14 @@ function kounselia_ajax_forgot_password() {
             $reset_url = network_site_url( "wp-login.php?action=rp&key=$key&login=" . rawurlencode( $user->user_login ), 'login' );
             
             $first_name = explode( ' ', trim( $user->display_name ?: $user->user_login ) )[0];
-            $headline   = "Reset your password";
-            $content    = "<p style='margin-bottom: 18px;'>Hi {$first_name},</p>
-                           <p style='margin-bottom: 18px;'>Someone requested a password reset for your Kounselia account. If this was you, you can set a new password by clicking the button below.</p>
-                           <p style='margin-bottom: 0;'>If you didn't request this, you can safely ignore this email and your account will remain secure.</p>";
+            // The person asking is the one reading: their saved language, else this request's.
+            $lang       = kounselia_mail_lang( $user, true );
+            $headline   = kounselia_t( 'mail.reset.headline', array(), $lang );
+            $content    = "<p style='margin-bottom: 18px;'>" . esc_html( kounselia_t( 'mail.reset.hi', array( 'name' => $first_name ), $lang ) ) . "</p>
+                           <p style='margin-bottom: 18px;'>" . esc_html( kounselia_t( 'mail.reset.body1', array(), $lang ) ) . "</p>
+                           <p style='margin-bottom: 0;'>" . esc_html( kounselia_t( 'mail.reset.body2', array(), $lang ) ) . "</p>";
             
-            kounselia_send_html_email( $email, 'Password Reset - Kounselia', $headline, $content, 'Reset Password', $reset_url );
+            kounselia_send_html_email( $email, kounselia_t( 'mail.reset.subject', array(), $lang ), $headline, $content, kounselia_t( 'mail.reset.button', array(), $lang ), $reset_url, array( 'lang' => $lang ) );
         }
     }
 

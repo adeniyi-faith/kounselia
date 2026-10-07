@@ -711,30 +711,31 @@ function kounselia_article_went_live( $post_id ) {
  * notifications, by push, and by email.
  */
 function kounselia_article_tell_author( $post, $what, $note = '' ) {
+    $lang     = kounselia_mail_lang( (int) $post->author_id );
     $messages = array(
-        'approved'                => array( 'Your article is live', 'Your article "%s" has been approved and is now live on the Journal.' ),
-        'edit_approved'           => array( 'Your changes are live', 'Your changes to "%s" have been approved.' ),
-        'changes_requested'       => array( 'An editor has suggestions', 'An editor has asked for a few changes to "%s" before it goes live.' ),
-        'changes_requested_edit'  => array( 'An editor has suggestions', 'An editor has asked for a few changes to your edit of "%s". The live version is unchanged.' ),
-        'rejected'                => array( 'Your article was not approved', '"%s" was not approved for the Journal.' ),
-        'rejected_edit'           => array( 'Your edit was not approved', 'Your edit to "%s" was not approved. The live version is unchanged.' ),
-        'removed'                 => array( 'Your article was taken down', '"%s" has been taken down from the Journal by an editor.' ),
+        'approved'                => array( kounselia_t( 'mail.article.approved_title', array(), $lang ), 'mail.article.approved_body' ),
+        'edit_approved'           => array( kounselia_t( 'mail.article.edit_approved_title', array(), $lang ), 'mail.article.edit_approved_body' ),
+        'changes_requested'       => array( kounselia_t( 'mail.article.changes_title', array(), $lang ), 'mail.article.changes_body' ),
+        'changes_requested_edit'  => array( kounselia_t( 'mail.article.changes_title', array(), $lang ), 'mail.article.changes_edit_body' ),
+        'rejected'                => array( kounselia_t( 'mail.article.rejected_title', array(), $lang ), 'mail.article.rejected_body' ),
+        'rejected_edit'           => array( kounselia_t( 'mail.article.rejected_edit_title', array(), $lang ), 'mail.article.rejected_edit_body' ),
+        'removed'                 => array( kounselia_t( 'mail.article.removed_title', array(), $lang ), 'mail.article.removed_body' ),
     );
     if ( ! isset( $messages[ $what ] ) || ! function_exists( 'kounselia_notify_user' ) ) {
         return;
     }
-    list( $title, $body ) = $messages[ $what ];
-    $body = sprintf( $body, $post->title );
+    list( $title, $body_key ) = $messages[ $what ];
+    $body = kounselia_t( $body_key, array( 'title' => $post->title ), $lang );
     $url  = '/pro-dashboard.php?tab=articles';
     $html = '<p>' . esc_html( $body ) . '</p>';
     if ( '' !== $note ) {
-        $html .= '<p style="background:#F8F6F2;border-radius:12px;padding:14px 16px;"><strong>Note from the editor:</strong><br>' . nl2br( esc_html( $note ) ) . '</p>';
+        $html .= '<p style="background:#F8F6F2;border-radius:12px;padding:14px 16px;"><strong>' . esc_html( kounselia_t( 'mail.article.editor_note', array(), $lang ) ) . '</strong><br>' . nl2br( esc_html( $note ) ) . '</p>';
     }
     kounselia_notify_user( (int) $post->author_id, 'article_' . $what, $title, $body, $url, array(
         'subject'      => $title,
         'headline'     => $title,
         'content_html' => $html,
-        'btn_text'     => in_array( $what, array( 'approved', 'edit_approved' ), true ) ? 'Read it on the Journal' : 'Open your articles',
+        'btn_text'     => in_array( $what, array( 'approved', 'edit_approved' ), true ) ? kounselia_t( 'mail.article.read_button', array(), $lang ) : kounselia_t( 'mail.article.open_button', array(), $lang ),
         'btn_url'      => in_array( $what, array( 'approved', 'edit_approved' ), true ) ? kounselia_blog_url( $post->slug, true ) : kounselia_site_url( $url ),
     ) );
 }
@@ -776,7 +777,8 @@ function kounselia_article_notify_editors() {
             $count > 1 ? $count . ' articles are waiting' : 'An article is waiting',
             '<p>A professional has sent an article (or changes to one) for the Journal. It will not go live until an editor approves it.</p>',
             'Open the review queue',
-            kounselia_site_url( '/portal/admin/pages/articles.php' )
+            kounselia_site_url( '/portal/admin/pages/articles.php' ),
+            array( 'lang' => 'en' ) // Staff alert: always English.
         );
     }
 }

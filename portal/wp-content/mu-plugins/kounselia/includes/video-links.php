@@ -169,11 +169,12 @@ function kounselia_ajax_pro_booking_video_link() {
     $now_video = kounselia_booking_video( kounselia_get_booking_with_parties( $booking->id ), $pro );
     if ( function_exists( 'kounselia_notify_user' ) ) {
         // The client hears where the session is now; the link itself stays behind Join.
+        $lang = kounselia_mail_lang( (int) $booking->client_user_id );
         kounselia_notify_user(
             (int) $booking->client_user_id,
             'booking_video_changed',
-            'Your session is now on ' . $now_video['provider'],
-            'Press Join on Kounselia when it\'s time. ' . date_i18n( 'D, M j \a\t g:ia', strtotime( $booking->scheduled_start ) ) . '.',
+            kounselia_t( 'mail.video.changed_title', array( 'provider' => $now_video['provider'] ), $lang ),
+            kounselia_t( 'mail.video.changed_body', array( 'when' => kounselia_mail_datetime( strtotime( $booking->scheduled_start ), $lang, true ) ), $lang ),
             '/dashboard.php#professionals'
         );
     }
@@ -196,11 +197,12 @@ function kounselia_ajax_admin_professional_video() {
     $wpdb->update( $wpdb->prefix . 'kounselia_professionals', array( 'video_link_allowed' => $allow ? 1 : 0, 'updated_at' => current_time( 'mysql' ) ), array( 'id' => $pro->id ) );
     kounselia_admin_log( $allow ? 'allowed_own_video' : 'stopped_own_video', 'professional', (int) $pro->id );
     if ( function_exists( 'kounselia_notify_user' ) ) {
+        $lang = kounselia_mail_lang( (int) $pro->user_id );
         kounselia_notify_user(
             (int) $pro->user_id,
             $allow ? 'own_video_allowed' : 'own_video_stopped',
-            $allow ? 'You can use your own video link' : 'Sessions are back on Kounselia video',
-            $allow ? 'You can now hold sessions on Zoom, Google Meet, Teams or Whereby. Set it up in Profile & rate.' : 'Your sessions will now use Kounselia\'s private video room.',
+            $allow ? kounselia_t( 'mail.video.allowed_title', array(), $lang ) : kounselia_t( 'mail.video.stopped_title', array(), $lang ),
+            $allow ? kounselia_t( 'mail.video.allowed_body', array(), $lang ) : kounselia_t( 'mail.video.stopped_body', array(), $lang ),
             '/pro-dashboard.php?tab=profile'
         );
     }

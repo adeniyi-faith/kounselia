@@ -16,6 +16,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { BackHandler, Linking, Modal, Platform, Pressable, Share, Text, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { PageSkeleton } from '@/components/Skeleton';
 import { SITE_URL } from '@/config';
@@ -179,6 +180,7 @@ function InAppBrowser({
 }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const frame = useRef<WebFrameHandle | null>(null);
   const [nav, setNav] = useState<NavState>({ url, title: '', canGoBack: false, canGoForward: false });
   const [progress, setProgress] = useState(0);
@@ -229,7 +231,7 @@ function InAppBrowser({
   // Website pages end their titles with the site name ("Safety resources — Kounselia");
   // the address under the title already says where the page is from.
   const pageTitle = nav.title.replace(/\s+[—–|-]\s+Kounselia\s*$/i, '').trim();
-  const title = pageTitle && !/^https?:\/\//.test(pageTitle) ? pageTitle : options.title || hostOf(nav.url) || 'Loading…';
+  const title = pageTitle && !/^https?:\/\//.test(pageTitle) ? pageTitle : options.title || hostOf(nav.url) || t('m.b.browser.loading');
 
   function onLoaded(loadedUrl: string) {
     setProgress(1);
@@ -251,7 +253,7 @@ function InAppBrowser({
     <View style={styles.wrap}>
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.header}>
         <View style={styles.headRow}>
-          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8} style={styles.iconBtn}>
+          <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel={t('m.b.common.close')} hitSlop={8} style={styles.iconBtn}>
             <TablerIcon name="x" size={22} color={colors.text} />
           </Pressable>
           <View style={styles.titleCol}>
@@ -261,7 +263,7 @@ function InAppBrowser({
             <View style={styles.hostRow}>
               {secure && <TablerIcon name="lock" size={11} color={colors.sage} />}
               <Text style={styles.host} numberOfLines={1}>
-                {copied ? 'Link copied' : hostOf(nav.url)}
+                {copied ? t('m.b.browser.link_copied') : hostOf(nav.url)}
               </Text>
             </View>
           </View>
@@ -271,7 +273,7 @@ function InAppBrowser({
               frame.current?.reload();
             }}
             accessibilityRole="button"
-            accessibilityLabel="Reload page"
+            accessibilityLabel={t('m.b.browser.reload')}
             hitSlop={8}
             style={styles.iconBtn}
           >
@@ -313,8 +315,8 @@ function InAppBrowser({
         {failed && (
           <View style={styles.cover}>
             <TablerIcon name="wifi-off" size={32} color={colors.text3} />
-            <Text style={styles.failTitle}>This page didn’t load</Text>
-            <Text style={styles.failText}>Please check your internet connection and try again.</Text>
+            <Text style={styles.failTitle}>{t('m.b.browser.page_failed')}</Text>
+            <Text style={styles.failText}>{t('m.b.browser.page_failed_body')}</Text>
             <Pressable
               onPress={() => {
                 setFailed(false);
@@ -323,7 +325,7 @@ function InAppBrowser({
               accessibilityRole="button"
               style={({ pressed }) => [styles.retry, pressed && { opacity: 0.85 }]}
             >
-              <Text style={styles.retryText}>Try again</Text>
+              <Text style={styles.retryText}>{t('m.b.common.try_again')}</Text>
             </Pressable>
           </View>
         )}
@@ -331,15 +333,15 @@ function InAppBrowser({
 
       <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.toolbar}>
         <View style={styles.toolRow}>
-          <ToolButton icon="chevron-left" label="Back" disabled={!nav.canGoBack} onPress={() => frame.current?.goBack()} />
-          <ToolButton icon="chevron-right" label="Forward" disabled={!nav.canGoForward} onPress={() => frame.current?.goForward()} />
-          <ToolButton icon="copy" label="Copy link" onPress={copy} />
+          <ToolButton icon="chevron-left" label={t('m.b.common.back')} disabled={!nav.canGoBack} onPress={() => frame.current?.goBack()} />
+          <ToolButton icon="chevron-right" label={t('m.b.browser.forward')} disabled={!nav.canGoForward} onPress={() => frame.current?.goForward()} />
+          <ToolButton icon="copy" label={t('m.b.browser.copy_link')} onPress={copy} />
           <ToolButton
             icon="share"
-            label="Share"
+            label={t('m.b.browser.share')}
             onPress={() => Share.share(Platform.OS === 'ios' ? { url: nav.url } : { message: nav.url }).catch(() => undefined)}
           />
-          <ToolButton icon="external-link" label="Open in your browser" onPress={() => Linking.openURL(nav.url).catch(() => undefined)} />
+          <ToolButton icon="external-link" label={t('m.b.browser.open_external')} onPress={() => Linking.openURL(nav.url).catch(() => undefined)} />
         </View>
       </SafeAreaView>
     </View>

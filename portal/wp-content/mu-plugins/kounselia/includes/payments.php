@@ -364,11 +364,16 @@ function kounselia_complete_subscription_payment( $reference ) {
 
     $user = get_userdata( $payment->user_id );
     if ( $user && function_exists( 'kounselia_send_html_email' ) ) {
+        $lang      = kounselia_mail_lang( $user );
+        $plan_name = $plan['name'] ?? 'Pro';
         kounselia_send_html_email(
             $user->user_email,
-            'Your Kounselia ' . ( $plan['name'] ?? 'Pro' ) . ' subscription is active',
-            'Payment confirmed',
-            '<p>Thanks for subscribing to ' . esc_html( $plan['name'] ?? 'Pro' ) . '. Your access is active until ' . esc_html( date( 'F j, Y', strtotime( $period_end ) ) ) . '.</p>'
+            kounselia_t( 'mail.pay.subject', array( 'plan' => $plan_name ), $lang ),
+            kounselia_t( 'mail.pay.headline', array(), $lang ),
+            '<p>' . kounselia_t( 'mail.pay.body', array( 'plan' => esc_html( $plan_name ), 'date' => esc_html( kounselia_mail_date( strtotime( $period_end ), $lang ) ) ), $lang ) . '</p>',
+            null,
+            null,
+            array( 'lang' => $lang )
         );
     }
 
