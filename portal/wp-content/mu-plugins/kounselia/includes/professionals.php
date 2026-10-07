@@ -116,6 +116,13 @@ function kounselia_store_professional_document( $professional_id, $file, $doc_ty
         return false;
     }
 
+    // The name alone can lie (a web page renamed licence.png). Check the
+    // file's contents really are a PDF or picture of the type its name says.
+    $real = wp_check_filetype_and_ext( $file['tmp_name'], $file['name'], $allowed );
+    if ( empty( $real['ext'] ) || empty( $real['type'] ) ) {
+        return false;
+    }
+
     kounselia_ensure_professional_docs_dir();
     $stored_filename = wp_generate_password( 32, false ) . '.' . $filetype['ext'];
     $dest            = trailingslashit( kounselia_professional_docs_dir() ) . $stored_filename;
@@ -174,7 +181,7 @@ function kounselia_user_can_view_professional_document( $user_id, $doc_owner_use
     if ( ! $user_id ) {
         return false;
     }
-    return ( (int) $doc_owner_user_id === (int) $user_id ) || kounselia_user_is_admin( $user_id );
+    return ( (int) $doc_owner_user_id === (int) $user_id ) || kounselia_admin_can( 'professionals', $user_id );
 }
 
 function kounselia_ajax_view_professional_document() {
@@ -218,6 +225,7 @@ function kounselia_ajax_view_professional_document() {
     header( 'Content-Disposition: inline; filename="' . sanitize_file_name( $doc->original_filename ) . '"' );
     header( 'Content-Length: ' . filesize( $path ) );
     header( 'X-Robots-Tag: noindex, nofollow' );
+    header( 'X-Content-Type-Options: nosniff' );
     readfile( $path );
     exit;
 }
@@ -403,7 +411,7 @@ function kounselia_notify_admins_new_professional_application( $professional_id 
 function kounselia_ajax_admin_review_professional() {
     check_ajax_referer( 'kounselia_admin_nonce', 'nonce' );
 
-    if ( ! kounselia_user_is_admin() ) {
+    if ( ! kounselia_admin_can( 'professionals' ) ) {
         kounselia_send_pure_json_error( array( 'message' => 'Unauthorized' ), 403 );
     }
 

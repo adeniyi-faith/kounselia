@@ -1517,6 +1517,8 @@
   "d.book.series_fail": "Could not cancel that series.",
   "d.book.cancel_confirm": "Cancel this session? You'll be refunded, and the professional will be notified.",
   "d.book.cancelled": "Booking cancelled.",
+  "d.book.cancel_confirm_cutoff": "Cancel this session? You'll be refunded if it is more than {hours} hours away, and the professional will be notified.",
+  "d.book.cancelled_no_refund": "Booking cancelled. It was too close to the start time for a refund.",
   "d.book.cancel_fail": "Could not cancel that booking.",
   "d.rate.title_with": "Rate your session with {name}",
   "d.rate.comment_label": "A word about your experience (optional)",

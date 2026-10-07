@@ -1517,6 +1517,8 @@
   "d.book.series_fail": "Impossible d'annuler cette série.",
   "d.book.cancel_confirm": "Annuler cette séance ? Vous serez remboursé(e) et le professionnel sera prévenu.",
   "d.book.cancelled": "Réservation annulée.",
+  "d.book.cancel_confirm_cutoff": "Annuler cette séance ? Vous serez remboursé(e) si elle a lieu dans plus de {hours} heures, et le professionnel sera prévenu.",
+  "d.book.cancelled_no_refund": "Réservation annulée. Elle était trop proche de l'heure de début pour être remboursée.",
   "d.book.cancel_fail": "Impossible d'annuler cette réservation.",
   "d.rate.title_with": "Évaluez votre séance avec {name}",
   "d.rate.comment_label": "Un mot sur votre expérience (facultatif)",

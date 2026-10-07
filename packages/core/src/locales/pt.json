@@ -1517,6 +1517,8 @@
   "d.book.series_fail": "Não foi possível cancelar essa série.",
   "d.book.cancel_confirm": "Cancelar esta sessão? Você será reembolsado e o profissional será avisado.",
   "d.book.cancelled": "Reserva cancelada.",
+  "d.book.cancel_confirm_cutoff": "Cancelar esta sessão? Você será reembolsado se faltarem mais de {hours} horas, e o profissional será avisado.",
+  "d.book.cancelled_no_refund": "Reserva cancelada. Faltava pouco para o início, então não há reembolso.",
   "d.book.cancel_fail": "Não foi possível cancelar essa reserva.",
   "d.rate.title_with": "Avalie sua sessão com {name}",
   "d.rate.comment_label": "Uma palavra sobre sua experiência (opcional)",

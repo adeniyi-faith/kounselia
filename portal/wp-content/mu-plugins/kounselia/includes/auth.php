@@ -12,6 +12,56 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /* -------------------------------------------------------------------------
+ * 2B. BANNED AND TRASHED ACCOUNTS
+ *
+ * An admin banning a member, or moving them to the Trash on the Members
+ * page, locks them out. Before, only the AI chat (and the app) checked
+ * this: a banned member could still sign in on the website and book
+ * sessions, comment, journal and so on.
+ * ---------------------------------------------------------------------- */
+
+define( 'KOUNSELIA_LOCKED_ACCOUNT_MESSAGE', 'This account has been suspended. If you think this is a mistake, please contact support.' );
+
+function kounselia_account_is_locked( $user_id ) {
+    return (bool) get_user_meta( $user_id, 'kounselia_banned', true )
+        || (bool) get_user_meta( $user_id, 'kounselia_deleted_at', true );
+}
+
+/**
+ * Refuses a correct password for a locked account, wherever someone signs
+ * in (website, app, admin panel, wp-login.php).
+ */
+function kounselia_block_locked_account_sign_in( $user ) {
+    if ( $user instanceof WP_User && kounselia_account_is_locked( $user->ID ) ) {
+        return new WP_Error( 'kounselia_account_locked', KOUNSELIA_LOCKED_ACCOUNT_MESSAGE );
+    }
+    return $user;
+}
+add_filter( 'authenticate', 'kounselia_block_locked_account_sign_in', 100 );
+
+/**
+ * A locked account that is still signed in somewhere (a cookie from
+ * before the ban) is treated as signed out on its next visit.
+ */
+function kounselia_sign_out_locked_account( $user_id ) {
+    if ( $user_id && kounselia_account_is_locked( $user_id ) ) {
+        return 0;
+    }
+    return $user_id;
+}
+add_filter( 'determine_current_user', 'kounselia_sign_out_locked_account', 40 );
+
+/**
+ * Signs a member out everywhere: every website session and the app.
+ */
+function kounselia_end_member_sessions( $user_id ) {
+    WP_Session_Tokens::get_instance( $user_id )->destroy_all();
+    if ( function_exists( 'kounselia_revoke_app_tokens' ) ) {
+        kounselia_revoke_app_tokens( $user_id );
+    }
+}
+
+/* -------------------------------------------------------------------------
  * 3. LOGIN
  * ---------------------------------------------------------------------- */
 
@@ -49,6 +99,9 @@ function kounselia_ajax_login() {
     ), is_ssl() );
 
     if ( is_wp_error( $user ) ) {
+        if ( 'kounselia_account_locked' === $user->get_error_code() ) {
+            wp_send_json_error( array( 'message' => KOUNSELIA_LOCKED_ACCOUNT_MESSAGE ), 403 );
+        }
         wp_send_json_error( array( 'message' => 'That email and password do not match.' ), 401 );
     }
     
