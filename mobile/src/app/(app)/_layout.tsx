@@ -45,6 +45,7 @@ export default function AppLayout() {
         <Stack.Screen name="comments/[postId]" />
         <Stack.Screen name="memory" />
         <Stack.Screen name="plan" />
+        <Stack.Screen name="growth" />
         <Stack.Screen name="apply" />
         <Stack.Screen name="account" />
       </Stack>

@@ -202,11 +202,18 @@ function kounselia_renew_subscription( $sub ) {
     // Tell them once, on the first failure, and again when we've stopped trying.
     if ( 1 === $attempts || $attempts >= KOUNSELIA_RENEWAL_MAX_ATTEMPTS ) {
         $final = $attempts >= KOUNSELIA_RENEWAL_MAX_ATTEMPTS;
-        kounselia_notify_user( $sub->user_id, 'subscription_payment_failed', "We couldn't renew your plan", $final ? 'Please renew from your dashboard to keep Pro.' : "We'll try again tomorrow.", '/dashboard.php?tab=upgrade', array(
-            'subject'      => $final ? 'Your Kounselia Pro membership needs attention' : "We couldn't renew your Kounselia plan",
-            'headline'     => "We couldn't take your payment",
-            'content_html' => '<p style="margin-bottom:18px;">We tried to renew your ' . esc_html( $name ) . ' plan but the payment didn\'t go through' . ( $error ? ' (' . esc_html( $error ) . ')' : '' ) . '.</p><p>' . ( $final ? 'We won\'t try again. You keep Pro until ' . esc_html( date_i18n( 'F j, Y', strtotime( $sub->current_period_end ) ) ) . ' — renew from your dashboard with any card to continue.' : 'We\'ll try again in about a day. If your card has changed, you can renew with a new one from your dashboard.' ) . '</p>',
-            'btn_text'     => 'Update payment',
+        $lang  = kounselia_mail_lang( $sub->user_id );
+        $p1    = $error
+            ? kounselia_t( 'mail.sub.failed_p1_reason', array( 'plan' => esc_html( $name ), 'reason' => esc_html( $error ) ), $lang )
+            : kounselia_t( 'mail.sub.failed_p1', array( 'plan' => esc_html( $name ) ), $lang );
+        $p2    = $final
+            ? kounselia_t( 'mail.sub.failed_final', array( 'date' => esc_html( kounselia_mail_date( strtotime( $sub->current_period_end ), $lang ) ) ), $lang )
+            : kounselia_t( 'mail.sub.failed_retry', array(), $lang );
+        kounselia_notify_user( $sub->user_id, 'subscription_payment_failed', kounselia_t( 'mail.sub.failed_title', array(), $lang ), $final ? kounselia_t( 'mail.sub.failed_body_final', array(), $lang ) : kounselia_t( 'mail.sub.failed_body_retry', array(), $lang ), '/dashboard.php?tab=upgrade', array(
+            'subject'      => $final ? kounselia_t( 'mail.sub.failed_subject_final', array(), $lang ) : kounselia_t( 'mail.sub.failed_title', array(), $lang ),
+            'headline'     => kounselia_t( 'mail.sub.failed_headline', array(), $lang ),
+            'content_html' => '<p style="margin-bottom:18px;">' . $p1 . '</p><p>' . $p2 . '</p>',
+            'btn_text'     => kounselia_t( 'mail.sub.failed_button', array(), $lang ),
             'btn_url'      => kounselia_site_url( '/dashboard.php?tab=upgrade' ),
         ) );
     }
@@ -259,11 +266,14 @@ function kounselia_apply_renewal_success( $payment, $data ) {
         'updated_at'              => current_time( 'mysql' ),
     ), kounselia_subscription_card_fields( isset( $data['authorization'] ) ? $data['authorization'] : array() ) ), array( 'id' => $sub->id ) );
 
-    kounselia_notify_user( $payment->user_id, 'subscription_renewed', 'Your ' . $name . ' plan renewed', 'Thank you — your membership continues until ' . date_i18n( 'F j, Y', strtotime( $end ) ) . '.', '/dashboard.php?tab=upgrade', array(
-        'subject'      => 'Your Kounselia ' . $name . ' plan has renewed',
-        'headline'     => 'Thank you for staying with us',
-        'content_html' => '<p style="margin-bottom:18px;">We charged ' . esc_html( kounselia_money( $payment->amount, $payment->currency ) ) . ' to your ' . esc_html( trim( $sub->card_brand . ' card ending ' . $sub->card_last4 ) ) . '. Your ' . esc_html( $name ) . ' membership now runs until <strong>' . esc_html( date_i18n( 'F j, Y', strtotime( $end ) ) ) . '</strong>.</p><p>You can change plan, turn off auto-renew or remove your card any time from your dashboard.</p>',
-        'btn_text'     => 'Manage my plan',
+    $lang     = kounselia_mail_lang( $payment->user_id );
+    $end_date = kounselia_mail_date( strtotime( $end ), $lang );
+    $card     = trim( kounselia_t( 'mail.sub.card_ending', array( 'brand' => $sub->card_brand, 'last4' => $sub->card_last4 ), $lang ) );
+    kounselia_notify_user( $payment->user_id, 'subscription_renewed', kounselia_t( 'mail.sub.renewed_title', array( 'plan' => $name ), $lang ), kounselia_t( 'mail.sub.renewed_body', array( 'date' => $end_date ), $lang ), '/dashboard.php?tab=upgrade', array(
+        'subject'      => kounselia_t( 'mail.sub.renewed_subject', array( 'plan' => $name ), $lang ),
+        'headline'     => kounselia_t( 'mail.sub.renewed_headline', array(), $lang ),
+        'content_html' => '<p style="margin-bottom:18px;">' . kounselia_t( 'mail.sub.renewed_content', array( 'amount' => esc_html( kounselia_money( $payment->amount, $payment->currency ) ), 'card' => esc_html( $card ), 'plan' => esc_html( $name ), 'date' => esc_html( $end_date ) ), $lang ) . '</p><p>' . kounselia_t( 'mail.sub.renewed_more', array(), $lang ) . '</p>',
+        'btn_text'     => kounselia_t( 'mail.sub.renewed_button', array(), $lang ),
         'btn_url'      => kounselia_site_url( '/dashboard.php?tab=upgrade' ),
     ) );
     return true;

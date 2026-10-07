@@ -1,34 +1,48 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchVoiceToken, logVoiceTurn } from '@kounselia/core';
 import type { KounseliaConfig } from '@kounselia/core';
+import { useT } from '../i18n';
 
 // Talks directly to Gemini's realtime voice websocket from the browser,
 // using a short-lived token the backend hands out. This whole hook is
-// Web Audio / WebSocket plumbing, so it's browser-only — a React Native
-// build would need its own version using its own audio APIs, but would
-// reuse core/voiceCall.ts (the token fetch + turn logging) unchanged.
+// Web Audio / WebSocket plumbing, so it's browser-only — the mobile app
+// has its own version (mobile/src/audio/useVoiceCall.ts) and both reuse
+// core/voiceCall.ts (the token fetch + turn logging) unchanged.
 
+const MIC_RATE = 16000; // what the live voice service expects from us
+const VOICE_RATE = 24000; // what it sends back
+
+// Turns the microphone's sound (usually 44.1 or 48 kHz) into 16 kHz
+// pieces. Each output sample is the average of the input samples it
+// covers rather than just one of them, which keeps speech clearer for
+// the service's speech recognition (picking single samples adds a hiss
+// of "folded back" high frequencies).
 const PCM_CAPTURE_WORKLET = `
 class PCMCaptureProcessor extends AudioWorkletProcessor {
   constructor(){
     super();
-    this.targetRate=16000;
-    this.ratio=sampleRate/this.targetRate;
+    this.ratio=sampleRate/${MIC_RATE};
     this.buf=[];
+    this.out=[];
   }
   process(inputs){
     const ch=inputs[0]&&inputs[0][0];
     if(ch){
       for(let i=0;i<ch.length;i++) this.buf.push(ch[i]);
       const outLen=Math.floor(this.buf.length/this.ratio);
-      if(outLen>0){
-        const out=new Int16Array(outLen);
-        for(let i=0;i<outLen;i++){
-          let s=this.buf[Math.floor(i*this.ratio)];
-          s=Math.max(-1,Math.min(1,s));
-          out[i]=s<0?s*0x8000:s*0x7FFF;
-        }
-        this.buf=this.buf.slice(Math.floor(outLen*this.ratio));
+      for(let i=0;i<outLen;i++){
+        const from=Math.floor(i*this.ratio);
+        const to=Math.max(from+1,Math.floor((i+1)*this.ratio));
+        let s=0;
+        for(let j=from;j<to;j++) s+=this.buf[j];
+        s=Math.max(-1,Math.min(1,s/(to-from)));
+        this.out.push(s<0?s*0x8000:s*0x7FFF);
+      }
+      this.buf=this.buf.slice(Math.floor(outLen*this.ratio));
+      // Send in 0.1 s pieces rather than hundreds of tiny ones a second.
+      if(this.out.length>=1600){
+        const out=Int16Array.from(this.out);
+        this.out=[];
         this.port.postMessage(out.buffer,[out.buffer]);
       }
     }
@@ -52,6 +66,10 @@ function formatTimer(seconds: number): string {
   return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
 }
 
+function newAudioContext(): AudioContext {
+  return new (window.AudioContext || (window as any).webkitAudioContext)();
+}
+
 export type CallStatus = 'idle' | 'connecting' | 'listening' | 'speaking' | 'ended';
 
 interface UseVoiceCallOptions {
@@ -62,6 +80,9 @@ interface UseVoiceCallOptions {
 }
 
 export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId }: UseVoiceCallOptions) {
+  const t = useT();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [status, setStatus] = useState<CallStatus>('idle');
   const [statusText, setStatusText] = useState('');
   const [timerText, setTimerText] = useState('00:00');
@@ -78,7 +99,6 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
   const nextStartTimeRef = useRef(0);
   const mutedRef = useRef(false);
   const sessionIdRef = useRef(0);
-  const allowedSecondsRef = useRef(0);
   const secondsLeftRef = useRef(0);
   const timerHandleRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const userUtteranceRef = useRef('');
@@ -86,6 +106,10 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
   const userFlushedRef = useRef(true);
   const activeRef = useRef(false);
   const connectingRef = useRef(false);
+  const latest = useRef({ config, counselorSlug, getSessionId, onSessionId });
+  useEffect(() => {
+    latest.current = { config, counselorSlug, getSessionId, onSessionId };
+  });
 
   const stopAllPlayback = useCallback(() => {
     playbackQueueRef.current.forEach((s) => {
@@ -101,37 +125,43 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
 
   const flushUserTranscript = useCallback(() => {
     if (userUtteranceRef.current.trim()) {
-      logVoiceTurn(config, sessionIdRef.current, 'user', userUtteranceRef.current);
+      logVoiceTurn(latest.current.config, sessionIdRef.current, 'user', userUtteranceRef.current);
     }
     userUtteranceRef.current = '';
     userFlushedRef.current = true;
-  }, [config]);
+  }, []);
 
   const flushBotTranscript = useCallback(() => {
     if (botUtteranceRef.current.trim()) {
-      logVoiceTurn(config, sessionIdRef.current, 'bot', botUtteranceRef.current);
+      logVoiceTurn(latest.current.config, sessionIdRef.current, 'bot', botUtteranceRef.current);
     }
     botUtteranceRef.current = '';
-  }, [config]);
+  }, []);
 
-  const endCall = useCallback(() => {
+  // Stops everything the call holds (connection, microphone, sound).
+  // Safe to call more than once.
+  const teardown = useCallback(() => {
     activeRef.current = false;
     connectingRef.current = false;
     if (timerHandleRef.current) clearInterval(timerHandleRef.current);
+    timerHandleRef.current = null;
     flushUserTranscript();
     flushBotTranscript();
     stopAllPlayback();
 
     if (wsRef.current) {
+      // Cleared before closing so this socket's onclose knows it's stale.
+      const ws = wsRef.current;
+      wsRef.current = null;
       try {
-        wsRef.current.close();
+        ws.close();
       } catch {
         // ignore
       }
-      wsRef.current = null;
     }
     if (workletNodeRef.current) {
       try {
+        workletNodeRef.current.port.onmessage = null;
         workletNodeRef.current.disconnect();
       } catch {
         // ignore
@@ -139,19 +169,11 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
       workletNodeRef.current = null;
     }
     if (audioCtxRef.current) {
-      try {
-        audioCtxRef.current.close();
-      } catch {
-        // ignore
-      }
+      audioCtxRef.current.close().catch(() => undefined);
       audioCtxRef.current = null;
     }
     if (playbackCtxRef.current) {
-      try {
-        playbackCtxRef.current.close();
-      } catch {
-        // ignore
-      }
+      playbackCtxRef.current.close().catch(() => undefined);
       playbackCtxRef.current = null;
     }
     if (micStreamRef.current) {
@@ -159,29 +181,33 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
       micStreamRef.current = null;
     }
     nextStartTimeRef.current = 0;
-    setStatus('ended');
   }, [flushBotTranscript, flushUserTranscript, stopAllPlayback]);
 
+  const endCall = useCallback(() => {
+    teardown();
+    setStatus('ended');
+  }, [teardown]);
+
   const schedulePlayback = useCallback((base64Pcm: string) => {
-    if (!playbackCtxRef.current) {
-      playbackCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
-      nextStartTimeRef.current = playbackCtxRef.current.currentTime;
-    }
     const ctx = playbackCtxRef.current;
+    if (!ctx) return; // Call ended meanwhile.
+    if (ctx.state === 'suspended') ctx.resume().catch(() => undefined);
     const binary = atob(base64Pcm);
     const bytes = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-    const int16 = new Int16Array(bytes.buffer);
+    const int16 = new Int16Array(bytes.buffer, 0, bytes.length >> 1);
     const float32 = new Float32Array(int16.length);
     for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / (int16[i] < 0 ? 0x8000 : 0x7fff);
+    if (!float32.length) return;
 
-    const buffer = ctx.createBuffer(1, float32.length, 24000);
-    buffer.copyToChannel(float32, 0);
+    const buffer = ctx.createBuffer(1, float32.length, VOICE_RATE);
+    buffer.getChannelData(0).set(float32);
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
     source.connect(ctx.destination);
 
+    // Queue each piece right after the previous one so speech is smooth.
     const startAt = Math.max(ctx.currentTime, nextStartTimeRef.current);
     source.start(startAt);
     nextStartTimeRef.current = startAt + buffer.duration;
@@ -191,19 +217,24 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
     };
   }, []);
 
-  const startMicCapture = useCallback(async () => {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    audioCtxRef.current = ctx;
-    const src = ctx.createMediaStreamSource(micStreamRef.current!);
-
+  // Wires the microphone into the 16 kHz converter. Pieces are only sent
+  // once the call is live (and not muted).
+  const startMicCapture = useCallback(async (ctx: AudioContext, stream: MediaStream) => {
     const blobUrl = URL.createObjectURL(new Blob([PCM_CAPTURE_WORKLET], { type: 'application/javascript' }));
-    await ctx.audioWorklet.addModule(blobUrl);
+    try {
+      await ctx.audioWorklet.addModule(blobUrl);
+    } finally {
+      URL.revokeObjectURL(blobUrl);
+    }
+    if (audioCtxRef.current !== ctx) return; // Call ended meanwhile.
 
+    const src = ctx.createMediaStreamSource(stream);
     const worklet = new AudioWorkletNode(ctx, 'pcm-capture-processor');
     worklet.port.onmessage = (e) => {
-      if (mutedRef.current || !wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
+      const ws = wsRef.current;
+      if (!activeRef.current || mutedRef.current || !ws || ws.readyState !== WebSocket.OPEN) return;
       const b64 = arrayBufferToBase64(e.data);
-      wsRef.current.send(JSON.stringify({ realtimeInput: { audio: { data: b64, mimeType: 'audio/pcm;rate=16000' } } }));
+      ws.send(JSON.stringify({ realtimeInput: { audio: { data: b64, mimeType: `audio/pcm;rate=${MIC_RATE}` } } }));
     };
     src.connect(worklet);
     workletNodeRef.current = worklet;
@@ -215,7 +246,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
       secondsLeftRef.current -= 1;
       setTimerText(formatTimer(secondsLeftRef.current));
       if (secondsLeftRef.current <= 0) {
-        setStatusText("Time's up");
+        setStatusText(tRef.current('c.call.times_up'));
         endCall();
       }
     }, 1000);
@@ -233,6 +264,7 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
         };
 
         ws.onmessage = async (evt) => {
+          if (wsRef.current !== ws) return; // From a call that already ended.
           let msg: any;
           try {
             const raw = evt.data instanceof Blob ? await evt.data.text() : evt.data;
@@ -244,28 +276,33 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
           if (msg.setupComplete) {
             activeRef.current = true;
             setStatus('listening');
-            setStatusText('Listening…');
+            setStatusText(tRef.current('c.call.listening'));
             startTimer();
-            startMicCapture();
             resolve();
             return;
           }
 
-          if (msg.serverContent) {
-            const sc = msg.serverContent;
+          const sc = msg.serverContent;
+          if (sc) {
             if (sc.interrupted) {
+              // The member started talking over the counselor.
               stopAllPlayback();
               flushBotTranscript();
             }
-            if (sc.inputTranscription && typeof sc.inputTranscription.text === 'string') {
-              userUtteranceRef.current = sc.inputTranscription.text;
+            if (typeof sc.inputTranscription?.text === 'string') {
+              // Each message carries the next chunk of speech, not the
+              // whole thing said so far, so the chunks must be joined.
+              // Otherwise only the last few words are kept, the caption
+              // flickers word by word, and the chat history gets
+              // fragments instead of what was actually said.
+              userUtteranceRef.current += sc.inputTranscription.text;
               userFlushedRef.current = false;
             }
-            if (sc.outputTranscription && typeof sc.outputTranscription.text === 'string') {
+            if (typeof sc.outputTranscription?.text === 'string') {
               if (!userFlushedRef.current) flushUserTranscript();
-              botUtteranceRef.current = sc.outputTranscription.text;
+              botUtteranceRef.current += sc.outputTranscription.text;
               setStatus('speaking');
-              setStatusText('Speaking…');
+              setStatusText(tRef.current('c.call.speaking'));
               setCaption(botUtteranceRef.current);
             }
             if (sc.modelTurn?.parts) {
@@ -277,78 +314,119 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
             if (sc.turnComplete) {
               flushBotTranscript();
               setStatus('listening');
-              setStatusText('Listening…');
+              setStatusText(tRef.current('c.call.listening'));
             }
           }
 
           if (msg.goAway) {
-            setStatusText('Call ending…');
-            setTimeout(endCall, 1200);
+            setStatusText(tRef.current('c.call.ending'));
+            setTimeout(() => {
+              if (wsRef.current === ws) endCall();
+            }, 1200);
           }
         };
 
         ws.onerror = () => reject(new Error('ws error'));
         ws.onclose = () => {
+          if (wsRef.current !== ws) return; // We closed it ourselves.
           if (activeRef.current) endCall();
+          // Closed before the call started (e.g. the pass was refused):
+          // give up rather than stay on "Connecting…" forever.
+          else reject(new Error('closed'));
         };
       }),
-    [endCall, flushBotTranscript, flushUserTranscript, schedulePlayback, startMicCapture, startTimer, stopAllPlayback],
+    [endCall, flushBotTranscript, flushUserTranscript, schedulePlayback, startTimer, stopAllPlayback],
   );
 
+  // Must be called straight from the member's tap: browsers (Safari on
+  // iPhone and iPad especially) only let sound start, and the microphone
+  // feed flow, for audio set up during a tap. Setting the audio up later,
+  // after waiting on the network, left those calls silent both ways.
   const startCall = useCallback(async () => {
     if (activeRef.current || connectingRef.current) return;
-    connectingRef.current = true;
-    setStatus('connecting');
-    setStatusText('Connecting…');
     setCaption('');
     setTimerText('00:00');
     setFreeCallMinutes(null);
     setMuted(false);
     mutedRef.current = false;
+    userUtteranceRef.current = '';
+    botUtteranceRef.current = '';
+    userFlushedRef.current = true;
 
-    if (!('mediaDevices' in navigator) || !window.AudioWorklet || !window.WebSocket) {
-      setStatusText('Voice calls need a modern browser (Chrome, Edge, or Safari) with microphone support.');
-      connectingRef.current = false;
+    if (!navigator.mediaDevices?.getUserMedia || !window.AudioWorklet || !window.WebSocket) {
+      setStatus('connecting');
+      setStatusText(tRef.current('c.call.unsupported'));
+      setTimeout(endCall, 3000);
       return;
     }
 
+    connectingRef.current = true;
+    setStatus('connecting');
+    setStatusText(tRef.current('c.call.connecting'));
+
+    const micCtx = newAudioContext();
+    const playbackCtx = newAudioContext();
+    micCtx.resume().catch(() => undefined);
+    playbackCtx.resume().catch(() => undefined);
+    audioCtxRef.current = micCtx;
+    playbackCtxRef.current = playbackCtx;
+    nextStartTimeRef.current = playbackCtx.currentTime;
+
+    // Shows why the call couldn't go ahead, then closes the call screen.
+    const giveUp = (text: string, delay = 2200) => {
+      teardown();
+      setStatusText(text);
+      setTimeout(endCall, delay);
+    };
+    // The member hung up while we were waiting on something.
+    const hungUp = () => !connectingRef.current;
+
+    let stream: MediaStream;
     try {
-      micStreamRef.current = await navigator.mediaDevices.getUserMedia({
-        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
       });
     } catch {
-      setStatusText('Microphone access was denied.');
-      connectingRef.current = false;
-      setTimeout(endCall, 1800);
+      if (!hungUp()) giveUp(tRef.current('c.call.mic_blocked'), 3000);
       return;
     }
+    if (hungUp()) {
+      stream.getTracks().forEach((t) => t.stop());
+      return;
+    }
+    micStreamRef.current = stream;
 
-    const tokenRes = await fetchVoiceToken(config, counselorSlug, getSessionId());
+    try {
+      await startMicCapture(micCtx, stream);
+    } catch {
+      if (!hungUp()) giveUp(tRef.current('c.call.mic_failed'));
+      return;
+    }
+    if (hungUp()) return;
+
+    const { config: cfg, counselorSlug: slug, getSessionId: getId, onSessionId: setId } = latest.current;
+    const tokenRes = await fetchVoiceToken(cfg, slug, getId());
+    if (hungUp()) return;
     if (!tokenRes.success || !tokenRes.token || !tokenRes.model) {
-      setStatusText(tokenRes.message || "Voice isn't available right now.");
-      connectingRef.current = false;
-      setTimeout(endCall, 2200);
+      giveUp(tokenRes.message || tRef.current('c.call.unavailable'));
       return;
     }
 
-    sessionIdRef.current = tokenRes.sessionId || getSessionId();
-    onSessionId(sessionIdRef.current);
-    allowedSecondsRef.current = tokenRes.allowedSeconds || 300;
-    secondsLeftRef.current = allowedSecondsRef.current;
+    sessionIdRef.current = tokenRes.sessionId || getId();
+    setId(sessionIdRef.current);
+    secondsLeftRef.current = tokenRes.allowedSeconds || 300;
     setTimerText(formatTimer(secondsLeftRef.current));
     if (tokenRes.plan === 'free') {
-      setFreeCallMinutes(Math.round(allowedSecondsRef.current / 60));
+      setFreeCallMinutes(Math.round(secondsLeftRef.current / 60));
     }
 
     try {
       await connectLiveSession(tokenRes.token, tokenRes.model);
       connectingRef.current = false;
     } catch {
-      setStatusText("Couldn't start the call, please try again.");
-      connectingRef.current = false;
-      setTimeout(endCall, 1800);
+      if (!hungUp()) giveUp(tRef.current('c.call.start_failed'), 1800);
     }
-  }, [config, connectLiveSession, counselorSlug, endCall, getSessionId, onSessionId]);
+  }, [connectLiveSession, endCall, startMicCapture, teardown]);
 
   const toggleMute = useCallback(() => {
     setMuted((m) => {
@@ -356,6 +434,10 @@ export function useVoiceCall({ config, counselorSlug, getSessionId, onSessionId 
       return !m;
     });
   }, []);
+
+  // Leaving the conversation hangs up, so the microphone never stays on
+  // with no call screen showing.
+  useEffect(() => () => teardown(), [teardown]);
 
   return { status, statusText, timerText, caption, muted, freeCallMinutes, startCall, endCall, toggleMute };
 }

@@ -22,6 +22,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { clearLockSetting } from './appLockSetting';
 import { showDialog } from './components/Dialog';
 import { AJAX_URL } from './config';
+import { useT } from './language';
 import { forgetPush, savedPushToken } from './notifications';
 import { deleteSecure, readSecure, writeSecure } from './secureStorage';
 
@@ -80,6 +81,12 @@ function makeConfig(token: string | null, onSignedOut?: () => void): KounseliaCo
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
+  const t = useT();
+  // Latest words for callbacks that outlive a render.
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
   const [status, setStatus] = useState<Status>('loading');
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<AppUser | null>(null);
@@ -166,7 +173,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       return;
     }
     forget();
-    showDialog({ title: 'Please sign in again', message: 'You were signed out of Kounselia on this phone. This happens if your password was changed.', icon: 'lock' });
+    showDialog({ title: tRef.current('m.session.signed_out_title'), message: tRef.current('m.session.signed_out_body'), icon: 'lock' });
   }, []);
 
   const config = useMemo(() => makeConfig(token, onSignedOut), [token, onSignedOut]);

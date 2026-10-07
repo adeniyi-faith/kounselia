@@ -8,7 +8,7 @@ import { useColors } from '@/theme';
 // Articles only shows once the Journal is open to professionals, or they
 // already have articles, as on the website.
 const ICONS = { index: 'layout-dashboard', bookings: 'calendar-event', articles: 'feather', earnings: 'cash', profile: 'user-edit' };
-const LABELS = { index: 'Overview', bookings: 'Bookings', articles: 'Articles', earnings: 'Earnings', profile: 'Profile' };
+const LABELS = { index: 'm.pro.tab_overview', bookings: 'm.pro.tab_bookings', articles: 'm.pro.tab_articles', earnings: 'm.pro.tab_earnings', profile: 'm.pro.tab_profile' };
 
 export default function ProLayout() {
   return (

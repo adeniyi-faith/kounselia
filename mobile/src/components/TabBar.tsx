@@ -6,16 +6,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { TablerIcon } from './TablerIcon';
 
 const ICONS: Record<string, string> = { index: 'home', sessions: 'history', book: 'calendar-event', settings: 'settings' };
-const LABELS: Record<string, string> = { index: 'Home', sessions: 'Sessions', book: 'Book', settings: 'Settings' };
+const LABELS: Record<string, string> = { index: 'm.tabs.home', sessions: 'm.tabs.sessions', book: 'm.tabs.book', settings: 'm.tabs.settings' };
 const CENTRE = 'talk';
 
 interface Options {
   // Another set of tabs (the professional's) passes its own icons and
-  // labels, by route name, and any tabs to leave out for now.
+  // labels (translation keys), by route name, and any tabs to leave out for now.
   icons?: Record<string, string>;
   labels?: Record<string, string>;
   hidden?: string[];
@@ -25,6 +26,7 @@ export function TabBar({ state, navigation, descriptors, icons = ICONS, labels =
   const styles = useStyles();
   const colors = useColors();
   const insets = useSafeAreaInsets();
+  const t = useT();
 
   return (
     <View style={[styles.bar, { paddingBottom: insets.bottom, height: 64 + insets.bottom }]}>
@@ -68,7 +70,7 @@ export function TabBar({ state, navigation, descriptors, icons = ICONS, labels =
             style={styles.tab}
           >
             <TablerIcon name={icons[route.name] ?? 'circle'} size={22} color={tint} />
-            <Text style={[styles.label, { color: tint }]}>{labels[route.name] ?? label}</Text>
+            <Text style={[styles.label, { color: tint }]}>{labels[route.name] ? t(labels[route.name]) : label}</Text>
           </Pressable>
         );
       })}

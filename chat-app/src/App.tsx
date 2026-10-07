@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { I18nProvider, useT } from './i18n';
 import { AuthModal, type AuthModalView } from './components/AuthModal';
 import { ChatScreen } from './components/ChatScreen';
 import type { CounselorMap, KounseliaConfig } from '@kounselia/core';
@@ -6,13 +7,24 @@ import type { CounselorMap, KounseliaConfig } from '@kounselia/core';
 interface Props {
   config: KounseliaConfig;
   counselors: CounselorMap;
+  language?: string;
+  words?: Record<string, string>;
 }
 
 function slugFromHash(): string {
   return window.location.hash.replace(/^#/, '');
 }
 
-export function App({ config: initialConfig, counselors }: Props) {
+export function App({ language, words, ...props }: Props) {
+  return (
+    <I18nProvider language={language} words={words}>
+      <AppBody {...props} />
+    </I18nProvider>
+  );
+}
+
+function AppBody({ config: initialConfig, counselors }: Omit<Props, 'language' | 'words'>) {
+  const t = useT();
   const [slug, setSlug] = useState(slugFromHash);
   const [config, setConfig] = useState(initialConfig);
   const [authView, setAuthView] = useState<AuthModalView>(null);
@@ -33,8 +45,8 @@ export function App({ config: initialConfig, counselors }: Props) {
     <>
       {!counselor ? (
         <div className="screen active" style={{ padding: 40, textAlign: 'center' }}>
-          <p>Choose a counselor from your dashboard to start a conversation.</p>
-          <a href="/dashboard.php">Go to dashboard</a>
+          <p>{t('c.chat.choose_counselor')}</p>
+          <a href="/dashboard.php">{t('c.chat.go_dashboard')}</a>
         </div>
       ) : (
         <ChatScreen

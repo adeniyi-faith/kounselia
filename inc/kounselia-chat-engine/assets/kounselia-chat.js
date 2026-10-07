@@ -5,24 +5,36 @@ let dictationChunks = [];
 let dictationStream = null;
 let isTranscribing = false;
 
+// Words on screen, in the member's language. inc/kounselia-chat-engine.php
+// prints them (KOUNSELIA.i18n); a missing sentence shows its key.
+function kT(key,vars){
+  const d=(window.KOUNSELIA&&KOUNSELIA.i18n)||{};
+  let t=Object.prototype.hasOwnProperty.call(d,key)?d[key]:key;
+  if(vars) t=t.replace(/\{(\w+)\}/g,(m,n)=>(n in vars?String(vars[n]):m));
+  return t;
+}
+
+// Same, escaped for putting into HTML.
+function kH(key,vars){return esc(kT(key,vars));}
+
 // Inherit dynamic database counselors from the PHP loader, or fallback to defaults
 const fallbackC={
-  serena:{name:'Serena',spec:'Emotional Healing',av:'ic-rose',icon:'ti-heart',
-    greeting:"Hello. I am really glad you are here.\n\nThis is your space. There is no agenda, no clock, and nothing you say here will be judged. Whatever you have been carrying, you do not have to carry it alone right now.\n\nTake your time. When you are ready, what has been sitting with you lately?"},
-  marcus:{name:'Marcus',spec:'Career and Purpose',av:'ic-blue',icon:'ti-briefcase',
-    greeting:"Good to have you here. I am Marcus.\n\nI work with people who are at crossroads. Careers that no longer fit, purposes they cannot locate, next steps that feel both necessary and terrifying.\n\nLet us get into it. What is the career or purpose question taking up the most space in your head right now?"},
-  noa:{name:'Noa',spec:'Personal Growth',av:'ic-sage',icon:'ti-leaf',
-    greeting:"Hey. I am Noa and I am genuinely glad you are here.\n\nI work with people who are in the middle of becoming. Sometimes that looks like reinvention. Sometimes it is understanding why certain patterns keep repeating. Sometimes it is just a quiet feeling that the current version of you is not the whole story.\n\nSo tell me. Who are you right now and who do you think you are becoming?"},
-  eli:{name:'Eli',spec:'Relationships',av:'ic-gold',icon:'ti-users',
-    greeting:"Hi, I am Eli. Welcome.\n\nRelationships are where most of our deepest joy and most of our real pain come from. They are also where we are most likely to repeat patterns we have not fully understood yet.\n\nI am here to help you see those patterns more clearly.\n\nWhat is the relationship situation you have been turning over in your mind?"},
-  dr_lena:{name:'Dr. Lena',spec:'Trauma and PTSD',av:'ic-teal',icon:'ti-stethoscope',voice:true,
-    greeting:"Hello. I am Dr. Lena and I am glad you are here.\n\nI want to be clear from the start. This space moves at your pace, entirely. There is nothing you are required to share and no sequence you have to follow.\n\nTrauma is not a character flaw. It is what happens when something genuinely overwhelming meets a person who was doing their best. My role is simply to be alongside you as you begin to understand it.\n\nWhere would you like to start today?"},
-  james:{name:'James',spec:"Men's Mental Health",av:'ic-navy',icon:'ti-shield',voice:true,
-    greeting:"Hey. I am James.\n\nA lot of men who end up here took a while to click that button. There is something that tells us we should handle things on our own. That talking about it makes it more real or makes us look weak.\n\nNone of that is true. And none of it applies here.\n\nThis is just a conversation. No performance required. What is going on?"},
-  theo:{name:'Theo',spec:'Grief and Loss',av:'ic-plum',icon:'ti-candle',
-    greeting:"Hello. I am Theo.\n\nGrief is one of the most isolating experiences a person can have. Partly because the world often expects us to move through it faster than we are able to. Partly because the people around us sometimes do not know how to hold it with us.\n\nI am not in a hurry. There is no timeline here.\n\nWould you like to tell me about who or what you have lost?"},
-  priya:{name:'Priya',spec:'Burnout and Balance',av:'ic-sienna',icon:'ti-battery-charging',
-    greeting:"Hi, I am Priya. I am glad you are here, even if getting here took more energy than you felt you had.\n\nBurnout tends to hit the people who cared the most, worked the hardest, and gave the most of themselves. It is not a sign of weakness. It is a sign that something has been out of balance for a long time.\n\nTell me. What does your exhaustion actually feel like right now?"}
+  serena:{name:'Serena',spec:kT('c.fallback.serena.spec'),av:'ic-rose',icon:'ti-heart',
+    greeting:kT('c.fallback.serena.greeting')},
+  marcus:{name:'Marcus',spec:kT('c.fallback.marcus.spec'),av:'ic-blue',icon:'ti-briefcase',
+    greeting:kT('c.fallback.marcus.greeting')},
+  noa:{name:'Noa',spec:kT('c.fallback.noa.spec'),av:'ic-sage',icon:'ti-leaf',
+    greeting:kT('c.fallback.noa.greeting')},
+  eli:{name:'Eli',spec:kT('c.fallback.eli.spec'),av:'ic-gold',icon:'ti-users',
+    greeting:kT('c.fallback.eli.greeting')},
+  dr_lena:{name:'Dr. Lena',spec:kT('c.fallback.dr_lena.spec'),av:'ic-teal',icon:'ti-stethoscope',voice:true,
+    greeting:kT('c.fallback.dr_lena.greeting')},
+  james:{name:'James',spec:kT('c.fallback.james.spec'),av:'ic-navy',icon:'ti-shield',voice:true,
+    greeting:kT('c.fallback.james.greeting')},
+  theo:{name:'Theo',spec:kT('c.fallback.theo.spec'),av:'ic-plum',icon:'ti-candle',
+    greeting:kT('c.fallback.theo.greeting')},
+  priya:{name:'Priya',spec:kT('c.fallback.priya.spec'),av:'ic-sienna',icon:'ti-battery-charging',
+    greeting:kT('c.fallback.priya.greeting')}
 };
 let C = (window.C && Object.keys(window.C).length > 0) ? window.C : fallbackC;
 
@@ -107,7 +119,7 @@ function closeChatMenu() {
 async function clearCurrentChat(e) {
   if(e) e.stopPropagation();
   closeChatMenu();
-  if(!confirm('Clear this conversation? It will be removed from your chat history and cannot be brought back.')) return;
+  if(!confirm(kT('c.chat.confirm_clear'))) return;
   stopVoiceActivity(true); // Force abort any active recording
 
   // Only wipe the screen once the server has actually cleared it, otherwise
@@ -119,16 +131,16 @@ async function clearCurrentChat(e) {
     const json = await r.json();
     if(!json.success) throw new Error('clear failed');
   } catch(err) {
-    showChatToast("Couldn't clear the chat. Please check your connection and try again.");
+    showChatToast(kT('c.chat.clear_failed'));
     return;
   }
 
-  showChatToast('Conversation cleared.');
+  showChatToast(kT('c.chat.cleared'));
   document.getElementById('messages').innerHTML = '';
   msgCount = 0;
   curSessionId = 0;
   userMessagesSinceSync = 0;
-  const greeting = cur ? (cur.greeting || `Hello. I am ${cur.name}. Where would you like to start today?`) : "Hello.";
+  const greeting = cur ? (cur.greeting || kT('c.chat.greeting_default',{name:cur.name})) : kT('c.chat.hello');
   setTimeout(() => aiMsg(greeting), 300); 
 }
 
@@ -138,14 +150,14 @@ function exportChat(e) {
   
   const messages = document.querySelectorAll('.msg .msg-bubble');
   if (messages.length === 0) {
-    showChatToast('No messages to export.');
+    showChatToast(kT('c.chat.no_export'));
     return;
   }
   
-  let text = "Kounselia Session Export\n\n";
+  let text = kT('c.export.title') + "\n\n";
   document.querySelectorAll('.msg').forEach(m => {
     const isAi = m.classList.contains('ai');
-    const sender = isAi ? (cur ? cur.name : 'Counselor') : 'Me';
+    const sender = isAi ? (cur ? cur.name : kT('c.export.counselor')) : kT('c.export.me');
     const content = m.querySelector('.msg-bubble').innerText.trim();
     text += sender + ":\n" + content + "\n\n";
   });
@@ -211,11 +223,11 @@ async function fetchAndDisplayHistory(e) {
       });
       scrollBot();
     } else {
-      showChatToast('No previous history found.');
+      showChatToast(kT('c.chat.history_empty'));
     }
   } catch(err) {
     icon.className = 'ti ti-history';
-    showChatToast("Couldn't load your history. Please check your connection and try again.");
+    showChatToast(kT('c.chat.history_error'));
   }
 }
 
@@ -226,9 +238,9 @@ function copyAiMsg(btn) {
   navigator.clipboard.writeText(text).then(() => {
     const icon = btn.querySelector('i');
     icon.className = 'ti ti-check action-pulse';
-    showChatToast('Message copied to clipboard');
+    showChatToast(kT('c.chat.copied'));
     setTimeout(() => icon.className = 'ti ti-copy', 2000);
-  }).catch(() => showChatToast('Failed to copy text'));
+  }).catch(() => showChatToast(kT('c.msg.copy_failed_plain')));
 }
 
 function applyRatingUI(bar, type) {
@@ -243,7 +255,7 @@ function applyRatingUI(bar, type) {
 
 async function rateAiMsg(btn, msgId, type) {
   const bar = btn.parentElement;
-  if(!msgId) { showChatToast("This message can't be rated."); return; }
+  if(!msgId) { showChatToast(kT('c.chat.cant_rate')); return; }
   if(bar.dataset.saving === '1' || bar.dataset.rating === type) return;
 
   const previous = bar.dataset.rating || null;
@@ -256,10 +268,10 @@ async function rateAiMsg(btn, msgId, type) {
     const r = await fetch(KOUNSELIA.ajaxUrl, {method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:params});
     const json = await r.json();
     if(!json.success) throw new Error('rate failed');
-    showChatToast(type === 'up' ? 'Thanks for the feedback!' : 'Feedback recorded.');
+    showChatToast(type === 'up' ? kT('c.msg.thanks') : kT('c.msg.recorded'));
   } catch(err) {
     applyRatingUI(bar, previous);
-    showChatToast("Couldn't save your feedback. Please try again.");
+    showChatToast(kT('c.msg.feedback_failed'));
   } finally {
     bar.dataset.saving = '0';
   }
@@ -268,7 +280,7 @@ async function rateAiMsg(btn, msgId, type) {
 async function startChat(id){
   cur=C[id];curSlug=id;curSessionId=0;msgCount=0;typing=false;userMessagesSinceSync=0;
   stopVoiceActivity(true); // Force abort any active recording
-  if(typeof liveCallActive!=='undefined'&&liveCallActive) endVoiceCall();
+  if(typeof liveCallActive!=='undefined'&&(liveCallActive||liveCallConnecting)) endVoiceCall();
   
   document.getElementById('chat-name').textContent=cur.name;
   document.getElementById('chat-spec').textContent=cur.spec;
@@ -289,7 +301,7 @@ async function startChat(id){
   showScreen('chat');
   if(location.hash!=='#'+id) history.replaceState(null,'','#'+id);
 
-  const greeting = cur.greeting || `Hello. I am ${cur.name}. Where would you like to start today?`;
+  const greeting = cur.greeting || kT('c.chat.greeting_default',{name:cur.name});
   setTimeout(()=>aiMsg(greeting),600);
 }
 
@@ -313,7 +325,7 @@ function showScreen(id){
 }
 
 function goBack(){
-  if(typeof liveCallActive!=='undefined'&&liveCallActive) endVoiceCall();
+  if(typeof liveCallActive!=='undefined'&&(liveCallActive||liveCallConnecting)) endVoiceCall();
   stopVoiceActivity(true);
   if(location.hash) history.replaceState(null,'',location.pathname+location.search);
   if(document.getElementById('landing')){
@@ -324,7 +336,7 @@ function goBack(){
 }
 
 function aiMsg(text){
-  text = text || "Hello.";
+  text = text || kT('c.chat.hello');
   typing=true;
   document.getElementById('dynamic-fab').disabled=true;
   
@@ -346,7 +358,7 @@ function renderUserBubble(text){
   m.innerHTML=`
     <div>
       <div class="msg-bubble">${esc(text)}</div>
-      <div class="msg-time" style="text-align:right; margin-top:6px; margin-right:4px;">${now()}</div>
+      <div class="msg-time" style="text-align:end; margin-top:6px; margin-inline-end:4px;">${now()}</div>
     </div>
     <div class="msg-av" style="background:var(--accent-light);color:var(--accent);font-size:12px;font-weight:600">${loggedIn?'U':'G'}</div>`;
   wrap.appendChild(m);
@@ -364,11 +376,11 @@ function renderAiBubble(text, messageId, consulted, rating){
   // Display the Team Collaboration Badge if the AI consulted its peers
   let consultHtml = '';
   if (consulted && consulted.length > 0) {
-    consultHtml = `<div style="font-size: 10px; color: var(--gold); font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 4px;"><i class="ti ti-users"></i> Consulted ${consulted.join(' & ')}</div>`;
+    consultHtml = `<div style="font-size: 10px; color: var(--gold); font-weight: 700; margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; display: flex; align-items: center; gap: 4px;"><i class="ti ti-users"></i> ${esc(kT('c.msg.consulted',{names:consulted.join(' & ')}))}</div>`;
   }
 
   const b64Text = btoa(unescape(encodeURIComponent(text)));
-  const playBtn=messageId?`<button class="voice-play-btn" onclick="playVoice(${messageId},this)" aria-label="Listen" title="Listen"><i class="ti ti-volume"></i></button>`:'';
+  const playBtn=messageId?`<button class="voice-play-btn" onclick="playVoice(${messageId},this)" aria-label="${kT('c.msg.listen')}" title="${kT('c.msg.listen')}"><i class="ti ti-volume"></i></button>`:'';
   
   m.innerHTML=`
     <div class="msg-av ${cur.av}"><i class="ti ${cur.icon}" style="font-size:13px"></i></div>
@@ -376,12 +388,12 @@ function renderAiBubble(text, messageId, consulted, rating){
       ${consultHtml}
       <div class="msg-bubble"><p>${html}</p></div>
       <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-        <div class="msg-time" style="margin-top:6px; margin-left:4px;">${now()}${playBtn}</div>
+        <div class="msg-time" style="margin-top:6px; margin-inline-start:4px;">${now()}${playBtn}</div>
       </div>
       <div class="msg-feedback-bar">
-        <button class="msg-fb-btn" data-raw="${b64Text}" onclick="copyAiMsg(this)" title="Copy"><i class="ti ti-copy"></i></button>
-        <button class="msg-fb-btn" onclick="rateAiMsg(this, ${messageId || 0}, 'up')" title="Helpful"><i class="ti ti-thumb-up"></i></button>
-        <button class="msg-fb-btn" onclick="rateAiMsg(this, ${messageId || 0}, 'down')" title="Not Helpful"><i class="ti ti-thumb-down"></i></button>
+        <button class="msg-fb-btn" data-raw="${b64Text}" onclick="copyAiMsg(this)" title="${kT('c.msg.copy')}"><i class="ti ti-copy"></i></button>
+        <button class="msg-fb-btn" onclick="rateAiMsg(this, ${messageId || 0}, 'up')" title="${kT('c.msg.helpful')}"><i class="ti ti-thumb-up"></i></button>
+        <button class="msg-fb-btn" onclick="rateAiMsg(this, ${messageId || 0}, 'down')" title="${kT('c.msg.not_helpful')}"><i class="ti ti-thumb-down"></i></button>
       </div>
     </div>`;
   wrap.appendChild(m);
@@ -405,7 +417,7 @@ function showTyping(){
     if (ind) {
       const bubble = ind.querySelector('.msg-bubble');
       if (bubble) {
-        bubble.innerHTML = `<div style="display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;"><i class="ti ti-users"></i> Consulting Team<span class="dot" style="margin-left:2px;background:var(--gold)"></span><span class="dot" style="background:var(--gold)"></span><span class="dot" style="background:var(--gold)"></span></div>`;
+        bubble.innerHTML = `<div style="display:flex;gap:6px;align-items:center;font-size:11px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:0.5px;"><i class="ti ti-users"></i> ${esc(kT('c.typing.consulting'))}<span class="dot" style="margin-inline-start:2px;background:var(--gold)"></span><span class="dot" style="background:var(--gold)"></span><span class="dot" style="background:var(--gold)"></span></div>`;
       }
     }
   }, 3500); 
@@ -493,18 +505,18 @@ async function sendMessage(){
       if(data.daily_limit){
         document.getElementById('limit-area').innerHTML=`<div class="limit-banner">
           <i class="ti ti-lock"></i>
-          <span>${esc(data.message||"You've reached today's guest limit.")} <a onclick="openModal('register')">Sign up free</a> to keep going.</span></div>`;
+          <span>${limitSentence(kT('c.limit.daily_cta',{message:data.message||kT('c.limit.daily_default'),link:'\u0001'}),kT('c.limit.hard_link'))}</span></div>`;
         document.getElementById('chat-input').disabled=true;
         document.getElementById('dynamic-fab').disabled=true;
       } else {
-        renderAiBubble(data.message||"I'm having trouble connecting right now. Please try again in a moment.");
+        renderAiBubble(data.message||kT('c.chat.trouble'));
         document.getElementById('dynamic-fab').disabled=false;
       }
     }
   }catch(err){
     hideTyping();
     typing=false;
-    renderAiBubble("I'm having trouble connecting right now. Please check your connection and try again.");
+    renderAiBubble(kT('c.chat.trouble_network'));
     document.getElementById('dynamic-fab').disabled=false;
   }
 }
@@ -526,16 +538,23 @@ function triggerMemorySynthesis() {
     .catch(e => false);
 }
 
+// A sentence holding a link marker, with the sign-up link put where the language wants it.
+function limitSentence(text,label){
+  const i=text.indexOf('\u0001');
+  if(i<0) return esc(text);
+  return esc(text.slice(0,i))+'<a onclick="openModal(\'register\')">'+esc(label)+'</a>'+esc(text.slice(i+1));
+}
+
 function softNudge(){
   document.getElementById('limit-area').innerHTML=`<div class="limit-banner">
     <i class="ti ti-info-circle"></i>
-    <span>One message left as a guest. <a onclick="openModal('register')">Create a free account</a> to keep going and save this session.</span></div>`;
+    <span>${limitSentence(kT('c.limit.soft',{link:'\u0001'}),kT('c.limit.soft_link'))}</span></div>`;
 }
 
 function showBlock(){
   document.getElementById('limit-area').innerHTML=`<div class="limit-banner">
     <i class="ti ti-lock"></i>
-    <span>You have reached the guest limit. <a onclick="openModal('register')">Sign up free</a> to continue and save your progress.</span></div>`;
+    <span>${limitSentence(kT('c.limit.hard_plain',{link:'\u0001'}),kT('c.limit.hard_link'))}</span></div>`;
   document.getElementById('chat-input').disabled=true;
   document.getElementById('dynamic-fab').disabled=true;
 }
@@ -558,7 +577,7 @@ function toggleVoiceInput() {
   }
 
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-    alert("Voice input isn't supported in this browser yet. Try Chrome, Edge, or Safari.");
+    alert(kT('c.dictation.unsupported'));
     return;
   }
 
@@ -610,7 +629,7 @@ function toggleVoiceInput() {
       console.error("Mic error: ", err);
       listening = false;
       updateMicUI();
-      alert("Microphone access denied or unavailable.");
+      alert(kT('c.dictation.denied'));
     });
 }
 
@@ -643,10 +662,10 @@ async function transcribeDictation(blob, mimeType) {
         handleInputStyling(inp);
         inp.focus();
       } else {
-        showChatToast(json.data && json.data.message ? json.data.message : "Could not transcribe audio.");
+        showChatToast(json.data && json.data.message ? json.data.message : kT('c.dictation.transcribe_failed'));
       }
     } catch (err) {
-      showChatToast("Network error during transcription.");
+      showChatToast(kT('c.dictation.network'));
     } finally {
       isTranscribing = false;
       updateMicUI();
@@ -739,24 +758,32 @@ function playVoice(messageId,btnEl){
       };
       audio.onended=resetBtn;
       audio.onerror=resetBtn;
-      audio.play().catch(()=>{ resetBtn(); showChatToast("Couldn't play this message."); });
+      audio.play().catch(()=>{ resetBtn(); showChatToast(kT('c.msg.play_failed_short')); });
     } else {
       btnEl.innerHTML='<i class="ti ti-volume"></i>';
-      showChatToast((json.data && json.data.message) || "Couldn't play this message. Please try again.");
+      showChatToast((json.data && json.data.message) || kT('c.msg.play_failed_retry'));
     }
   })
   .catch(()=>{
     btnEl.classList.remove('loading');
     btnEl.innerHTML='<i class="ti ti-volume"></i>';
-    showChatToast("Couldn't play this message. Please check your connection and try again.");
+    showChatToast(kT('c.msg.play_failed'));
   });
 }
 
 function handleKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendMessage();}}
 function autoResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,120)+'px';}
 function scrollBot(){const w=document.getElementById('messages');w.scrollTop=w.scrollHeight;}
-function now(){return new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}
+function now(){return new Date().toLocaleTimeString((window.KOUNSELIA&&KOUNSELIA.language)||[],{hour:'2-digit',minute:'2-digit'});}
 function esc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// A sentence with a {link} marker, put into HTML with the link where the language wants it.
+function modalLinkSentence(key,onclick,labelKey){
+  const text=kT(key,{link:'\u0001'});
+  const i=text.indexOf('\u0001');
+  if(i<0) return esc(text);
+  return esc(text.slice(0,i))+'<a onclick="'+onclick+'">'+kH(labelKey)+'</a>'+esc(text.slice(i+1));
+}
 
 function openModal(type){
   const overlay = document.getElementById('modal-overlay');
@@ -766,45 +793,45 @@ function openModal(type){
   
   const c=document.getElementById('modal-content');
   if(type==='login'){
-    c.innerHTML=`<h2>Welcome back</h2>
-      <p class="sub">Your sessions and progress, right where you left off.</p>
-      <div class="form-field"><label>Email address</label><input type="email" id="l-e" placeholder="you@example.com" autocomplete="email"></div>
+    c.innerHTML=`<h2>${kH('c.auth.login_title')}</h2>
+      <p class="sub">${kH('c.auth.login_sub')}</p>
+      <div class="form-field"><label>${kH('c.auth.email')}</label><input type="email" id="l-e" placeholder="you@example.com" autocomplete="email"></div>
       <div class="form-field">
-        <label>Password</label>
+        <label>${kH('c.auth.password')}</label>
         <div class="pw-wrap">
           <input type="password" id="l-p" class="pw-input" placeholder="••••••••" autocomplete="current-password">
-          <button type="button" class="pw-toggle" onclick="togglePw('l-p', this)"><i class="ti ti-eye"></i></button>
+          <button type="button" class="pw-toggle" aria-label="${kH('c.auth.show_password')}" onclick="togglePw('l-p', this)"><i class="ti ti-eye"></i></button>
         </div>
-        <p style="text-align:right;margin-top:8px"><a onclick="openModal('forgot')" style="font-size:13px;color:var(--accent);cursor:pointer;text-decoration:none;font-weight:500">Forgot your password?</a></p>
+        <p style="text-align:end;margin-top:8px"><a onclick="openModal('forgot')" style="font-size:13px;color:var(--accent);cursor:pointer;text-decoration:none;font-weight:500">${kH('c.auth.forgot_link')}</a></p>
       </div>
       <input type="text" id="l-hp" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
-      <button class="modal-btn" onclick="doLogin()">Sign in</button>
-      <p class="modal-switch">No account? <a onclick="openModal('register')">Create one free</a></p>`;
+      <button class="modal-btn" onclick="doLogin()">${kH('c.auth.sign_in')}</button>
+      <p class="modal-switch">${modalLinkSentence('c.auth.no_account',"openModal('register')",'c.auth.create_free_link')}</p>`;
   } else if(type==='forgot'){
-    c.innerHTML=`<h2>Reset your password</h2>
-      <p class="sub">Enter the email on your account and we will send you a link to set a new password.</p>
-      <div class="form-field"><label>Email address</label><input type="email" id="f-e" placeholder="you@example.com" autocomplete="email"></div>
+    c.innerHTML=`<h2>${kH('c.auth.reset_title')}</h2>
+      <p class="sub">${kH('c.auth.reset_sub')}</p>
+      <div class="form-field"><label>${kH('c.auth.email')}</label><input type="email" id="f-e" placeholder="you@example.com" autocomplete="email"></div>
       <input type="text" id="f-hp" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
-      <button class="modal-btn" onclick="doForgotPassword()">Send reset link</button>
-      <p class="modal-switch"><a onclick="openModal('login')">Back to sign in</a></p>`;
+      <button class="modal-btn" onclick="doForgotPassword()">${kH('c.auth.send_reset')}</button>
+      <p class="modal-switch"><a onclick="openModal('login')">${kH('c.auth.back_to_signin')}</a></p>`;
   } else if(type==='register') {
-    c.innerHTML=`<h2>Create your account</h2>
-      <p class="sub">Free to start. Save sessions, track your journey, never start over.</p>
-      <div class="form-field"><label>Full name</label><input type="text" id="r-n" placeholder="Your name" autocomplete="name"></div>
-      <div class="form-field"><label>Email address</label><input type="email" id="r-e" placeholder="you@example.com" autocomplete="email"></div>
+    c.innerHTML=`<h2>${kH('c.auth.create_title')}</h2>
+      <p class="sub">${kH('c.auth.create_sub')}</p>
+      <div class="form-field"><label>${kH('c.auth.full_name')}</label><input type="text" id="r-n" placeholder="${kH('c.auth.your_name')}" autocomplete="name"></div>
+      <div class="form-field"><label>${kH('c.auth.email')}</label><input type="email" id="r-e" placeholder="you@example.com" autocomplete="email"></div>
       <div class="form-field">
-        <label>Password</label>
+        <label>${kH('c.auth.password')}</label>
         <div class="pw-wrap">
-          <input type="password" id="r-p" class="pw-input" placeholder="Create a password" autocomplete="new-password">
-          <button type="button" class="pw-toggle" onclick="togglePw('r-p', this)"><i class="ti ti-eye"></i></button>
+          <input type="password" id="r-p" class="pw-input" placeholder="${kH('c.auth.create_password')}" autocomplete="new-password">
+          <button type="button" class="pw-toggle" aria-label="${kH('c.auth.show_password')}" onclick="togglePw('r-p', this)"><i class="ti ti-eye"></i></button>
         </div>
       </div>
       <input type="text" id="r-hp" name="website" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
-      <button class="modal-btn" onclick="doRegister()">Create free account</button>
-      <p class="modal-switch">Already have an account? <a onclick="openModal('login')">Sign in</a></p>
+      <button class="modal-btn" onclick="doRegister()">${kH('c.auth.create_btn')}</button>
+      <p class="modal-switch">${modalLinkSentence('c.auth.have_account',"openModal('login')",'c.auth.sign_in')}</p>
       <a class="apply-pro-card" href="/apply.php">
         <span class="apply-pro-icon"><i class="ti ti-briefcase"></i></span>
-        <span class="apply-pro-text"><strong>Licensed therapist or counselor?</strong><span>Apply as a professional and join our care team</span></span>
+        <span class="apply-pro-text"><strong>${kH('c.auth.apply_q')}</strong><span>${kH('c.auth.apply_card')}</span></span>
         <span class="apply-pro-arrow"><i class="ti ti-arrow-right"></i></span>
       </a>`;
   }
@@ -816,9 +843,11 @@ function togglePw(id, btn) {
   if (inp.type === 'password') {
     inp.type = 'text';
     icon.className = 'ti ti-eye-off';
+    btn.setAttribute('aria-label', kT('c.auth.hide_password'));
   } else {
     inp.type = 'password';
     icon.className = 'ti ti-eye';
+    btn.setAttribute('aria-label', kT('c.auth.show_password'));
   }
 }
 
@@ -826,9 +855,9 @@ function doLogin(){
   const e=document.getElementById('l-e').value.trim();
   const p=document.getElementById('l-p').value;
   const hp=document.getElementById('l-hp').value;
-  if(!e||!p){alert('Please enter your credentials.');return;}
+  if(!e||!p){alert(kT('c.auth.enter_credentials'));return;}
   const btn=document.querySelector('#modal-content .modal-btn');
-  if(btn){btn.disabled=true;btn.textContent='Signing in...';}
+  if(btn){btn.disabled=true;btn.textContent=kT('c.auth.signing_in');}
   fetch(KOUNSELIA.ajaxUrl,{
     method:'POST',
     headers:{'Content-Type':'application/x-www-form-urlencoded'},
@@ -840,16 +869,16 @@ function doLogin(){
       loggedIn=true;
       if(res.data.nonce) KOUNSELIA.nonce=res.data.nonce;
       unlockChat();
-      authSuccess('Welcome back, '+res.data.name+'.',true);
+      authSuccess(res.data.name?kT('c.auth.welcome_back',{name:res.data.name}):kT('c.auth.welcome_back_anon'),true);
       updateUserUI(res.data.name);
     } else {
-      alert(res.data && res.data.message ? res.data.message : 'Sign in failed, please try again.');
-      if(btn){btn.disabled=false;btn.textContent='Sign in';}
+      alert(res.data && res.data.message ? res.data.message : kT('c.auth.signin_failed'));
+      if(btn){btn.disabled=false;btn.textContent=kT('c.auth.sign_in');}
     }
   })
   .catch(()=>{
-    alert('Something went wrong, please check your connection and try again.');
-    if(btn){btn.disabled=false;btn.textContent='Sign in';}
+    alert(kT('c.auth.network_error'));
+    if(btn){btn.disabled=false;btn.textContent=kT('c.auth.sign_in');}
   });
 }
 
@@ -858,9 +887,9 @@ function doRegister(){
   const e=document.getElementById('r-e').value.trim();
   const p=document.getElementById('r-p').value;
   const hp=document.getElementById('r-hp').value;
-  if(!n||!e||!p){alert('Please fill in all fields.');return;}
+  if(!n||!e||!p){alert(kT('c.auth.fill_all'));return;}
   const btn=document.querySelector('#modal-content .modal-btn');
-  if(btn){btn.disabled=true;btn.textContent='Creating account...';}
+  if(btn){btn.disabled=true;btn.textContent=kT('c.auth.creating');}
   fetch(KOUNSELIA.ajaxUrl,{
     method:'POST',
     headers:{'Content-Type':'application/x-www-form-urlencoded'},
@@ -873,25 +902,25 @@ function doRegister(){
       if(res.data.nonce) KOUNSELIA.nonce=res.data.nonce;
       unlockChat();
       const fname=res.data.name.split(' ')[0]||res.data.name;
-      authSuccess('Welcome to Kounselia, '+fname+'.',false);
+      authSuccess(fname?kT('c.auth.welcome_new',{name:fname}):kT('c.auth.welcome_new_anon'),false);
       updateUserUI(fname);
     } else {
-      alert(res.data && res.data.message ? res.data.message : 'Could not create your account, please try again.');
-      if(btn){btn.disabled=false;btn.textContent='Create free account';}
+      alert(res.data && res.data.message ? res.data.message : kT('c.auth.register_failed'));
+      if(btn){btn.disabled=false;btn.textContent=kT('c.auth.create_btn');}
     }
   })
   .catch(()=>{
-    alert('Something went wrong, please check your connection and try again.');
-    if(btn){btn.disabled=false;btn.textContent='Create free account';}
+    alert(kT('c.auth.network_error'));
+    if(btn){btn.disabled=false;btn.textContent=kT('c.auth.create_btn');}
   });
 }
 
 function doForgotPassword(){
   const e=document.getElementById('f-e').value.trim();
   const hp=document.getElementById('f-hp').value;
-  if(!e){alert('Please enter your email address.');return;}
+  if(!e){alert(kT('c.auth.enter_email'));return;}
   const btn=document.querySelector('#modal-content .modal-btn');
-  if(btn){btn.disabled=true;btn.textContent='Sending...';}
+  if(btn){btn.disabled=true;btn.textContent=kT('c.auth.sending');}
   fetch(KOUNSELIA.ajaxUrl,{
     method:'POST',
     headers:{'Content-Type':'application/x-www-form-urlencoded'},
@@ -901,17 +930,17 @@ function doForgotPassword(){
   .then(res=>{
     if(res.success){
       const c=document.getElementById('modal-content');
-      c.innerHTML=`<h2>Check your email</h2>
-        <p class="sub">If an account exists for ${esc(e)}, a password reset link is on its way. It can take a few minutes to arrive.</p>
-        <button class="modal-btn" onclick="openModal('login')">Back to sign in</button>`;
+      c.innerHTML=`<h2>${kH('c.auth.check_email')}</h2>
+        <p class="sub">${kH('c.auth.reset_sent',{email:e})}</p>
+        <button class="modal-btn" onclick="openModal('login')">${kH('c.auth.back_to_signin')}</button>`;
     } else {
-      if(btn){btn.disabled=false;btn.textContent='Send reset link';}
-      alert(res.data && res.data.message ? res.data.message : 'Could not send the reset link, please try again.');
+      if(btn){btn.disabled=false;btn.textContent=kT('c.auth.send_reset');}
+      alert(res.data && res.data.message ? res.data.message : kT('c.auth.reset_failed'));
     }
   })
   .catch(()=>{
-    if(btn){btn.disabled=false;btn.textContent='Send reset link';}
-    alert('Something went wrong, please check your connection and try again.');
+    if(btn){btn.disabled=false;btn.textContent=kT('c.auth.send_reset');}
+    alert(kT('c.auth.network_error'));
   });
 }
 
@@ -923,7 +952,7 @@ function updateUserUI(name) {
       <div class="user-menu">
         <div class="user-av">${init}</div>
         <span class="user-name">${name}</span>
-        <button class="btn-ghost" onclick="logout()" style="padding: 7px 16px;">Sign out</button>
+        <button class="btn-ghost" onclick="logout()" style="padding: 7px 16px;">${kH('c.nav.sign_out')}</button>
       </div>
     `;
   }
@@ -941,8 +970,8 @@ function logout() {
     const navRight = document.getElementById('nav-right');
     if(navRight) {
       navRight.innerHTML = `
-        <button class="btn-ghost" onclick="openModal('login')">Sign in</button>
-        <button class="btn-nav-primary" onclick="openModal('register')">Start free</button>
+        <button class="btn-ghost" onclick="openModal('login')">${kH('c.auth.sign_in')}</button>
+        <button class="btn-nav-primary" onclick="openModal('register')">${kH('c.nav.start_free')}</button>
       `;
     }
     const gn = document.getElementById('guest-note');
@@ -969,18 +998,18 @@ function authSuccess(msg,pro){
   if(back){ window.location.href=back; return; }
   const isChatActive = (curSlug !== null && curSlug !== '');
   const btnAction = isChatActive ? "closeModal()" : "window.location.href='/dashboard.php'";
-  const btnText = isChatActive ? "Continue my session" : "Go to your dashboard";
+  const btnText = isChatActive ? kT('c.auth.continue') : kT('c.auth.dashboard');
 
   document.getElementById('modal-content').innerHTML=`
     <div class="success-wrap">
       <div class="success-icon"><i class="ti ti-check"></i></div>
-      <h2 style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:500;margin-bottom:10px">${msg}</h2>
-      <p style="font-size:15px;color:var(--text2);font-weight:400;line-height:1.65">Your sessions are now saved. Unlimited conversations on the free plan.</p>
-      ${pro?`<div class="pro-card"><h4>Upgrade to Pro</h4>
-        <p>Deep session memory, structured 30 day programs, and priority access to all counselors.</p>
-        <button onclick="${btnAction}">See Pro plans</button></div>`:''}
-      <button class="modal-btn" style="margin-top:24px" onclick="${btnAction}">${btnText}</button>
-      ${isChatActive ? `<p class="modal-switch"><a href="/dashboard.php">Go to your dashboard →</a></p>` : ''}
+      <h2 style="font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:500;margin-bottom:10px">${esc(msg)}</h2>
+      <p style="font-size:15px;color:var(--text2);font-weight:400;line-height:1.65">${kH('c.auth.saved')}</p>
+      ${pro?`<div class="pro-card"><h4>${kH('c.auth.pro_title')}</h4>
+        <p>${kH('c.auth.pro_body')}</p>
+        <button onclick="${btnAction}">${kH('c.auth.see_pro')}</button></div>`:''}
+      <button class="modal-btn" style="margin-top:24px" onclick="${btnAction}">${esc(btnText)}</button>
+      ${isChatActive ? `<p class="modal-switch"><a href="/dashboard.php">${kH('c.auth.dashboard_arrow')}</a></p>` : ''}
     </div>`;
 }
 
@@ -1002,21 +1031,31 @@ function fmtTimer(s){
   return String(m).padStart(2,'0')+':'+String(sec).padStart(2,'0');
 }
 
+// Must run straight from the member's tap: browsers (Safari on iPhone
+// and iPad especially) only let sound play, and the microphone feed flow,
+// for audio set up during a tap. Setting the audio up later, after waiting
+// on the network, left those calls silent both ways.
 async function startVoiceCall(){
   if(!cur||!(cur.voice||parseInt(cur.voice_enabled)===1||cur.voice_enabled===true)){return;}
   if(!loggedIn){openModal('login');return;}
   if(liveCallActive||liveCallConnecting) return;
-  liveCallConnecting=true;
-  if(!('mediaDevices' in navigator)||!window.AudioWorklet||!window.WebSocket){
-    alert("Voice calls need a modern browser (Chrome, Edge, or Safari) with microphone support.");
-    liveCallConnecting=false;
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia||!window.AudioWorklet||!window.WebSocket){
+    alert(kT('c.call.unsupported'));
     return;
   }
+  liveCallConnecting=true;
   stopVoiceActivity(true);
+
+  liveAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  livePlaybackCtx=new (window.AudioContext||window.webkitAudioContext)();
+  liveAudioCtx.resume().catch(()=>{});
+  livePlaybackCtx.resume().catch(()=>{});
+  liveNextStartTime=livePlaybackCtx.currentTime;
+  liveUserUtterance='';liveBotUtterance='';liveUserFlushed=true;
 
   const overlay=document.getElementById('call-overlay');
   overlay.classList.add('active');
-  document.getElementById('call-status').textContent='Connecting…';
+  document.getElementById('call-status').textContent=kT('c.call.connecting');
   document.getElementById('call-name').textContent=cur.name;
   document.getElementById('call-avatar').innerHTML=`<i class="ti ${cur.icon}"></i>`;
   document.getElementById('call-avatar').className='call-avatar '+cur.av;
@@ -1026,14 +1065,32 @@ async function startVoiceCall(){
   liveMuted=false;
   updateMuteUI();
 
+  // The member hung up while we were waiting on something.
+  const hungUp=()=>!liveCallConnecting;
+  // Shows why the call couldn't go ahead, then closes the call screen.
+  const giveUp=(text,delay)=>{
+    releaseVoiceCall();
+    document.getElementById('call-status').textContent=text;
+    setTimeout(endVoiceCall,delay||2200);
+  };
+
+  let stream;
   try{
-    liveMicStream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true}});
+    stream=await navigator.mediaDevices.getUserMedia({audio:{channelCount:1,echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
   }catch(err){
-    document.getElementById('call-status').textContent='Microphone access was denied.';
-    liveCallConnecting=false;
-    setTimeout(endVoiceCall,1800);
+    if(!hungUp()) giveUp(kT('c.call.mic_blocked'),3000);
     return;
   }
+  if(hungUp()){ stream.getTracks().forEach(t=>t.stop()); return; }
+  liveMicStream=stream;
+
+  try{
+    await startMicCapture();
+  }catch(err){
+    if(!hungUp()) giveUp(kT('c.call.mic_failed'));
+    return;
+  }
+  if(hungUp()) return;
 
   const params=new URLSearchParams({action:'kounselia_voice_token',nonce:KOUNSELIA.nonce,counselor:curSlug,session_id:curSessionId||0});
   let tokenRes;
@@ -1041,15 +1098,12 @@ async function startVoiceCall(){
     const r=await fetch(KOUNSELIA.ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:params});
     tokenRes=await r.json();
   }catch(err){
-    document.getElementById('call-status').textContent="Couldn't connect, please try again.";
-    liveCallConnecting=false;
-    setTimeout(endVoiceCall,1800);
+    if(!hungUp()) giveUp(kT('c.call.connect_failed'),1800);
     return;
   }
+  if(hungUp()) return;
   if(!tokenRes.success){
-    document.getElementById('call-status').textContent=(tokenRes.data&&tokenRes.data.message)||"Voice isn't available right now.";
-    liveCallConnecting=false;
-    setTimeout(endVoiceCall,2200);
+    giveUp((tokenRes.data&&tokenRes.data.message)||kT('c.call.unavailable'));
     return;
   }
 
@@ -1060,29 +1114,33 @@ async function startVoiceCall(){
   liveSecondsLeft=liveAllowedSeconds;
   document.getElementById('call-timer').textContent=fmtTimer(liveSecondsLeft);
   if(data.plan==='free'){
-    document.getElementById('call-plan-note').innerHTML='Free members get '+Math.round(liveAllowedSeconds/60)+' minutes per call. <a href="/dashboard.php#upgrade">Upgrade to Pro</a> for longer sessions.';
+    (function(){
+      const note=kT('c.call.free_note',{minutes:Math.round(liveAllowedSeconds/60),link:'\u0001'});
+      const i=note.indexOf('\u0001');
+      document.getElementById('call-plan-note').innerHTML=i<0?esc(note):esc(note.slice(0,i))+'<a href="/dashboard.php#upgrade">'+kH('c.call.upgrade_link')+'</a>'+esc(note.slice(i+1));
+    })();
   }
 
   try{
     await connectLiveSession(data.token,data.model);
     liveCallConnecting=false;
   }catch(err){
-    document.getElementById('call-status').textContent="Couldn't start the call, please try again.";
-    liveCallConnecting=false;
-    setTimeout(endVoiceCall,1800);
+    if(!hungUp()) giveUp(kT('c.call.start_failed'),1800);
   }
 }
 
 function connectLiveSession(token,model){
   return new Promise((resolve,reject)=>{
     const url='wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1alpha.GenerativeService.BidiGenerateContentConstrained?access_token='+encodeURIComponent(token);
-    liveWs=new WebSocket(url);
+    const ws=new WebSocket(url);
+    liveWs=ws;
 
-    liveWs.onopen=function(){
-      liveWs.send(JSON.stringify({setup:{model:'models/'+model}}));
+    ws.onopen=function(){
+      ws.send(JSON.stringify({setup:{model:'models/'+model}}));
     };
 
-    liveWs.onmessage=async function(evt){
+    ws.onmessage=async function(evt){
+      if(liveWs!==ws) return; // From a call that already ended.
       let msg;
       try{
         const raw=(evt.data instanceof Blob)?await evt.data.text():evt.data;
@@ -1091,9 +1149,8 @@ function connectLiveSession(token,model){
 
       if(msg.setupComplete){
         liveCallActive=true;
-        document.getElementById('call-status').textContent='Listening…';
+        document.getElementById('call-status').textContent=kT('c.call.listening');
         startVoiceTimer();
-        startMicCapture();
         resolve();
         return;
       }
@@ -1105,14 +1162,18 @@ function connectLiveSession(token,model){
           flushBotTranscript();
         }
 
+        // Each message carries the next chunk of speech, not the whole
+        // thing said so far, so the chunks must be joined. Otherwise only
+        // the last few words are kept, the caption flickers word by word,
+        // and the chat history gets fragments instead of what was said.
         if(sc.inputTranscription&&typeof sc.inputTranscription.text==='string'){
-          liveUserUtterance=sc.inputTranscription.text;
+          liveUserUtterance+=sc.inputTranscription.text;
           liveUserFlushed=false;
         }
         if(sc.outputTranscription&&typeof sc.outputTranscription.text==='string'){
           if(!liveUserFlushed){flushUserTranscript();}
-          liveBotUtterance=sc.outputTranscription.text;
-          document.getElementById('call-status').textContent='Speaking…';
+          liveBotUtterance+=sc.outputTranscription.text;
+          document.getElementById('call-status').textContent=kT('c.call.speaking');
           document.getElementById('call-ring').classList.add('speaking');
           document.getElementById('call-caption').textContent=liveBotUtterance;
         }
@@ -1128,49 +1189,61 @@ function connectLiveSession(token,model){
 
         if(sc.turnComplete){
           flushBotTranscript();
-          document.getElementById('call-status').textContent='Listening…';
+          document.getElementById('call-status').textContent=kT('c.call.listening');
           document.getElementById('call-ring').classList.remove('speaking');
         }
       }
 
       if(msg.goAway){
-        document.getElementById('call-status').textContent='Call ending…';
-        setTimeout(endVoiceCall,1200);
+        document.getElementById('call-status').textContent=kT('c.call.ending');
+        setTimeout(()=>{ if(liveWs===ws) endVoiceCall(); },1200);
       }
     };
 
-    liveWs.onerror=function(){reject(new Error('ws error'));};
-    liveWs.onclose=function(){
+    ws.onerror=function(){reject(new Error('ws error'));};
+    ws.onclose=function(){
+      if(liveWs!==ws) return; // We closed it ourselves.
       if(liveCallActive){endVoiceCall();}
+      // Closed before the call started (e.g. the pass was refused):
+      // give up rather than stay on "Connecting…" forever.
+      else reject(new Error('closed'));
     };
   });
 }
 
+// Wires the microphone into a converter that turns its sound (usually
+// 44.1 or 48 kHz) into the 16 kHz pieces the service expects. Each output
+// sample is the average of the input samples it covers rather than just
+// one of them, which keeps speech clearer for the speech recognition.
+// Pieces are only sent once the call is live (and not muted).
 async function startMicCapture(){
-  liveAudioCtx=new (window.AudioContext||window.webkitAudioContext)();
-  const src=liveAudioCtx.createMediaStreamSource(liveMicStream);
-
+  const ctx=liveAudioCtx;
   const workletCode=`
     class PCMCaptureProcessor extends AudioWorkletProcessor {
       constructor(){
         super();
-        this.targetRate=16000;
-        this.ratio=sampleRate/this.targetRate;
+        this.ratio=sampleRate/16000;
         this.buf=[];
+        this.out=[];
       }
       process(inputs){
         const ch=inputs[0]&&inputs[0][0];
         if(ch){
           for(let i=0;i<ch.length;i++) this.buf.push(ch[i]);
           const outLen=Math.floor(this.buf.length/this.ratio);
-          if(outLen>0){
-            const out=new Int16Array(outLen);
-            for(let i=0;i<outLen;i++){
-              let s=this.buf[Math.floor(i*this.ratio)];
-              s=Math.max(-1,Math.min(1,s));
-              out[i]=s<0?s*0x8000:s*0x7FFF;
-            }
-            this.buf=this.buf.slice(Math.floor(outLen*this.ratio));
+          for(let i=0;i<outLen;i++){
+            const from=Math.floor(i*this.ratio);
+            const to=Math.max(from+1,Math.floor((i+1)*this.ratio));
+            let s=0;
+            for(let j=from;j<to;j++) s+=this.buf[j];
+            s=Math.max(-1,Math.min(1,s/(to-from)));
+            this.out.push(s<0?s*0x8000:s*0x7FFF);
+          }
+          this.buf=this.buf.slice(Math.floor(outLen*this.ratio));
+          // Send in 0.1 s pieces rather than hundreds of tiny ones a second.
+          if(this.out.length>=1600){
+            const out=Int16Array.from(this.out);
+            this.out=[];
             this.port.postMessage(out.buffer,[out.buffer]);
           }
         }
@@ -1180,11 +1253,14 @@ async function startMicCapture(){
     registerProcessor('pcm-capture-processor',PCMCaptureProcessor);
   `;
   const blobUrl=URL.createObjectURL(new Blob([workletCode],{type:'application/javascript'}));
-  await liveAudioCtx.audioWorklet.addModule(blobUrl);
+  try{ await ctx.audioWorklet.addModule(blobUrl); }
+  finally{ URL.revokeObjectURL(blobUrl); }
+  if(liveAudioCtx!==ctx) return; // Call ended meanwhile.
 
-  liveWorkletNode=new AudioWorkletNode(liveAudioCtx,'pcm-capture-processor');
+  const src=ctx.createMediaStreamSource(liveMicStream);
+  liveWorkletNode=new AudioWorkletNode(ctx,'pcm-capture-processor');
   liveWorkletNode.port.onmessage=function(e){
-    if(liveMuted||!liveWs||liveWs.readyState!==WebSocket.OPEN)return;
+    if(!liveCallActive||liveMuted||!liveWs||liveWs.readyState!==WebSocket.OPEN)return;
     const b64=arrayBufferToBase64(e.data);
     liveWs.send(JSON.stringify({realtimeInput:{audio:{data:b64,mimeType:'audio/pcm;rate=16000'}}}));
   };
@@ -1199,25 +1275,26 @@ function arrayBufferToBase64(buf){
 }
 
 function schedulePlayback(base64Pcm){
-  if(!livePlaybackCtx){
-    livePlaybackCtx=new (window.AudioContext||window.webkitAudioContext)();
-    liveNextStartTime=livePlaybackCtx.currentTime;
-  }
+  const ctx=livePlaybackCtx;
+  if(!ctx) return; // Call ended meanwhile.
+  if(ctx.state==='suspended') ctx.resume().catch(()=>{});
   const binary=atob(base64Pcm);
   const bytes=new Uint8Array(binary.length);
   for(let i=0;i<binary.length;i++) bytes[i]=binary.charCodeAt(i);
-  const int16=new Int16Array(bytes.buffer);
+  const int16=new Int16Array(bytes.buffer,0,bytes.length>>1);
   const float32=new Float32Array(int16.length);
   for(let i=0;i<int16.length;i++) float32[i]=int16[i]/(int16[i]<0?0x8000:0x7FFF);
+  if(!float32.length) return;
 
-  const buffer=livePlaybackCtx.createBuffer(1,float32.length,24000);
-  buffer.copyToChannel(float32,0);
+  const buffer=ctx.createBuffer(1,float32.length,24000);
+  buffer.getChannelData(0).set(float32);
 
-  const source=livePlaybackCtx.createBufferSource();
+  const source=ctx.createBufferSource();
   source.buffer=buffer;
-  source.connect(livePlaybackCtx.destination);
+  source.connect(ctx.destination);
 
-  const startAt=Math.max(livePlaybackCtx.currentTime,liveNextStartTime);
+  // Queue each piece right after the previous one so speech is smooth.
+  const startAt=Math.max(ctx.currentTime,liveNextStartTime);
   source.start(startAt);
   liveNextStartTime=startAt+buffer.duration;
   livePlaybackQueue.push(source);
@@ -1259,8 +1336,9 @@ function startVoiceTimer(){
     liveSecondsLeft--;
     document.getElementById('call-timer').textContent=fmtTimer(liveSecondsLeft);
     if(liveSecondsLeft<=0){
-      document.getElementById('call-status').textContent="Time's up";
-      endVoiceCall();
+      document.getElementById('call-status').textContent=kT('c.call.times_up');
+      releaseVoiceCall();
+      setTimeout(endVoiceCall,900);
     }
   },1000);
 }
@@ -1277,7 +1355,9 @@ function updateMuteUI(){
   btn.innerHTML=liveMuted?'<i class="ti ti-microphone-off"></i>':'<i class="ti ti-microphone"></i>';
 }
 
-function endVoiceCall(){
+// Stops everything the call holds (connection, microphone, sound) but
+// leaves the call screen up. Safe to call more than once.
+function releaseVoiceCall(){
   liveCallActive=false;
   liveCallConnecting=false;
   clearInterval(liveTimerHandle);
@@ -1285,13 +1365,17 @@ function endVoiceCall(){
   flushBotTranscript();
   stopAllPlayback();
 
-  if(liveWs){ try{liveWs.close();}catch(e){} liveWs=null; }
-  if(liveWorkletNode){ try{liveWorkletNode.disconnect();}catch(e){} liveWorkletNode=null; }
-  if(liveAudioCtx){ try{liveAudioCtx.close();}catch(e){} liveAudioCtx=null; }
-  if(livePlaybackCtx){ try{livePlaybackCtx.close();}catch(e){} livePlaybackCtx=null; }
+  // Cleared before closing so the socket's onclose knows it's stale.
+  if(liveWs){ const ws=liveWs; liveWs=null; try{ws.close();}catch(e){} }
+  if(liveWorkletNode){ try{liveWorkletNode.port.onmessage=null;liveWorkletNode.disconnect();}catch(e){} liveWorkletNode=null; }
+  if(liveAudioCtx){ liveAudioCtx.close().catch(()=>{}); liveAudioCtx=null; }
+  if(livePlaybackCtx){ livePlaybackCtx.close().catch(()=>{}); livePlaybackCtx=null; }
   if(liveMicStream){ liveMicStream.getTracks().forEach(t=>t.stop()); liveMicStream=null; }
   liveNextStartTime=0;
+}
 
+function endVoiceCall(){
+  releaseVoiceCall();
   document.getElementById('call-overlay').classList.remove('active');
   document.getElementById('call-ring').classList.remove('speaking');
-}
+}

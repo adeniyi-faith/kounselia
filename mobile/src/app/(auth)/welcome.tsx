@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FlatList, Image, Text, useWindowDimensions, View, type ImageSourcePropType, type NativeScrollEvent, type NativeSyntheticEvent } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
+import { useT } from '@/language';
 import { fonts, makeStyles, radius, shadows } from '@/theme';
 
 // The campaign posters, shown whole: each is sized to the largest it can
@@ -14,17 +15,17 @@ const SLIDES: { key: string; image: ImageSourcePropType; label: string }[] = [
   {
     key: 'no-waiting',
     image: require('../../../assets/onboarding/1-no-waiting.webp'),
-    label: 'No appointments. No waiting. Just support.',
+    label: 'm.welcome.slide1',
   },
   {
     key: 'privacy',
     image: require('../../../assets/onboarding/2-privacy.webp'),
-    label: "We blurred this on purpose. Your privacy isn't a feature. It's a promise.",
+    label: 'm.welcome.slide2',
   },
   {
     key: 'not-alone',
     image: require('../../../assets/onboarding/3-not-alone.webp'),
-    label: "You don't have to carry every thought alone.",
+    label: 'm.welcome.slide3',
   },
 ];
 
@@ -34,6 +35,7 @@ const SIDE_GAP = 24;
 
 export default function Welcome() {
   const styles = useStyles();
+  const t = useT();
   const { width: screenWidth } = useWindowDimensions();
   const [areaHeight, setAreaHeight] = useState(0);
   const [page, setPage] = useState(0);
@@ -74,7 +76,7 @@ export default function Welcome() {
                     resizeMode="contain"
                     accessible
                     accessibilityRole="image"
-                    accessibilityLabel={item.label}
+                    accessibilityLabel={t(item.label)}
                   />
                 </View>
               </View>
@@ -83,21 +85,21 @@ export default function Welcome() {
         )}
       </View>
 
-      <View style={styles.dots} accessibilityRole="adjustable" accessibilityLabel={`Slide ${page + 1} of ${SLIDES.length}`}>
+      <View style={styles.dots} accessibilityRole="adjustable" accessibilityLabel={t('m.welcome.slide_of', { n: page + 1, total: SLIDES.length })}>
         {SLIDES.map((s, i) => (
           <View key={s.key} style={[styles.dot, i === page && styles.dotActive]} />
         ))}
       </View>
 
       <View style={styles.actions}>
-        <Button title="Create a free account" onPress={() => router.push('/sign-up')} />
-        <Button title="I already have an account" variant="ghost" onPress={() => router.push('/sign-in')} />
+        <Button title={t('m.welcome.create_free')} onPress={() => router.push('/sign-up')} />
+        <Button title={t('m.welcome.have_account')} variant="ghost" onPress={() => router.push('/sign-in')} />
         {/* Professionals sign in with "I already have an account" too; this
             is for one who hasn't joined yet (the website's apply.php). */}
         <Text style={styles.pro}>
-          Licensed therapist or counselor?{' '}
+          {t('m.welcome.pro_prompt')}{' '}
           <Text accessibilityRole="link" style={styles.proLink} onPress={() => router.push('/apply')}>
-            Join as a professional
+            {t('m.welcome.pro_join')}
           </Text>
         </Text>
       </View>

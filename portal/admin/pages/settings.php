@@ -207,6 +207,32 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
             }
         }
 
+    // 11F. Video calls: 8x8 hosted Jitsi (no login / no waiting for a host)
+    } elseif ( 'save_jaas_settings' === $kounselia_action
+        && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_jaas' ) ) {
+
+        $app_id = isset( $_POST['jaas_app_id'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['jaas_app_id'] ) ) ) : '';
+        $key_id = isset( $_POST['jaas_key_id'] ) ? trim( sanitize_text_field( wp_unslash( $_POST['jaas_key_id'] ) ) ) : '';
+        // A PEM key spans several lines, so it can't go through sanitize_text_field.
+        $pem    = isset( $_POST['jaas_private_key'] ) ? trim( str_replace( "\r", '', (string) wp_unslash( $_POST['jaas_private_key'] ) ) ) : '';
+        $keep_pem = ( '' === $pem && '' !== $app_id );
+
+        if ( '' !== $app_id && ! preg_match( '/^vpaas-magic-cookie-[a-f0-9]+$/i', $app_id ) ) {
+            $kounselia_error = 'That App ID doesn\'t look right. 8x8 App IDs start with vpaas-magic-cookie-.';
+        } elseif ( '' !== $pem && ! openssl_pkey_get_private( $pem ) ) {
+            $kounselia_error = 'That private key couldn\'t be read. Paste the whole .pk file, including the -----BEGIN and -----END lines.';
+        } else {
+            update_option( 'kounselia_jaas_app_id', $app_id );
+            update_option( 'kounselia_jaas_key_id', $key_id );
+            if ( ! $keep_pem ) {
+                update_option( 'kounselia_jaas_private_key', $pem );
+            }
+            kounselia_admin_log( 'update_jaas_settings', 'settings' );
+            $kounselia_notice = kounselia_jaas_is_configured()
+                ? 'Video settings saved. Sessions now run on 8x8, with no login and no waiting for a host.'
+                : ( '' === $app_id ? 'Video settings cleared. Sessions use the free meet.jit.si again.' : 'Video settings saved, but something is still missing, so sessions still use meet.jit.si.' );
+        }
+
     // 11E. Currency & pricing
     } elseif ( 'save_currency_settings' === $kounselia_action
         && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_currency' ) ) {
@@ -311,6 +337,10 @@ $kounselia_awaiting_payouts = function_exists( 'kounselia_get_awaiting_payouts' 
 $kounselia_paystack_mode = $kounselia_paystack_key
     ? ( 0 === strpos( $kounselia_paystack_key, 'sk_live_' ) ? 'Live mode' : 'Test mode' )
     : 'Not configured';
+
+$kounselia_jaas            = kounselia_jaas_settings();
+$kounselia_jaas_ready      = kounselia_jaas_is_configured();
+$kounselia_jaas_in_config  = defined( 'KOUNSELIA_JAAS_APP_ID' ) || defined( 'KOUNSELIA_JAAS_KEY_ID' ) || defined( 'KOUNSELIA_JAAS_PRIVATE_KEY' );
 
 // Retrieve platform limits for the form
 $opt_guest_session = (int) get_option('kounselia_guest_session_limit', 6);
@@ -519,6 +549,46 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
     <a class="login-submit" style="display:inline-block;width:auto;padding:11px 22px;text-decoration:none;color:#fff;" href="/portal/admin/pages/email-delivery.php">Manage email delivery</a>
   </div>
   <?php endif; ?>
+
+  <!-- ===============================================================
+       2B-2. VIDEO CALLS (8x8 hosted Jitsi)
+  ================================================---------------- -->
+  <div class="panel" id="video-calls">
+    <div class="panel-title">
+      Video calls
+      <span style="font-weight:400;color:var(--text3);font-size:12px;"><?php echo $kounselia_jaas_ready ? 'Running on 8x8' : 'Using meet.jit.si'; ?></span>
+    </div>
+    <p style="color:var(--text2);font-size:13px;margin-bottom:12px;line-height:1.55;max-width:64ch;">
+      The free meet.jit.si server makes whoever joins a session first wait on a <em>"waiting for a moderator… please log in"</em> screen. Connect 8x8's hosted Jitsi (JaaS) and both people go straight into the call, with no login and no waiting. It's the same call screen as now.
+    </p>
+    <ol style="color:var(--text2);font-size:13px;margin:0 0 16px 18px;line-height:1.6;max-width:64ch;">
+      <li>Create a free account at <a href="https://jaas.8x8.vc" target="_blank" rel="noopener">jaas.8x8.vc</a>. The free plan covers 25 different people a month; paid plans cover more.</li>
+      <li>Copy the <strong>AppID</strong> (starts with <code>vpaas-magic-cookie-</code>) from the dashboard.</li>
+      <li>Under <strong>API Keys</strong>, choose <strong>Add API key → Generate API key pair</strong>. Download the private key, then copy the new key's ID.</li>
+      <li>Paste all three below and save.</li>
+    </ol>
+    <?php if ( $kounselia_jaas_in_config ) : ?>
+      <p style="color:var(--text2);font-size:13px;line-height:1.55;">These are set in <code>wp-config.php</code> (KOUNSELIA_JAAS_*), which wins over this form.</p>
+    <?php endif; ?>
+    <form method="post">
+      <?php wp_nonce_field( 'kounselia_settings_jaas' ); ?>
+      <input type="hidden" name="kounselia_action" value="save_jaas_settings">
+      <div class="login-field">
+        <label for="jaas_app_id">8x8 App ID</label>
+        <input type="text" id="jaas_app_id" name="jaas_app_id" autocomplete="off" spellcheck="false" style="width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:6px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;background:var(--bg);color:var(--text1);" value="<?php echo esc_attr( get_option( 'kounselia_jaas_app_id', '' ) ); ?>" placeholder="vpaas-magic-cookie-...">
+      </div>
+      <div class="login-field">
+        <label for="jaas_key_id">API key ID</label>
+        <input type="text" id="jaas_key_id" name="jaas_key_id" autocomplete="off" spellcheck="false" style="width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:6px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;background:var(--bg);color:var(--text1);" value="<?php echo esc_attr( get_option( 'kounselia_jaas_key_id', '' ) ); ?>" placeholder="vpaas-magic-cookie-.../abc123">
+      </div>
+      <div class="login-field">
+        <label for="jaas_private_key">Private key</label>
+        <textarea id="jaas_private_key" name="jaas_private_key" rows="5" autocomplete="off" spellcheck="false" style="width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:6px;font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;background:var(--bg);color:var(--text1);" placeholder="<?php echo get_option( 'kounselia_jaas_private_key', '' ) ? 'Saved. Leave empty to keep it, or paste a new one.' : '-----BEGIN PRIVATE KEY----- ...'; ?>"></textarea>
+        <p style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.5;">Kept on the server and never shown again. To go back to meet.jit.si, clear the App ID and save.</p>
+      </div>
+      <button type="submit" class="login-submit" style="width:auto;padding:11px 22px;">Save video settings</button>
+    </form>
+  </div>
 
   <!-- ===============================================================
        2C. PAYSTACK PAYMENTS

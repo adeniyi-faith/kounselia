@@ -33,6 +33,7 @@ import { Sheet } from '@/components/Sheet';
 import { ArticlesSkeleton } from '@/components/Skeleton';
 import { TablerIcon } from '@/components/TablerIcon';
 import { useKeyboardOpen } from '@/components/useKeyboardOpen';
+import { useT } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, useColors } from '@/theme';
 
@@ -49,6 +50,7 @@ function mapComment(list: Comment[], id: number, fn: (c: Comment) => Comment): C
 export default function Conversation() {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const insets = useSafeAreaInsets();
   const keyboardOpen = useKeyboardOpen();
   const toast = useToast();
@@ -85,7 +87,7 @@ export default function Conversation() {
   const load = useCallback(async () => {
     const res = await fetchComments(config, postId, 1);
     if (!res.ok) {
-      setFailed(res.offline ? "We couldn't load the conversation. Please check your internet connection." : res.message);
+      setFailed(res.offline ? t('m.b.comments.load_failed') : res.message);
       return;
     }
     setFailed(null);
@@ -94,7 +96,7 @@ export default function Conversation() {
     setEnabled(res.data.enabled);
     setHasMore(res.data.has_more);
     setPage(1);
-  }, [config, postId]);
+  }, [config, postId, t]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -159,7 +161,7 @@ export default function Conversation() {
   function reply(c: Comment) {
     if (!viewer?.can_comment) {
       if (viewer?.reason === 'need_identity') setNaming(true);
-      else toast.show(viewer?.message ?? 'You cannot comment here.');
+      else toast.show(viewer?.message ?? t('m.b.comments.cannot'));
       return;
     }
     // One level of replies: answering a reply joins the same thread.
@@ -180,14 +182,14 @@ export default function Conversation() {
 
   function remove(c: Comment) {
     showDialog({
-      title: 'Delete your comment?',
-      message: 'This cannot be undone.',
+      title: t('m.b.comments.delete_title'),
+      message: t('m.b.comments.delete_body'),
       icon: 'trash',
       tone: 'danger',
       buttons: [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('m.b.common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('m.b.common.delete'),
           style: 'destructive',
           onPress: async () => afterChange(await deleteComment(config, c.id)),
         },
@@ -202,10 +204,10 @@ export default function Conversation() {
       return;
     }
     showDialog({
-      title: 'Hide this comment?',
-      message: 'Nobody else will see it. The Kounselia team can still review it.',
+      title: t('m.b.comments.hide_title'),
+      message: t('m.b.comments.hide_body'),
       icon: 'eye-off',
-      buttons: [{ text: 'Cancel', style: 'cancel' }, { text: 'Hide', style: 'destructive', onPress: go }],
+      buttons: [{ text: t('m.b.common.cancel'), style: 'cancel' }, { text: t('m.b.comments.hide'), style: 'destructive', onPress: go }],
     });
   }
 
@@ -228,8 +230,26 @@ export default function Conversation() {
     }
     setViewer((v) => (v ? { ...v, identity: res.data, can_comment: true, reason: null, message: null } : v));
     setNaming(false);
-    toast.show(`Thanks, ${res.data.name}. You're all set.`);
+    toast.show(t('m.b.comments.thanks_name', { name: res.data.name }));
     setTimeout(() => input.current?.focus(), 300);
+  }
+
+  // The reasons come from the shared core list in English; show them in the member's language.
+  function reasonLabel(key: string, fallback: string) {
+    switch (key) {
+      case 'unkind':
+        return t('m.b.comments.reason_unkind');
+      case 'harmful':
+        return t('m.b.comments.reason_harmful');
+      case 'spam':
+        return t('m.b.comments.reason_spam');
+      case 'private_info':
+        return t('m.b.comments.reason_private');
+      case 'other':
+        return t('m.b.comments.reason_other');
+      default:
+        return fallback;
+    }
   }
 
   function openNaming() {
@@ -249,13 +269,13 @@ export default function Conversation() {
       ) : null}
       <View style={styles.note}>
         <TablerIcon name="heart-handshake" size={18} color={colors.gold} />
-        <Text style={styles.noteText}>Be kind: people here may be going through something hard. Comments show only a first name or nickname.</Text>
+        <Text style={styles.noteText}>{t('m.b.comments.be_kind')}</Text>
       </View>
       {care && (
         <View style={styles.care} accessibilityRole="alert">
-          <Text style={styles.careTitle}>You are not alone.</Text>
+          <Text style={styles.careTitle}>{t('m.b.comments.not_alone')}</Text>
           <Text style={styles.careText}>{care}</Text>
-          <Button title="See where to get help now" onPress={openSafetyResources} style={{ marginTop: 12 }} />
+          <Button title={t('m.b.comments.get_help')} onPress={openSafetyResources} style={{ marginTop: 12 }} />
         </View>
       )}
     </View>
@@ -263,12 +283,12 @@ export default function Conversation() {
 
   function composer() {
     if (!viewer) return null;
-    if (!enabled) return <Text style={styles.closed}>Comments are closed on this article.</Text>;
+    if (!enabled) return <Text style={styles.closed}>{t('m.b.comments.closed')}</Text>;
     if (viewer.reason === 'need_identity') {
       return (
         <Pressable onPress={openNaming} accessibilityRole="button" style={({ pressed }) => [styles.joinBtn, pressed && { opacity: 0.85 }]}>
           <TablerIcon name="message-circle" size={18} color="#fff" />
-          <Text style={styles.joinText}>Join the conversation</Text>
+          <Text style={styles.joinText}>{t('m.b.comments.join')}</Text>
         </Pressable>
       );
     }
@@ -279,9 +299,9 @@ export default function Conversation() {
         {replyTo ? (
           <View style={styles.replying}>
             <Text style={styles.replyingText} numberOfLines={1}>
-              Replying to {replyTo.author.name}
+              {t('m.b.comments.replying_to', { name: replyTo.author.name })}
             </Text>
-            <Pressable onPress={() => setReplyTo(null)} accessibilityRole="button" accessibilityLabel="Cancel reply" hitSlop={8}>
+            <Pressable onPress={() => setReplyTo(null)} accessibilityRole="button" accessibilityLabel={t('m.b.comments.cancel_reply')} hitSlop={8}>
               <TablerIcon name="x" size={16} color={colors.text3} />
             </Pressable>
           </View>
@@ -291,18 +311,18 @@ export default function Conversation() {
             ref={input}
             value={text}
             onChangeText={setText}
-            placeholder={replyTo ? 'Write a reply…' : 'Share your thoughts, or ask a question…'}
+            placeholder={replyTo ? t('m.b.comments.write_reply') : t('m.b.comments.write_comment')}
             placeholderTextColor={colors.text3}
             multiline
             maxLength={viewer.max_length}
             style={styles.input}
-            accessibilityLabel={replyTo ? 'Your reply' : 'Your comment'}
+            accessibilityLabel={replyTo ? t('m.b.comments.your_reply') : t('m.b.comments.your_comment')}
           />
           <Pressable
             onPress={post}
             disabled={text.trim().length < 2 || posting}
             accessibilityRole="button"
-            accessibilityLabel="Post"
+            accessibilityLabel={t('m.b.comments.post')}
             style={({ pressed }) => [styles.send, (text.trim().length < 2 || posting) && { opacity: 0.4 }, pressed && { opacity: 0.8 }]}
           >
             <TablerIcon name="send" size={18} color="#fff" />
@@ -311,7 +331,7 @@ export default function Conversation() {
         <View style={styles.underInput}>
           <Pressable onPress={openNaming} accessibilityRole="button" hitSlop={6}>
             <Text style={styles.postingAs}>
-              Posting as {viewer.identity?.name ?? 'you'} · <Text style={styles.link}>change</Text>
+              {t('m.b.comments.posting_as', { name: viewer.identity?.name ?? t('m.b.comments.you') })} · <Text style={styles.link}>{t('m.b.comments.change')}</Text>
             </Text>
           </Pressable>
           {left < 200 ? <Text style={[styles.postingAs, left < 20 && { color: colors.rose }]}>{left}</Text> : null}
@@ -322,13 +342,13 @@ export default function Conversation() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScreenHeader title={total ? `Conversation · ${total}` : 'Conversation'} />
+      <ScreenHeader title={total ? t('m.b.comments.title_count', { n: total }) : t('m.b.comments.title')} />
       <KeyboardAvoidingView style={styles.flex} behavior="padding">
         {!comments ? (
           failed ? (
             <View style={styles.center}>
               <Text style={styles.empty}>{failed}</Text>
-              <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+              <Button title={t('m.b.common.try_again')} variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
             <View style={{ padding: 16 }}>
@@ -350,7 +370,7 @@ export default function Conversation() {
             ListEmptyComponent={
               <View style={styles.emptyBox}>
                 <TablerIcon name="message-circle" size={28} color={colors.text3} />
-                <Text style={styles.empty}>{enabled ? 'No comments yet. Be the first to share what this meant to you.' : 'No comments.'}</Text>
+                <Text style={styles.empty}>{enabled ? t('m.b.comments.empty') : t('m.b.comments.none')}</Text>
               </View>
             }
             renderItem={({ item }) => (
@@ -367,76 +387,76 @@ export default function Conversation() {
         <View style={[styles.footer, { paddingBottom: keyboardOpen ? 8 : Math.max(insets.bottom, 10) }]}>{composer()}</View>
       </KeyboardAvoidingView>
 
-      <Sheet visible={!!menu} title="Comment" onClose={() => setMenu(null)}>
+      <Sheet visible={!!menu} title={t('m.b.comments.comment')} onClose={() => setMenu(null)}>
         {menu && (
           <View style={styles.menu}>
             <MenuItem
               icon="copy"
-              label="Copy text"
+              label={t('m.b.comments.copy')}
               onPress={() => {
                 Clipboard.setStringAsync(menu.c.content).catch(() => undefined);
                 setMenu(null);
-                toast.show('Copied');
+                toast.show(t('m.b.comments.copied'));
               }}
             />
             {viewer?.can_moderate && !menu.isReply && !menu.c.held && (
-              <MenuItem icon="pin" label={menu.c.pinned ? 'Unpin' : 'Pin to the top'} onPress={() => { const c = menu.c; setMenu(null); moderate(c, c.pinned ? 'unpin' : 'pin'); }} />
+              <MenuItem icon="pin" label={menu.c.pinned ? t('m.b.comments.unpin') : t('m.b.comments.pin')} onPress={() => { const c = menu.c; setMenu(null); moderate(c, c.pinned ? 'unpin' : 'pin'); }} />
             )}
             {viewer?.can_moderate && !menu.c.is_mine && (
-              <MenuItem icon="eye-off" label="Hide this comment" onPress={() => { const c = menu.c; setMenu(null); moderate(c, 'hide'); }} />
+              <MenuItem icon="eye-off" label={t('m.b.comments.hide_title')} onPress={() => { const c = menu.c; setMenu(null); moderate(c, 'hide'); }} />
             )}
             {!menu.c.is_mine && !menu.c.held && (
-              <MenuItem icon="flag" label="Report" onPress={() => { setReporting(menu.c); setReason(REPORT_REASONS[0].key); setMenu(null); }} />
+              <MenuItem icon="flag" label={t('m.b.comments.report')} onPress={() => { setReporting(menu.c); setReason(REPORT_REASONS[0].key); setMenu(null); }} />
             )}
-            {menu.c.is_mine && <MenuItem icon="trash" label="Delete my comment" danger onPress={() => { const c = menu.c; setMenu(null); remove(c); }} />}
+            {menu.c.is_mine && <MenuItem icon="trash" label={t('m.b.comments.delete_mine')} danger onPress={() => { const c = menu.c; setMenu(null); remove(c); }} />}
           </View>
         )}
       </Sheet>
 
-      <Sheet visible={!!reporting} title="Report comment" onClose={() => setReporting(null)}>
-        <Text style={styles.sheetText}>What is wrong with this comment? Our team will take a look.</Text>
+      <Sheet visible={!!reporting} title={t('m.b.comments.report_title')} onClose={() => setReporting(null)}>
+        <Text style={styles.sheetText}>{t('m.b.comments.report_body')}</Text>
         {REPORT_REASONS.map((r) => (
           <Pressable key={r.key} onPress={() => setReason(r.key)} accessibilityRole="radio" accessibilityState={{ checked: reason === r.key }} style={[styles.option, reason === r.key && styles.optionOn]}>
             <TablerIcon name={reason === r.key ? 'circle-check-filled' : 'circle'} size={20} color={reason === r.key ? colors.accentText : colors.text3} />
-            <Text style={styles.optionText}>{r.label}</Text>
+            <Text style={styles.optionText}>{reasonLabel(r.key, r.label)}</Text>
           </Pressable>
         ))}
         <TextInput
           value={reportNote}
           onChangeText={setReportNote}
-          placeholder="Anything else we should know? (optional)"
+          placeholder={t('m.b.comments.report_note')}
           placeholderTextColor={colors.text3}
           multiline
           maxLength={500}
           style={styles.noteInput}
         />
-        <Button title="Send report" onPress={sendReport} />
+        <Button title={t('m.b.comments.send_report')} onPress={sendReport} />
       </Sheet>
 
-      <Sheet visible={naming} title="Your name here" onClose={() => setNaming(false)}>
-        <Text style={styles.sheetText}>To keep this space safe, we never show your full name, email or photo on comments. Choose what people see.</Text>
+      <Sheet visible={naming} title={t('m.b.comments.name_title')} onClose={() => setNaming(false)}>
+        <Text style={styles.sheetText}>{t('m.b.comments.name_body')}</Text>
         <Pressable onPress={() => setNameMode('first_name')} accessibilityRole="radio" accessibilityState={{ checked: nameMode === 'first_name' }} style={[styles.option, nameMode === 'first_name' && styles.optionOn]}>
           <TablerIcon name={nameMode === 'first_name' ? 'circle-check-filled' : 'circle'} size={20} color={nameMode === 'first_name' ? colors.accentText : colors.text3} />
-          <Text style={styles.optionText}>My first name: {viewer?.identity?.first_name ?? 'Member'}</Text>
+          <Text style={styles.optionText}>{t('m.b.comments.first_name', { name: viewer?.identity?.first_name ?? t('m.b.comments.member') })}</Text>
         </Pressable>
         <Pressable onPress={() => setNameMode('nickname')} accessibilityRole="radio" accessibilityState={{ checked: nameMode === 'nickname' }} style={[styles.option, nameMode === 'nickname' && styles.optionOn]}>
           <TablerIcon name={nameMode === 'nickname' ? 'circle-check-filled' : 'circle'} size={20} color={nameMode === 'nickname' ? colors.accentText : colors.text3} />
-          <Text style={styles.optionText}>A nickname</Text>
+          <Text style={styles.optionText}>{t('m.b.comments.nickname')}</Text>
         </Pressable>
         {nameMode === 'nickname' && (
           <TextInput
             value={nickname}
             onChangeText={setNickname}
-            placeholder="e.g. Quiet River"
+            placeholder={t('m.b.comments.nick_example')}
             placeholderTextColor={colors.text3}
             maxLength={24}
             autoFocus
             style={styles.nickInput}
-            accessibilityLabel="Nickname"
+            accessibilityLabel={t('m.b.comments.nickname_label')}
           />
         )}
         {nameError ? <Text style={styles.error}>{nameError}</Text> : null}
-        <Button title="Save" onPress={saveName} busy={savingName} style={{ marginTop: 8 }} />
+        <Button title={t('m.b.comments.save')} onPress={saveName} busy={savingName} style={{ marginTop: 8 }} />
       </Sheet>
 
       <Toast note={toast.note} />

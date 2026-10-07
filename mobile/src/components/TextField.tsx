@@ -4,6 +4,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { forwardRef, useState } from 'react';
 import { Pressable, Text, TextInput, View, type TextInputProps } from 'react-native';
+import { useT } from '@/language';
 import { fonts, makeStyles, radius, useColors } from '@/theme';
 
 interface Props extends TextInputProps {
@@ -14,6 +15,7 @@ interface Props extends TextInputProps {
 export const TextField = forwardRef<TextInput, Props>(function TextField({ label, password = false, style, ...input }, ref) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const [focused, setFocused] = useState(false);
   const [visible, setVisible] = useState(false);
 
@@ -40,7 +42,7 @@ export const TextField = forwardRef<TextInput, Props>(function TextField({ label
         {password && (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={visible ? 'Hide password' : 'Show password'}
+            accessibilityLabel={visible ? t('m.b.field.hide_password') : t('m.b.field.show_password')}
             hitSlop={12}
             onPress={() => setVisible((v) => !v)}
             style={styles.toggle}

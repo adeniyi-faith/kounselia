@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { transcribeAudio } from '@kounselia/core';
 import type { KounseliaConfig } from '@kounselia/core';
+import { useT } from '../i18n';
 
 export type DictationState = 'idle' | 'recording' | 'transcribing';
 
@@ -8,6 +9,7 @@ export type DictationState = 'idle' | 'recording' | 'transcribing';
 // browser-specific (React Native records audio a different way), so
 // unlike src/core/ this hook stays in the web app.
 export function useDictation(config: KounseliaConfig, onTranscript: (text: string) => void) {
+  const t = useT();
   const [state, setState] = useState<DictationState>('idle');
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -28,7 +30,7 @@ export function useDictation(config: KounseliaConfig, onTranscript: (text: strin
 
   const start = useCallback(async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      alert("Voice input isn't supported in this browser yet. Try Chrome, Edge, or Safari.");
+      alert(t('c.dictation.unsupported'));
       return;
     }
     try {
@@ -80,9 +82,9 @@ export function useDictation(config: KounseliaConfig, onTranscript: (text: strin
     } catch (err) {
       console.error('Mic error:', err);
       setState('idle');
-      alert('Microphone access denied or unavailable.');
+      alert(t('c.dictation.denied'));
     }
-  }, [config, onTranscript]);
+  }, [config, onTranscript, t]);
 
   const toggle = useCallback(() => {
     if (state === 'transcribing') return;

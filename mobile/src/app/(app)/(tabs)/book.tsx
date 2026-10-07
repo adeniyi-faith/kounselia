@@ -11,6 +11,7 @@ import { ProfessionalAvatar } from '@/components/dashboard/ProfessionalAvatar';
 import { RateSheet } from '@/components/dashboard/RateSheet';
 import { sessionWhen } from '@/components/dashboard/when';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useLanguage, useT } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 import { showDialog } from '@/components/Dialog';
@@ -21,6 +22,7 @@ import { ListSkeleton } from '@/components/Skeleton';
 export default function Book() {
   const styles = useStyles();
   const colors = useColors();
+  const { language, t } = useLanguage();
   const { config } = useSession();
   const [data, setData] = useState<BookingsData | null>(null);
   const [failed, setFailed] = useState(false);
@@ -53,26 +55,26 @@ export default function Book() {
 
   async function join(b: UpcomingBooking) {
     setJoining(b.id);
-    const problem = await joinSession(config, b.id);
+    const problem = await joinSession(config, b.id, t);
     setJoining(null);
     if (problem) toast.show(problem);
   }
 
   function confirmCancel(b: UpcomingBooking, wholeSeries: boolean) {
     showDialog({
-      title: wholeSeries ? 'Cancel your weekly sessions?' : 'Cancel this session?',
+      title: wholeSeries ? t('m.book.cancel_weekly_q') : t('m.book.cancel_this_q'),
       message: wholeSeries
-        ? `This cancels every upcoming weekly session with ${b.pro_name}.`
-        : `Your session with ${b.pro_name} on ${sessionWhen(b.start_utc)} will be cancelled.`,
+        ? t('m.book.cancel_weekly_body', { name: b.pro_name })
+        : t('m.book.cancel_one_body', { name: b.pro_name, when: sessionWhen(b.start_utc, false, language) }),
       icon: 'calendar-x',
       buttons: [
-        { text: 'Keep it', style: 'cancel' },
+        { text: t('m.book.keep'), style: 'cancel' },
         {
-          text: wholeSeries ? 'Cancel weekly' : 'Cancel session',
+          text: wholeSeries ? t('m.book.cancel_weekly') : t('m.book.cancel_session'),
           style: 'destructive',
           onPress: async () => {
             const res = wholeSeries ? await cancelSeries(config, b.series_id) : await cancelBooking(config, b.id);
-            toast.show(res.ok ? res.data.message || 'Cancelled.' : res.message);
+            toast.show(res.ok ? res.data.message || t('m.book.cancelled') : res.message);
             load();
           },
         },
@@ -82,12 +84,12 @@ export default function Book() {
 
   function moreFor(b: UpcomingBooking) {
     const buttons: { text: string; style?: 'cancel' | 'destructive'; onPress?: () => void }[] = [
-      { text: 'Reschedule', onPress: () => router.push({ pathname: '/book/[proId]', params: { proId: String(b.professional_id), reschedule: String(b.id) } }) },
-      { text: 'Cancel session', style: 'destructive', onPress: () => confirmCancel(b, false) },
+      { text: t('m.book.reschedule'), onPress: () => router.push({ pathname: '/book/[proId]', params: { proId: String(b.professional_id), reschedule: String(b.id) } }) },
+      { text: t('m.book.cancel_session'), style: 'destructive', onPress: () => confirmCancel(b, false) },
     ];
-    if (b.series_id) buttons.push({ text: 'Cancel weekly sessions', style: 'destructive', onPress: () => confirmCancel(b, true) });
-    buttons.push({ text: 'Close', style: 'cancel' });
-    showDialog({ title: b.pro_name, message: sessionWhen(b.start_utc), icon: 'calendar-event', buttons });
+    if (b.series_id) buttons.push({ text: t('m.book.cancel_weekly_sessions'), style: 'destructive', onPress: () => confirmCancel(b, true) });
+    buttons.push({ text: t('m.common.close'), style: 'cancel' });
+    showDialog({ title: b.pro_name, message: sessionWhen(b.start_utc, false, language), icon: 'calendar-event', buttons });
   }
 
   return (
@@ -97,13 +99,13 @@ export default function Book() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
       >
         <Text style={styles.title} accessibilityRole="header">
-          Sessions with professionals
+          {t('m.book.title')}
         </Text>
         {!data ? (
           failed ? (
             <View style={styles.center}>
-              <Text style={styles.notice}>We couldn’t load your sessions. Please check your internet connection.</Text>
-              <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+              <Text style={styles.notice}>{t('m.sessions.load_failed')}</Text>
+              <Button title={t('growth.try_again')} variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
             <View style={{ marginTop: 16 }}>
@@ -112,11 +114,11 @@ export default function Book() {
           )
         ) : (
           <>
-            <SectionHead title="Your upcoming sessions" />
+            <SectionHead title={t('m.book.upcoming')} />
             {data.upcoming.length === 0 ? (
               <EmptyState>
                 <TablerIcon name="calendar-event" size={28} color={colors.text3} />
-                <Text style={styles.notice}>No sessions booked yet. Find a licensed professional below and pick a time that works for you.</Text>
+                <Text style={styles.notice}>{t('m.book.no_sessions')}</Text>
               </EmptyState>
             ) : (
               data.upcoming.map((b) => (
@@ -127,15 +129,15 @@ export default function Book() {
                     </View>
                     <View style={styles.meta}>
                       <Text style={styles.name}>{b.pro_name}</Text>
-                      <Text style={styles.sub}>{sessionWhen(b.start_utc)}</Text>
+                      <Text style={styles.sub}>{sessionWhen(b.start_utc, false, language)}</Text>
                     </View>
-                    {b.series_id ? <Text style={styles.weekly}>Weekly</Text> : null}
+                    {b.series_id ? <Text style={styles.weekly}>{t('m.book.weekly')}</Text> : null}
                   </View>
                   <View style={styles.actions}>
                     {b.joinable && (
                       <Pressable onPress={() => join(b)} accessibilityRole="button" style={[styles.action, styles.joinAction]}>
                         {joining === b.id ? <ActivityIndicator size="small" color="#fff" /> : <TablerIcon name="video" size={16} color="#fff" />}
-                        <Text style={[styles.actionText, { color: '#fff' }]}>Join</Text>
+                        <Text style={[styles.actionText, { color: '#fff' }]}>{t('m.book.join')}</Text>
                       </Pressable>
                     )}
                     <Pressable
@@ -144,11 +146,11 @@ export default function Book() {
                       style={styles.action}
                     >
                       <TablerIcon name="message" size={16} color={colors.accentText} />
-                      <Text style={styles.actionText}>Message</Text>
+                      <Text style={styles.actionText}>{t('m.book.message')}</Text>
                     </Pressable>
-                    <Pressable onPress={() => moreFor(b)} accessibilityRole="button" accessibilityLabel="Reschedule or cancel" style={styles.action}>
+                    <Pressable onPress={() => moreFor(b)} accessibilityRole="button" accessibilityLabel={t('m.book.change_a11y')} style={styles.action}>
                       <TablerIcon name="calendar-cog" size={16} color={colors.accentText} />
-                      <Text style={styles.actionText}>Change</Text>
+                      <Text style={styles.actionText}>{t('m.book.change')}</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -157,7 +159,7 @@ export default function Book() {
 
             {data.past.length > 0 && (
               <>
-                <SectionHead title="Past sessions" />
+                <SectionHead title={t('m.book.past')} />
                 {data.past.map((b) => (
                   <View key={b.id} style={[styles.row, styles.rowTop]}>
                     <View style={[styles.av, { backgroundColor: colors.accentLight }]}>
@@ -165,16 +167,16 @@ export default function Book() {
                     </View>
                     <View style={styles.meta}>
                       <Text style={styles.name}>{b.pro_name}</Text>
-                      <Text style={styles.sub}>{sessionWhen(b.start_utc, true)}</Text>
+                      <Text style={styles.sub}>{sessionWhen(b.start_utc, true, language)}</Text>
                     </View>
                     {b.review_rating ? (
-                      <Text style={styles.stars} accessibilityLabel={`You rated it ${b.review_rating} out of 5`}>
+                      <Text style={styles.stars} accessibilityLabel={t('m.book.rated_a11y', { n: b.review_rating })}>
                         {'★'.repeat(b.review_rating)}
                         {'☆'.repeat(5 - b.review_rating)}
                       </Text>
                     ) : (
                       <Pressable onPress={() => setRating({ id: b.id, pro_name: b.pro_name })} accessibilityRole="button" hitSlop={6}>
-                        <Text style={styles.link}>Rate</Text>
+                        <Text style={styles.link}>{t('m.book.rate')}</Text>
                       </Pressable>
                     )}
                   </View>
@@ -182,11 +184,11 @@ export default function Book() {
               </>
             )}
 
-            <SectionHead title="Find a professional" note="Licensed and verified" />
+            <SectionHead title={t('m.book.find')} note={t('m.book.verified')} />
             {data.professionals.length === 0 ? (
               <EmptyState>
                 <TablerIcon name="users" size={28} color={colors.text3} />
-                <Text style={styles.notice}>No verified professionals are available to book just yet. Check back soon.</Text>
+                <Text style={styles.notice}>{t('m.book.none_available')}</Text>
               </EmptyState>
             ) : (
               <View style={styles.grid}>
@@ -204,7 +206,7 @@ export default function Book() {
         onClose={(rated) => {
           setRating(null);
           if (rated) {
-            toast.show('Thanks for the feedback.');
+            toast.show(t('m.book.thanks'));
             load();
           }
         }}
@@ -217,11 +219,12 @@ export default function Book() {
 function ProfessionalTile({ pro }: { pro: Professional }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/book/[proId]', params: { proId: String(pro.id), pro: JSON.stringify(pro) } })}
       accessibilityRole="button"
-      accessibilityLabel={`${pro.name}, ${pro.title}. ${pro.free_label ? `${pro.free_label}. ` : ''}${pro.price ? `${pro.price} per session.` : ''} Book a session`}
+      accessibilityLabel={[`${pro.name}, ${pro.title}.`, pro.free_label ? `${pro.free_label}.` : '', pro.price ? t('m.book.price_per_a11y', { price: pro.price }) : '', t('m.book.book_a_session')].filter(Boolean).join(' ')}
       style={({ pressed }) => [styles.tile, pressed && { transform: [{ scale: 0.97 }] }]}
     >
       <ProfessionalAvatar pro={pro} size={48} />
@@ -233,15 +236,15 @@ function ProfessionalTile({ pro }: { pro: Professional }) {
         {pro.specialty ? ` · ${pro.specialty}` : ''}
       </Text>
       <Text style={[styles.tileSpec, { color: pro.review_count ? colors.gold : colors.text3, marginTop: 4 }]}>
-        {pro.review_count ? `★ ${pro.rating.toFixed(1)} (${pro.review_count})` : 'No reviews yet'}
+        {pro.review_count ? `★ ${pro.rating.toFixed(1)} (${pro.review_count})` : t('m.book.no_reviews')}
       </Text>
       {pro.free_label ? <Text style={styles.free}>{pro.free_label}</Text> : null}
-      {pro.video_provider ? <Text style={styles.video}>Sessions on {pro.video_provider}</Text> : null}
-      {pro.price ? <Text style={styles.price}>{pro.price} / session</Text> : null}
+      {pro.video_provider ? <Text style={styles.video}>{t('m.book.sessions_on', { provider: pro.video_provider })}</Text> : null}
+      {pro.price ? <Text style={styles.price}>{t('m.book.price_per_session', { price: pro.price })}</Text> : null}
       {pro.full_price ? (
         // Pro members pay less; show what it would have been, as the website does.
         <Text style={styles.proPrice}>
-          <Text style={styles.fullPrice}>{pro.full_price}</Text> Pro price
+          <Text style={styles.fullPrice}>{pro.full_price}</Text> {t('m.book.pro_price')}
         </Text>
       ) : null}
     </Pressable>

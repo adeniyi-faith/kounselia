@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { formatTime } from '@/components/chat/formatTime';
 import { Toast, useToast } from '@/components/chat/Toast';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useLanguage } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { ChatSkeleton } from '@/components/Skeleton';
@@ -17,6 +18,7 @@ import { ChatSkeleton } from '@/components/Skeleton';
 export default function BookingMessages() {
   const styles = useStyles();
   const colors = useColors();
+  const { language, t } = useLanguage();
   const { id, name } = useLocalSearchParams<{ id: string; name?: string }>();
   const bookingId = Number(id);
   const { config } = useSession();
@@ -60,14 +62,14 @@ export default function BookingMessages() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       <View style={styles.nav}>
-        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel="Back" style={styles.back} hitSlop={6}>
+        <Pressable onPress={() => router.back()} accessibilityRole="button" accessibilityLabel={t('m.b.common.back')} style={styles.back} hitSlop={6}>
           <TablerIcon name="arrow-left" size={20} color={colors.text} />
         </Pressable>
         <View style={{ flex: 1 }}>
           <Text style={styles.navTitle} numberOfLines={1}>
-            {name || 'Your professional'}
+            {name || t('m.b.booking.your_professional')}
           </Text>
-          <Text style={styles.navSub}>About your booked session</Text>
+          <Text style={styles.navSub}>{t('m.b.booking.about')}</Text>
         </View>
       </View>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
@@ -82,7 +84,7 @@ export default function BookingMessages() {
             ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
             ListEmptyComponent={
               <Text style={styles.empty}>
-                No messages yet. Say hello, or share anything they should know before your session.
+                {t('m.b.booking.empty')}
               </Text>
             }
             renderItem={({ item }) => (
@@ -90,7 +92,7 @@ export default function BookingMessages() {
                 <View style={[styles.bubble, item.is_mine ? styles.bubbleMine : styles.bubbleTheirs]}>
                   <Text style={[styles.msgText, item.is_mine && { color: '#fff' }]}>{item.content}</Text>
                 </View>
-                <Text style={styles.time}>{item.sent_at ? formatTime(Date.parse(item.sent_at)) : ''}</Text>
+                <Text style={styles.time}>{item.sent_at ? formatTime(Date.parse(item.sent_at), language) : ''}</Text>
               </View>
             )}
           />
@@ -99,18 +101,18 @@ export default function BookingMessages() {
           <TextInput
             value={text}
             onChangeText={setText}
-            placeholder="Message"
+            placeholder={t('m.b.booking.message')}
             placeholderTextColor="#94A3B8"
             multiline
             maxLength={2000}
             style={styles.input}
-            accessibilityLabel="Message"
+            accessibilityLabel={t('m.b.booking.message')}
           />
           <Pressable
             onPress={send}
             disabled={!text.trim() || sending}
             accessibilityRole="button"
-            accessibilityLabel="Send"
+            accessibilityLabel={t('m.b.booking.send')}
             style={[styles.send, { backgroundColor: text.trim() ? colors.accent : colors.surface3 }]}
           >
             {sending ? <ActivityIndicator color="#fff" /> : <TablerIcon name="send" size={20} color={text.trim() ? '#fff' : colors.text3} />}

@@ -28,7 +28,7 @@
     display: flex;
     gap: 6px;
     margin-top: 4px;
-    margin-left: 42px; /* Align with text, skipping avatar */
+    margin-inline-start: 42px; /* Align with text, skipping avatar */
     opacity: 0;
     transform: translateY(-4px);
     transition: all 0.3s ease;
@@ -76,7 +76,7 @@
     color: white;
     border-radius: 50%;
     font-size: 9px;
-    margin-left: 4px;
+    margin-inline-start: 4px;
     vertical-align: middle;
   }
   
@@ -161,7 +161,7 @@
   .chat-dropdown {
     position: fixed;
     top: 70px; 
-    right: 16px;
+    inset-inline-end: 16px;
     background: var(--surface);
     border-radius: 16px;
     box-shadow: 0 12px 32px rgba(0,0,0,0.15);
@@ -248,3 +248,5 @@
     50% { transform: scale(1.25); color: var(--accent); }
     100% { transform: scale(1); }
   }
+
+[dir="rtl"] .chat-dropdown { transform-origin: top left; }

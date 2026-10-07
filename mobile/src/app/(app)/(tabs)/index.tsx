@@ -8,6 +8,7 @@ import { Button } from '@/components/Button';
 import { SectionHead } from '@/components/dashboard/Card';
 import { CareTeamCard } from '@/components/dashboard/CareTeamCard';
 import { CheckInCard } from '@/components/dashboard/CheckInCard';
+import { GrowthCard } from '@/components/dashboard/GrowthCard';
 import { joinSession } from '@/components/dashboard/joinSession';
 import { JournalCard } from '@/components/dashboard/JournalCard';
 import { MoodCard } from '@/components/dashboard/MoodCard';
@@ -16,6 +17,7 @@ import { StatsRow } from '@/components/dashboard/StatsRow';
 import { WelcomeBanner } from '@/components/dashboard/WelcomeBanner';
 import { Toast, useToast } from '@/components/chat/Toast';
 import { useCounselors } from '@/counselors';
+import { useLanguage } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { HomeSkeleton } from '@/components/Skeleton';
@@ -26,6 +28,7 @@ import { HomeSkeleton } from '@/components/Skeleton';
 export default function Home() {
   const styles = useStyles();
   const colors = useColors();
+  const { t } = useLanguage();
   const { user, config } = useSession();
   const { bySlug } = useCounselors();
   const [home, setHome] = useState<HomeData | null>(null);
@@ -83,7 +86,7 @@ export default function Home() {
 
   async function join(bookingId: number) {
     setJoining(true);
-    const problem = await joinSession(config, bookingId);
+    const problem = await joinSession(config, bookingId, t);
     setJoining(false);
     if (problem) toast.show(problem);
   }
@@ -105,8 +108,8 @@ export default function Home() {
         {!home ? (
           failed ? (
             <View style={styles.center}>
-              <Text style={styles.notice}>We couldn’t load your dashboard. Please check your internet connection.</Text>
-              <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+              <Text style={styles.notice}>{t('m.home.load_failed')}</Text>
+              <Button title={t('growth.try_again')} variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
             <View style={styles.loading}>
@@ -128,13 +131,14 @@ export default function Home() {
                 onLater={() => laterCheckin(home.checkin!.id)}
               />
             )}
+            <GrowthCard plan={home.growth} onOpen={() => router.push('/growth')} />
             <CareTeamCard care={home.care} joining={joining} onJoin={join} onManage={() => router.navigate('/book')} />
             <MoodCard mood={home.mood} saving={savingMood} onPick={pickMood} />
             <StatsRow stats={home.stats} />
 
             {recommended && (
               <>
-                <SectionHead title="Recommended for you" />
+                <SectionHead title={t('m.home.recommended')} />
                 <RecommendedCard
                   counselor={recommended}
                   reason={home.recommended.reason}
@@ -143,12 +147,12 @@ export default function Home() {
               </>
             )}
 
-            <SectionHead title="Today's reflection" action={{ label: 'Past entries', onPress: () => router.push('/journal') }} />
+            <SectionHead title={t('m.home.todays_reflection')} action={{ label: t('m.home.past_entries'), onPress: () => router.push('/journal') }} />
             <JournalCard config={config} initial={home.journal} />
 
             {articles.length > 0 && (
               <>
-                <SectionHead title="Read and reflect" action={{ label: 'See all', onPress: () => router.push('/articles') }} />
+                <SectionHead title={t('m.home.read_reflect')} action={{ label: t('m.home.see_all'), onPress: () => router.push('/articles') }} />
                 <FlatList
                   horizontal
                   data={articles}

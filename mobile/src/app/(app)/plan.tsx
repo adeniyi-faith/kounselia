@@ -13,12 +13,14 @@ import { Toast, useToast } from '@/components/chat/Toast';
 import { DetailSkeleton } from '@/components/Skeleton';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useT } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 
 export default function MyPlan() {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const { config } = useSession();
   const { openInApp } = useBrowser();
   const toast = useToast();
@@ -49,7 +51,7 @@ export default function MyPlan() {
     }
     closing.current = false;
     await openInApp(res.data.authorization_url, {
-      title: 'Secure payment',
+      title: t('m.b.book.secure_payment'),
       closeWhen: (u) => u.includes('subscription-callback'),
     });
     // Paystack's page confirmed the payment with our server directly, so
@@ -73,7 +75,7 @@ export default function MyPlan() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScreenHeader title="My plan" />
+      <ScreenHeader title={t('m.b.plan.title')} />
       {!plan || !plans ? (
         <DetailSkeleton />
       ) : (
@@ -86,7 +88,7 @@ export default function MyPlan() {
             <Text style={styles.heroDetail}>{plan.detail}</Text>
             {plan.is_pro && plan.state === 'active' ? (
               <Button
-                title="Turn off auto-renew"
+                title={t('m.b.plan.auto_off')}
                 variant="ghost"
                 busy={busyAction}
                 onPress={() => toggleAutoRenew(false)}
@@ -95,7 +97,7 @@ export default function MyPlan() {
             ) : null}
             {plan.state === 'renewal_off' ? (
               <Button
-                title="Turn auto-renew back on"
+                title={t('m.b.plan.auto_on')}
                 busy={busyAction}
                 onPress={() => toggleAutoRenew(true)}
                 style={styles.heroButton}
@@ -105,12 +107,12 @@ export default function MyPlan() {
 
           {!plan.is_pro || plan.state === 'ended' || plan.state === 'payment_problem' ? (
             <View style={styles.plans}>
-              <Text style={styles.sectionTitle}>{plan.state === 'ended' ? 'Come back to Pro' : 'Choose a plan'}</Text>
+              <Text style={styles.sectionTitle}>{plan.state === 'ended' ? t('m.b.plan.come_back') : t('m.b.plan.choose')}</Text>
               {plans.map((p) => (
                 <View key={p.id} style={styles.planCard}>
                   {p.is_popular ? (
                     <View style={styles.badge}>
-                      <Text style={styles.badgeText}>Popular</Text>
+                      <Text style={styles.badgeText}>{t('m.b.plan.popular')}</Text>
                     </View>
                   ) : null}
                   <Text style={styles.planName}>{p.name}</Text>
@@ -123,12 +125,12 @@ export default function MyPlan() {
                       <Text style={styles.featureText}>{f}</Text>
                     </View>
                   ))}
-                  <Button title={`Get ${p.name}`} busy={busyPlan === p.id} onPress={() => subscribe(p)} style={styles.planButton} />
+                  <Button title={t('m.b.plan.get', { name: p.name })} busy={busyPlan === p.id} onPress={() => subscribe(p)} style={styles.planButton} />
                 </View>
               ))}
               <View style={styles.secureRow}>
                 <TablerIcon name="lock" size={14} color={colors.text3} />
-                <Text style={styles.secureText}>Your card is handled by Paystack — Kounselia never sees or stores your card number.</Text>
+                <Text style={styles.secureText}>{t('m.b.plan.secure')}</Text>
               </View>
             </View>
           ) : null}

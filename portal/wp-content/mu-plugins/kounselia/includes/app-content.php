@@ -288,6 +288,8 @@ function kounselia_ajax_app_account() {
             'blog'       => $on && 1 === (int) $sub->list_blog,
         ),
         'memory' => $has_memory ? $mem : null,
+        // The language the member chose (or their phone's, until they do).
+        'language'  => function_exists( 'kounselia_current_language' ) ? kounselia_current_language( $user_id ) : 'en',
         'links'  => kounselia_app_links(),
     ) );
 }
