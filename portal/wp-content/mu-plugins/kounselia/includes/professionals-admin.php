@@ -148,13 +148,15 @@ function kounselia_admin_professional_suspend( $professional_id, $reason, $opts 
     }
 
     if ( $opts['notify'] && function_exists( 'kounselia_notify_user' ) ) {
-        $body = 'Your Kounselia professional account has been suspended. Clients cannot find or book you while it is suspended.';
-        kounselia_notify_user( (int) $pro->user_id, 'professional_suspended', 'Your account is suspended', $body, '/pro-dashboard.php', array(
-            'subject'      => 'Your Kounselia professional account is suspended',
-            'headline'     => 'Your account is suspended',
-            'content_html' => '<p>' . esc_html( $body ) . '</p><p style="background:#F8F6F2;border-radius:12px;padding:14px 16px;"><strong>Reason:</strong><br>' . nl2br( esc_html( $reason ) ) . '</p>'
-                . ( $cancelled ? '<p>Your ' . (int) $cancelled . ' upcoming ' . ( 1 === $cancelled ? 'session was' : 'sessions were' ) . ' cancelled and the clients refunded.</p>' : '' )
-                . '<p>If you think this is a mistake, please reply to this email.</p>',
+        $lang  = kounselia_mail_lang( (int) $pro->user_id );
+        $body  = kounselia_t( 'mail.pro.suspended_body', array(), $lang );
+        $title = kounselia_t( 'mail.pro.suspended_title', array(), $lang );
+        kounselia_notify_user( (int) $pro->user_id, 'professional_suspended', $title, $body, '/pro-dashboard.php', array(
+            'subject'      => kounselia_t( 'mail.pro.suspended_subject', array(), $lang ),
+            'headline'     => $title,
+            'content_html' => '<p>' . esc_html( $body ) . '</p><p style="background:#F8F6F2;border-radius:12px;padding:14px 16px;"><strong>' . esc_html( kounselia_t( 'mail.pro.reason_label', array(), $lang ) ) . '</strong><br>' . nl2br( esc_html( $reason ) ) . '</p>'
+                . ( $cancelled ? '<p>' . esc_html( kounselia_t( 1 === $cancelled ? 'mail.pro.cancelled_one' : 'mail.pro.cancelled_other', array( 'n' => (int) $cancelled ), $lang ) ) . '</p>' : '' )
+                . '<p>' . esc_html( kounselia_t( 'mail.pro.suspended_mistake', array(), $lang ) ) . '</p>',
         ) );
     }
     kounselia_admin_log( 'suspended_professional', 'professional', (int) $pro->id );
@@ -179,11 +181,12 @@ function kounselia_admin_professional_reinstate( $professional_id, $notify = tru
         $wpdb->update( $wpdb->prefix . 'kounselia_professionals', array( 'publishing' => 'default', 'publishing_note' => null ), array( 'id' => $pro->id ) );
     }
     if ( $notify && function_exists( 'kounselia_notify_user' ) ) {
-        kounselia_notify_user( (int) $pro->user_id, 'professional_reinstated', 'Your account is active again', 'Clients can find and book you again.', '/pro-dashboard.php', array(
-            'subject'      => 'Your Kounselia professional account is active again',
-            'headline'     => 'Welcome back',
-            'content_html' => '<p>Your suspension has been lifted. Clients can find and book you again.</p>',
-            'btn_text'     => 'Open your dashboard',
+        $lang = kounselia_mail_lang( (int) $pro->user_id );
+        kounselia_notify_user( (int) $pro->user_id, 'professional_reinstated', kounselia_t( 'mail.pro.reinstated_title', array(), $lang ), kounselia_t( 'mail.pro.reinstated_body', array(), $lang ), '/pro-dashboard.php', array(
+            'subject'      => kounselia_t( 'mail.pro.reinstated_subject', array(), $lang ),
+            'headline'     => kounselia_t( 'mail.pro.reinstated_headline', array(), $lang ),
+            'content_html' => '<p>' . esc_html( kounselia_t( 'mail.pro.reinstated_content', array(), $lang ) ) . '</p>',
+            'btn_text'     => kounselia_t( 'mail.pro.open_dashboard', array(), $lang ),
             'btn_url'      => kounselia_site_url( '/pro-dashboard.php' ),
         ) );
     }

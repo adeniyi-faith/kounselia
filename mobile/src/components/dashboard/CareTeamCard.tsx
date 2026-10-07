@@ -1,9 +1,10 @@
 // "Your care team" (inc/dashboard-care-team.php): the member's next
 // session with a professional up front, with Join now when it's time —
 // or, with nothing booked, a few professionals' faces and an invitation.
-import type { CareTeam } from '@kounselia/core';
+import type { CareTeam, Translate } from '@kounselia/core';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { useLanguage } from '@/language';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 import { ProfessionalAvatar } from './ProfessionalAvatar';
@@ -16,20 +17,21 @@ interface Props {
 }
 
 // "Today", "Tomorrow", or the weekday — like the website.
-function dayWord(d: Date): string {
+function dayWord(d: Date, t: Translate, language: string): string {
   const start = new Date();
   start.setHours(0, 0, 0, 0);
   const that = new Date(d);
   that.setHours(0, 0, 0, 0);
   const days = Math.round((that.getTime() - start.getTime()) / 86400000);
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Tomorrow';
-  return d.toLocaleDateString([], { weekday: 'long' });
+  if (days === 0) return t('growth.today');
+  if (days === 1) return t('m.care.tomorrow');
+  return d.toLocaleDateString(language, { weekday: 'long' });
 }
 
 export function CareTeamCard({ care, joining, onJoin, onManage }: Props) {
   const styles = useStyles();
   const colors = useColors();
+  const { language, t } = useLanguage();
   const next = care.next;
   const discount = care.discount_percent ? `${Number(care.discount_percent.toFixed(1))}%` : null;
 
@@ -39,22 +41,22 @@ export function CareTeamCard({ care, joining, onJoin, onManage }: Props) {
     // wherever their name first appears (their profile, the sessions
     // list); tacked onto this line too it just reads as clutter.
     const details = [
-      at ? `${dayWord(at)} · ${at.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '',
-      next.more_booked > 0 ? `+${next.more_booked} more booked` : '',
+      at ? `${dayWord(at, t, language)} · ${at.toLocaleTimeString(language, { hour: 'numeric', minute: '2-digit' })}` : '',
+      next.more_booked > 0 ? t('m.care.more_booked', { n: next.more_booked }) : '',
     ].filter(Boolean);
     return (
       <LinearGradient colors={[colors.accentLight, colors.surface]} start={{ x: 0, y: 0 }} end={{ x: 0.9, y: 0.9 }} style={[styles.card, styles.hasNext]}>
         <View style={styles.row}>
           {at && (
-            <View style={styles.date} accessible accessibilityLabel={at.toLocaleDateString([], { day: 'numeric', month: 'long' })}>
-              <Text style={styles.dateM}>{at.toLocaleDateString([], { month: 'short' })}</Text>
+            <View style={styles.date} accessible accessibilityLabel={at.toLocaleDateString(language, { day: 'numeric', month: 'long' })}>
+              <Text style={styles.dateM}>{at.toLocaleDateString(language, { month: 'short' })}</Text>
               <Text style={styles.dateD}>{at.getDate()}</Text>
             </View>
           )}
           <View style={styles.meta}>
             <View style={styles.eyebrowRow}>
               <TablerIcon name="calendar-event" size={12} color={colors.gold} />
-              <Text style={styles.eyebrow}>Your next session</Text>
+              <Text style={styles.eyebrow}>{t('m.care.next_session')}</Text>
             </View>
             <Text style={styles.title}>{next.pro_name}</Text>
             <Text style={styles.body}>{details.join(' · ')}</Text>
@@ -64,11 +66,11 @@ export function CareTeamCard({ care, joining, onJoin, onManage }: Props) {
           {next.joinable && (
             <Pressable onPress={() => onJoin(next.id)} accessibilityRole="button" style={[styles.btn, styles.btnFill]}>
               {joining ? <ActivityIndicator size="small" color="#fff" /> : <TablerIcon name="video" size={16} color="#fff" />}
-              <Text style={[styles.btnText, { color: '#fff' }]}>Join now</Text>
+              <Text style={[styles.btnText, { color: '#fff' }]}>{t('m.care.join_now')}</Text>
             </Pressable>
           )}
           <Pressable onPress={onManage} accessibilityRole="button" style={[styles.btn, next.joinable ? styles.btnGhost : styles.btnFill]}>
-            <Text style={[styles.btnText, { color: next.joinable ? colors.text2 : '#fff' }]}>Manage</Text>
+            <Text style={[styles.btnText, { color: next.joinable ? colors.text2 : '#fff' }]}>{t('m.care.manage')}</Text>
           </Pressable>
         </View>
       </LinearGradient>
@@ -94,17 +96,17 @@ export function CareTeamCard({ care, joining, onJoin, onManage }: Props) {
         <View style={styles.meta}>
           <View style={styles.eyebrowRow}>
             <TablerIcon name="user-heart" size={12} color={colors.gold} />
-            <Text style={styles.eyebrow}>Your care team</Text>
+            <Text style={styles.eyebrow}>{t('m.care.team')}</Text>
           </View>
-          <Text style={styles.title}>Sometimes you want a person in the room</Text>
+          <Text style={styles.title}>{t('m.care.headline')}</Text>
         </View>
       </View>
       <Text style={styles.body}>
-        Book a video session with a licensed, verified professional, at a time that suits you.
-        {discount ? <Text style={styles.perk}> You save {discount} with Pro.</Text> : null}
+        {t('m.care.body')}
+        {discount ? <Text style={styles.perk}> {t('m.care.save_pro', { pct: discount })}</Text> : null}
       </Text>
       <Pressable onPress={onManage} accessibilityRole="button" style={[styles.btnWide, styles.btnFill]}>
-        <Text style={[styles.btnText, { color: '#fff' }]}>{care.professionals.length ? 'Browse professionals' : 'See professionals'}</Text>
+        <Text style={[styles.btnText, { color: '#fff' }]}>{care.professionals.length ? t('m.care.browse') : t('m.care.see')}</Text>
       </Pressable>
     </LinearGradient>
   );

@@ -782,11 +782,14 @@ function kounselia_block_signup_button() {
  * The newsletter sign-up form (footer, blog sidebar, pages). Submitted
  * by /inc/kounselia-site-scripts.php to kounselia_newsletter_subscribe.
  */
-function kounselia_newsletter_form_html( $source = 'website', $button = 'Subscribe' ) {
+function kounselia_newsletter_form_html( $source = 'website', $button = '' ) {
+    if ( '' === $button || 'Subscribe' === $button ) {
+        $button = kounselia_t( 's.blog.subscribe' );
+    }
     return '<form class="k-nl-form" data-source="' . esc_attr( $source ) . '" novalidate>'
         . '<input type="text" name="website" class="k-hp" tabindex="-1" autocomplete="off" aria-hidden="true">'
-        . '<input type="text" name="name" placeholder="First name (optional)" autocomplete="given-name" aria-label="First name">'
-        . '<input type="email" name="email" placeholder="Your email address" autocomplete="email" required aria-label="Email address">'
+        . '<input type="text" name="name" placeholder="' . esc_attr( kounselia_t( 's.nl.form_first_name' ) ) . '" autocomplete="given-name" aria-label="' . esc_attr( kounselia_t( 's.nl.form_first_name_aria' ) ) . '">'
+        . '<input type="email" name="email" placeholder="' . esc_attr( kounselia_t( 's.nl.form_email' ) ) . '" autocomplete="email" required aria-label="' . esc_attr( kounselia_t( 's.nl.form_email_aria' ) ) . '">'
         . '<button type="submit">' . esc_html( $button ) . '</button>'
         . '<div class="k-nl-msg" role="status" aria-live="polite"></div>'
         . '</form>';

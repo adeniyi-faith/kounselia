@@ -128,11 +128,12 @@ function kounselia_maybe_save_series_authorization( $booking_id, $paystack_data 
         // silent surprise when next week never gets booked.
         $client = get_userdata( $booking->client_user_id );
         if ( $client && function_exists( 'kounselia_notify_user' ) ) {
+            $lang = kounselia_mail_lang( $booking->client_user_id );
             kounselia_notify_user(
                 $booking->client_user_id,
                 'series_needs_manual_renewal',
-                'Weekly sessions need to be booked manually',
-                'Your payment method can\'t be auto-charged for future weeks, so please book each session yourself.',
+                kounselia_t( 'mail.series.manual_title', array(), $lang ),
+                kounselia_t( 'mail.series.manual_body', array(), $lang ),
                 '/dashboard.php#professionals'
             );
         }
@@ -366,16 +367,22 @@ function kounselia_pause_series( $series, $reason ) {
 
     $professional = kounselia_get_professional_by_id( $series->professional_id );
 
+    $lang        = kounselia_mail_lang( $series->client_user_id );
+    $title       = kounselia_t( 'mail.series.paused_title', array(), $lang );
+    $pro_name    = $professional ? ( get_userdata( $professional->user_id )->display_name ?? '' ) : '';
+    $paused_line = $professional
+        ? kounselia_t( 'mail.series.paused_content_with', array( 'name' => esc_html( $pro_name ), 'reason' => esc_html( $reason ) ), $lang )
+        : kounselia_t( 'mail.series.paused_content', array( 'reason' => esc_html( $reason ) ), $lang );
     kounselia_notify_user(
         $series->client_user_id,
         'series_paused',
-        'Your weekly sessions have paused',
+        $title,
         $reason,
         '/dashboard.php#professionals',
         array(
-            'subject'      => 'Your weekly sessions have paused',
-            'headline'     => 'Weekly sessions paused',
-            'content_html' => '<p>Your weekly sessions' . ( $professional ? ' with ' . esc_html( get_userdata( $professional->user_id )->display_name ?? '' ) : '' ) . ' have paused: ' . esc_html( $reason ) . '</p><p>You can book a fresh session (and set up a new weekly time) any time from your dashboard.</p>',
+            'subject'      => $title,
+            'headline'     => kounselia_t( 'mail.series.paused_headline', array(), $lang ),
+            'content_html' => '<p>' . $paused_line . '</p><p>' . kounselia_t( 'mail.series.paused_more', array(), $lang ) . '</p>',
         )
     );
 
@@ -383,7 +390,7 @@ function kounselia_pause_series( $series, $reason ) {
         kounselia_notify_user(
             $professional->user_id,
             'series_paused',
-            'A client\'s weekly sessions have paused',
+            kounselia_t( 'mail.series.pro_paused_title', array(), kounselia_mail_lang( $professional->user_id ) ),
             $reason,
             '/pro-dashboard.php#bookings'
         );

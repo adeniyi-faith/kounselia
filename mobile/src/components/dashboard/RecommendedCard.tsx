@@ -1,5 +1,6 @@
 import type { CounselorSummary } from '@kounselia/core';
 import { Pressable, Text, View } from 'react-native';
+import { useT } from '@/language';
 import { fonts, makeStyles, useColors } from '@/theme';
 import { CounselorAvatar } from '../CounselorAvatar';
 import { Card } from './Card';
@@ -8,6 +9,7 @@ import { Card } from './Card';
 export function RecommendedCard({ counselor, reason, onStart }: { counselor: CounselorSummary; reason: string; onStart: () => void }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   return (
     <Card style={styles.card}>
       <View style={styles.top}>
@@ -18,8 +20,8 @@ export function RecommendedCard({ counselor, reason, onStart }: { counselor: Cou
         </View>
       </View>
       <Text style={styles.reason}>{reason}</Text>
-      <Pressable onPress={onStart} accessibilityRole="button" accessibilityLabel={`Start talking with ${counselor.name}`} style={({ pressed }) => [styles.btn, pressed && { backgroundColor: colors.accent2 }]}>
-        <Text style={styles.btnText}>Start talking</Text>
+      <Pressable onPress={onStart} accessibilityRole="button" accessibilityLabel={t('m.rec.start_a11y', { name: counselor.name })} style={({ pressed }) => [styles.btn, pressed && { backgroundColor: colors.accent2 }]}>
+        <Text style={styles.btnText}>{t('m.rec.start')}</Text>
       </Pressable>
     </Card>
   );

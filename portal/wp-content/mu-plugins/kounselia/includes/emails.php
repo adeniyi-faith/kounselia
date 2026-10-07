@@ -11,6 +11,76 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 /**
+ * The language to write an email to someone in: what they saved in their
+ * account, else (only when they are the person making this request, or
+ * $acting is true because the visitor is acting for themselves, e.g. a
+ * password reset) the language of this request, else English.
+ *
+ * $who may be a user id, a WP_User, an email address, or null (the
+ * person making the request).
+ */
+function kounselia_mail_lang( $who = null, $acting = false ) {
+    $user_id = 0;
+    if ( $who instanceof WP_User ) {
+        $user_id = (int) $who->ID;
+    } elseif ( is_numeric( $who ) ) {
+        $user_id = (int) $who;
+    } elseif ( is_string( $who ) && '' !== $who && is_email( $who ) ) {
+        $found = get_user_by( 'email', $who );
+        if ( ! $found ) {
+            // Not a member (e.g. a newsletter contact): the request's language.
+            return kounselia_current_language( 0 );
+        }
+        $user_id = (int) $found->ID;
+    } else {
+        return kounselia_current_language();
+    }
+    $pref = kounselia_user_language_preference( $user_id );
+    if ( $pref ) {
+        return $pref;
+    }
+    if ( $acting || ( $user_id && $user_id === (int) get_current_user_id() ) ) {
+        return kounselia_current_language( 0 );
+    }
+    return 'en';
+}
+
+/** "3:00 PM" in English, "15:00" in the other languages. */
+function kounselia_mail_time( $ts, $lang ) {
+    return 'en' === $lang ? date_i18n( 'g:i A', $ts ) : date_i18n( 'H:i', $ts );
+}
+
+/** "October 7, 2026" in English; the same date written in another language. */
+function kounselia_mail_date( $ts, $lang ) {
+    if ( 'en' === $lang ) {
+        return date_i18n( 'F j, Y', $ts );
+    }
+    return kounselia_t( 'mail.date.long', array(
+        'day'   => date_i18n( 'j', $ts ),
+        'month' => kounselia_t( 'mail.month.' . (int) date_i18n( 'n', $ts ), array(), $lang ),
+        'year'  => date_i18n( 'Y', $ts ),
+    ), $lang );
+}
+
+/**
+ * "Monday, October 7, 2026 at 3:00 PM" in English. $short gives the
+ * compact "Mon, Oct 7 at 3:00pm" form.
+ */
+function kounselia_mail_datetime( $ts, $lang, $short = false ) {
+    if ( 'en' === $lang ) {
+        return $short ? date_i18n( 'D, M j \a\t g:ia', $ts ) : date_i18n( 'l, F j, Y \a\t g:i A', $ts );
+    }
+    $vars = array(
+        'weekday' => kounselia_t( 'mail.day.' . (int) date_i18n( 'w', $ts ), array(), $lang ),
+        'day'     => date_i18n( 'j', $ts ),
+        'month'   => kounselia_t( 'mail.month.' . (int) date_i18n( 'n', $ts ), array(), $lang ),
+        'year'    => date_i18n( 'Y', $ts ),
+        'time'    => kounselia_mail_time( $ts, $lang ),
+    );
+    return kounselia_t( $short ? 'mail.datetime.short' : 'mail.datetime.long', $vars, $lang );
+}
+
+/**
  * Builds the full branded email document (no sending). Split out of
  * kounselia_send_html_email() so the newsletter composer can show an
  * exact preview of what recipients will receive.
@@ -19,10 +89,15 @@ if ( ! defined( 'ABSPATH' ) ) {
  *   preheader    — the grey preview line inboxes show after the subject.
  *   footer_html  — extra footer markup, e.g. the unsubscribe links.
  *   pixel_url    — open-tracking image URL (newsletters only).
+ *   lang         — language of the fixed wording (footer) and the page
+ *                  direction; English when not given.
  */
 function kounselia_render_email_html( $subject, $headline, $content, $btn_text = null, $btn_url = null, $opts = array() ) {
     $logo_url = 'https://kounselia.com/img/Kounselia_Logo_IconMark_MidnightNavy.png';
     $year     = date( 'Y' );
+    $lang     = ! empty( $opts['lang'] ) ? kounselia_language_normalize( $opts['lang'] ) : 'en';
+    $dir      = kounselia_language_is_rtl( $lang ) ? 'rtl' : 'ltr';
+    $align    = 'rtl' === $dir ? 'right' : 'left';
 
     $button_html = '';
     if ( $btn_text && $btn_url ) {
@@ -54,13 +129,13 @@ function kounselia_render_email_html( $subject, $headline, $content, $btn_text =
     // We use Georgia as a safe fallback for the Cormorant Garamond serif feel.
     return '
     <!DOCTYPE html>
-    <html lang="en">
+    <html lang="' . esc_attr( $lang ) . '" dir="' . $dir . '">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>' . esc_html( $subject ) . '</title>
     </head>
-    <body style="margin: 0; padding: 0; background-color: #F8F6F2; font-family: Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+    <body dir="' . $dir . '" style="margin: 0; padding: 0; background-color: #F8F6F2; font-family: Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
         ' . $preheader_html . '
         <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #F8F6F2; width: 100%; padding: 40px 20px;">
             <tr>
@@ -79,7 +154,7 @@ function kounselia_render_email_html( $subject, $headline, $content, $btn_text =
                             <td style="padding: 0 40px 40px;">
                                 ' . $headline_html . '
 
-                                <div style="color: #5B574D; font-size: 16px; line-height: 1.7; font-weight: normal;">
+                                <div style="color: #5B574D; font-size: 16px; line-height: 1.7; font-weight: normal; text-align: ' . $align . ';">
                                     ' . $content . '
                                 </div>
 
@@ -93,8 +168,8 @@ function kounselia_render_email_html( $subject, $headline, $content, $btn_text =
                         <tr>
                             <td align="center" style="padding: 30px 20px; color: #A8A49A; font-size: 13px; line-height: 1.6;">
                                 &copy; ' . $year . ' Kounselia.<br>
-                                A global mental wellness initiative.<br>
-                                <span style="font-size: 11px; margin-top: 10px; display: block;">This email was sent securely. Please do not reply directly to this message.</span>
+                                ' . esc_html( kounselia_t( 'mail.footer.tagline', array(), $lang ) ) . '<br>
+                                <span style="font-size: 11px; margin-top: 10px; display: block;">' . esc_html( kounselia_t( 'mail.footer.secure', array(), $lang ) ) . '</span>
                                 ' . $footer_extra . '
                                 ' . $pixel . '
                             </td>
@@ -113,9 +188,13 @@ function kounselia_render_email_html( $subject, $headline, $content, $btn_text =
  * Kounselia's brand colors, typography, and logo.
  *
  * $opts is passed through to kounselia_render_email_html(); it may also
- * carry 'headers' (extra mail headers, e.g. List-Unsubscribe).
+ * carry 'headers' (extra mail headers, e.g. List-Unsubscribe) and 'lang'
+ * (the recipient's language; worked out from the address when not given).
  */
 function kounselia_send_html_email( $to, $subject, $headline, $content, $btn_text = null, $btn_url = null, $opts = array() ) {
+    if ( empty( $opts['lang'] ) && is_string( $to ) ) {
+        $opts['lang'] = kounselia_mail_lang( $to );
+    }
     $html = kounselia_render_email_html( $subject, $headline, $content, $btn_text, $btn_url, $opts );
 
     // Force WP to send as HTML instead of default plain text

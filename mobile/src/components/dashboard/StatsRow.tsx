@@ -1,5 +1,6 @@
 import type { HomeData } from '@kounselia/core';
 import { Text, View } from 'react-native';
+import { useT } from '@/language';
 import { counselorColors, fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 import { TablerIcon } from '../TablerIcon';
 
@@ -7,10 +8,11 @@ import { TablerIcon } from '../TablerIcon';
 export function StatsRow({ stats }: { stats: HomeData['stats'] }) {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
   const items = [
-    { icon: 'message-circle', color: 'blue', num: stats.conversations, label: 'Conversations' },
-    { icon: 'calendar-week', color: 'sage', num: stats.messages_this_week, label: 'Messages this week' },
-    { icon: 'users', color: 'gold', num: stats.counselors_met, label: 'Counselors met' },
+    { icon: 'message-circle', color: 'blue', num: stats.conversations, label: t('m.stats.conversations') },
+    { icon: 'calendar-week', color: 'sage', num: stats.messages_this_week, label: t('m.stats.messages_week') },
+    { icon: 'users', color: 'gold', num: stats.counselors_met, label: t('m.stats.counselors_met') },
   ];
   return (
     <View style={styles.row}>

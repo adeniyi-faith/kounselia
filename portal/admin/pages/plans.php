@@ -40,6 +40,7 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
                 'reflections_per_month' => $_POST['b'][ $kounselia_tier ]['reflections_per_month'] ?? 0,
                 'auto_reflection_days'  => $_POST['b'][ $kounselia_tier ]['auto_reflection_days'] ?? 30,
                 'booking_discount'      => $_POST['b'][ $kounselia_tier ]['booking_discount'] ?? 0,
+                'growth_plans'          => $_POST['b'][ $kounselia_tier ]['growth_plans'] ?? 3,
             );
         }
         kounselia_save_plan_benefits( $kounselia_benefits_input );
@@ -199,6 +200,7 @@ $form_sort_order    = $edit_plan ? $edit_plan['sort_order'] : ( count( $plans ) 
           'reflections_per_month' => array( 'Milestone Reflections per month', 'number', '0 = unlimited. Each one uses the most capable (most expensive) AI model.' ),
           'auto_reflection_days'  => array( 'Reflection refreshes itself every … days', 'number', '0 = never automatically.' ),
           'booking_discount'      => array( 'Discount on professional sessions (%)', 'number', 'Taken from Kounselia\'s commission, never the professional\'s share, so it can\'t exceed the commission rate.' ),
+          'growth_plans'          => array( 'Growth plans a member can start', 'number', '0 = unlimited. Each is a 30 day Personal Development plan written by the AI. A plan ended on the day it started is given back.' ),
       );
       ?>
   <div class="panel">

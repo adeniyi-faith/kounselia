@@ -41,8 +41,8 @@ kounselia_public_head( array(
 <body class="k-site">
 <?php if ( $kounselia_is_admin ) : ?>
   <div class="k-draft-bar"<?php echo 'published' === $kounselia_page->status ? ' style="background:var(--accent)"' : ''; ?>>
-    <?php echo 'published' === $kounselia_page->status ? 'You are signed in as staff.' : 'Draft preview — only staff can see this page.'; ?>
-    <a href="/portal/admin/pages/pages.php?edit=<?php echo (int) $kounselia_page->id; ?>">Edit this page</a>
+    <?php echo esc_html( kounselia_t( 'published' === $kounselia_page->status ? 's.page.staff_signed_in' : 's.page.draft_preview' ) ); ?>
+    <a href="/portal/admin/pages/pages.php?edit=<?php echo (int) $kounselia_page->id; ?>"><?php echo esc_html( kounselia_t( 's.page.edit' ) ); ?></a>
   </div>
 <?php endif; ?>
 
@@ -69,11 +69,11 @@ kounselia_public_head( array(
 
   <?php if ( 'safety-resources' !== $kounselia_page->slug ) : ?>
     <section class="k-cta-band">
-      <h2>You deserve someone <em>to talk to</em></h2>
-      <p>Private, judgement free conversations with a counselor who understands. No appointment. No waiting list.</p>
+      <h2><?php echo str_replace( '@@em@@', '<em>' . esc_html( kounselia_t( 's.home.hero_title_em' ) ) . '</em>', esc_html( kounselia_t( 's.home.hero_title', array( 'em' => '@@em@@' ) ) ) ); ?></h2>
+      <p><?php echo esc_html( kounselia_t( 's.page.cta_p' ) ); ?></p>
       <div class="k-cta-actions">
-        <a class="k-btn" href="/?browse=1#counselors-anchor">Talk to someone now</a>
-        <a class="k-btn ghost" href="/blog/">Read the journal</a>
+        <a class="k-btn" href="/?browse=1#counselors-anchor"><?php echo esc_html( kounselia_t( 's.home.hero_cta_talk' ) ); ?></a>
+        <a class="k-btn ghost" href="/blog/"><?php echo esc_html( kounselia_t( 's.page.read_journal' ) ); ?></a>
       </div>
     </section>
   <?php endif; ?>

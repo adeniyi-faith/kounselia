@@ -15,7 +15,7 @@
 // app.json) and, on Android, Firebase's google-services.json file (named
 // in app.json as android.googleServicesFile). Until then pushState() says
 // 'unavailable': Settings hides the switch and booking doesn't offer it.
-import { registerPushToken, unregisterPushToken, type KounseliaConfig } from '@kounselia/core';
+import { deviceLanguage, makeT, normalizeLanguage, registerPushToken, unregisterPushToken, type KounseliaConfig } from '@kounselia/core';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
@@ -43,6 +43,13 @@ if (Platform.OS !== 'web') {
   });
 }
 
+// These functions run outside any screen, so they read the member's chosen
+// language (see language.tsx) themselves.
+async function translator() {
+  const saved = await readSecure('kounselia_app_language').catch(() => null);
+  return makeT(saved ? normalizeLanguage(saved) : deviceLanguage());
+}
+
 function projectId(): string | undefined {
   return Constants.expoConfig?.extra?.eas?.projectId ?? Constants.easConfig?.projectId;
 }
@@ -56,8 +63,9 @@ export type PushState =
 async function androidChannel() {
   // Android 13+ only shows the permission prompt once a channel exists.
   if (Platform.OS !== 'android') return;
+  const t = await translator();
   await Notifications.setNotificationChannelAsync('default', {
-    name: 'Reminders and updates',
+    name: t('m.b.push.channel'),
     importance: Notifications.AndroidImportance.HIGH,
   }).catch(() => undefined);
 }
@@ -139,14 +147,15 @@ export async function showBookedDialog(config: KounseliaConfig, title: string, m
     showDialog({ title, message, icon: 'calendar-check', tone: 'success' });
     return;
   }
+  const t = await translator();
   showDialog({
     title,
-    message: `${message}\n\nWould you like a notification on this phone before it starts?`,
+    message: `${message}\n\n${t('m.b.push.ask')}`,
     icon: 'calendar-check',
     tone: 'success',
     buttons: [
-      { text: 'Not now', style: 'cancel', onPress: () => writeSecure(CHOICE_KEY, 'off') },
-      { text: 'Remind me', onPress: () => withoutLocking(() => turnOnPush(config)) },
+      { text: t('m.b.push.not_now'), style: 'cancel', onPress: () => writeSecure(CHOICE_KEY, 'off') },
+      { text: t('m.b.push.remind'), onPress: () => withoutLocking(() => turnOnPush(config)) },
     ],
   });
 }
@@ -159,6 +168,7 @@ export function routeForLink(url: string): Href {
   const article = /^\/blog\/([^/?#]+)/.exec(path);
   if (article && article[1] !== 'tag') return { pathname: '/articles/[slug]', params: { slug: decodeURIComponent(article[1]) } };
   if (path.includes('tab=upgrade')) return '/plan';
+  if (path.includes('tab=growth')) return '/growth';
   // A professional's own news (new bookings, payouts, article reviews):
   // the matching tab of their professional home.
   if (path.startsWith('/pro-dashboard.php') || path.startsWith('/pro-write.php')) {

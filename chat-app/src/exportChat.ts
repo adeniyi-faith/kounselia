@@ -1,13 +1,13 @@
-import type { ChatMessage, Counselor } from '@kounselia/core';
+import type { ChatMessage, Counselor, Translate } from '@kounselia/core';
 
 // Triggers a browser file download, so this stays out of core/ (a
 // React Native build would save the transcript a different way).
-export function exportChatAsFile(messages: ChatMessage[], counselor: Counselor) {
+export function exportChatAsFile(messages: ChatMessage[], counselor: Counselor, t: Translate) {
   if (messages.length === 0) return false;
 
-  let text = 'Kounselia Session Export\n\n';
+  let text = `${t('c.export.title')}\n\n`;
   for (const m of messages) {
-    const sender = m.sender === 'ai' ? counselor.name : 'Me';
+    const sender = m.sender === 'ai' ? counselor.name : t('c.export.me');
     text += `${sender}:\n${m.text}\n\n`;
   }
 

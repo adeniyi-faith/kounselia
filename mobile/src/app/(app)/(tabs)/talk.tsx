@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Button } from '@/components/Button';
 import { CounselorAvatar } from '@/components/CounselorAvatar';
 import { useCounselors } from '@/counselors';
+import { useT } from '@/language';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 import { GridSkeleton } from '@/components/Skeleton';
 
@@ -13,6 +14,7 @@ import { GridSkeleton } from '@/components/Skeleton';
 // row, each opening a conversation with that counselor.
 export default function Talk() {
   const styles = useStyles();
+  const t = useT();
   const colors = useColors();
   const { status, counselors, reload } = useCounselors();
   const [refreshing, setRefreshing] = useState(false);
@@ -26,9 +28,9 @@ export default function Talk() {
   const header = (
     <View style={styles.head}>
       <Text style={styles.title} accessibilityRole="header">
-        Talk to someone
+        {t('m.tabs.talk')}
       </Text>
-      <Text style={styles.sub}>Pick whoever fits right now</Text>
+      <Text style={styles.sub}>{t('m.talk.sub')}</Text>
     </View>
   );
 
@@ -48,8 +50,8 @@ export default function Talk() {
       <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
         {header}
         <View style={styles.center}>
-          <Text style={styles.errorText}>We couldn’t load the counselors. Please check your internet connection.</Text>
-          <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+          <Text style={styles.errorText}>{t('m.talk.load_failed')}</Text>
+          <Button title={t('growth.try_again')} variant="ghost" onPress={refresh} busy={refreshing} />
         </View>
       </SafeAreaView>
     );
@@ -73,12 +75,13 @@ export default function Talk() {
 
 function CounselorTile({ counselor }: { counselor: CounselorSummary }) {
   const styles = useStyles();
+  const t = useT();
   return (
     <Pressable
       onPress={() => router.push({ pathname: '/chat/[slug]', params: { slug: counselor.slug } })}
       accessibilityRole="button"
       accessibilityLabel={`${counselor.name}, ${counselor.spec}`}
-      accessibilityHint="Opens a conversation"
+      accessibilityHint={t('m.talk.opens_chat')}
       style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
     >
       <CounselorAvatar icon={counselor.icon} color={counselor.color} size={44} />

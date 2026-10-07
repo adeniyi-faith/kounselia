@@ -5,7 +5,7 @@ import type { CounselorMap, KounseliaConfig } from '@kounselia/core';
 
 declare global {
   interface Window {
-    KOUNSELIA: KounseliaConfig;
+    KOUNSELIA: KounseliaConfig & { language?: string; i18n?: Record<string, string> };
     C: CounselorMap;
     kounseliaMountChat?: () => void;
     __kounseliaDeferMount?: boolean;

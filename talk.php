@@ -56,13 +56,14 @@ $kounselia_avatar_url   = function_exists( 'kounselia_get_avatar_url' )
     : false;
 $kounselia_ajax_url     = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $kounselia_nonce        = wp_create_nonce( 'kounselia_auth' );
+$kounselia_talk_lang    = kounselia_current_language( $kounselia_current_user->ID );
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html <?php echo function_exists( 'kounselia_html_attrs' ) ? kounselia_html_attrs() : 'lang="en"'; ?>>
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Kounselia — Conversation</title>
+<title><?php echo esc_html( kounselia_t( 's.talk.title', array(), $kounselia_talk_lang ) ); ?></title>
 <meta name="robots" content="noindex, nofollow">
 
 <!-- PRELOAD CRITICAL BRANDING -->
@@ -123,7 +124,7 @@ $kounselia_nonce        = wp_create_nonce( 'kounselia_auth' );
     <div class="loading-dots">
       <div></div><div></div><div></div>
     </div>
-    <div class="loading-text" id="loading-text">Preparing your space...</div>
+    <div class="loading-text" id="loading-text"><?php echo esc_html( kounselia_t( 's.talk.preparing', array(), $kounselia_talk_lang ) ); ?></div>
   </div>
 </div>
 
@@ -147,7 +148,7 @@ document.addEventListener('DOMContentLoaded',async function(){
     // Personalize the loader if counselor is known
     const loaderText = document.getElementById('loading-text');
     if(loaderText && C[slug].name) {
-      loaderText.textContent = 'Connecting you with ' + C[slug].name + '...';
+      loaderText.textContent = <?php echo wp_json_encode( kounselia_t( 's.talk.connecting', array( 'name' => '@@NAME@@' ), $kounselia_talk_lang ) ); ?>.replace('@@NAME@@', C[slug].name);
     }
 
     // Arrived from a dashboard "Smart Check-in" card: swap the usual

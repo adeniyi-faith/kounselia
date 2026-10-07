@@ -22,6 +22,11 @@ function kounselia_community_login_url( $anchor = '' ) {
     return '/?auth=login&return=' . rawurlencode( $path . ( $anchor ? '#' . $anchor : '' ) );
 }
 
+/** Words for the public community pieces, in the visitor's language. */
+function kounselia_community_t( $key, $vars = array() ) {
+    return function_exists( 'kounselia_t' ) ? kounselia_t( $key, $vars ) : $key;
+}
+
 function kounselia_follow_button_html( $professional_id, $opts = array() ) {
     if ( ! function_exists( 'kounselia_follows_on' ) || ! kounselia_follows_on() ) {
         return '';
@@ -34,14 +39,14 @@ function kounselia_follow_button_html( $professional_id, $opts = array() ) {
     }
     $following = kounselia_is_following( $user_id, $pro->id );
     $count     = $opts['count'] ? kounselia_follower_count( $pro->id ) : null;
-    $label     = $following ? 'Following' : 'Follow';
+    $label     = esc_html( kounselia_community_t( $following ? 'd.cm.following' : 'd.cm.follow' ) );
     $attrs     = 'class="k-follow' . ( $following ? ' on' : '' ) . ( $opts['class'] ? ' ' . esc_attr( $opts['class'] ) : '' ) . '" data-pro="' . (int) $pro->id . '" aria-pressed="' . ( $following ? 'true' : 'false' ) . '"';
     $inner     = '<i class="ti ti-' . ( $following ? 'check' : 'plus' ) . '"></i><span>' . $label . '</span>';
     $html      = $user_id
         ? '<button type="button" ' . $attrs . '>' . $inner . '</button>'
         : '<a href="' . esc_url( kounselia_community_login_url() ) . '" ' . $attrs . '>' . $inner . '</a>';
     if ( null !== $count ) {
-        $html .= '<span class="k-follow-count" data-pro-count="' . (int) $pro->id . '">' . esc_html( number_format_i18n( $count ) ) . ' ' . ( 1 === $count ? 'follower' : 'followers' ) . '</span>';
+        $html .= '<span class="k-follow-count" data-pro-count="' . (int) $pro->id . '">' . esc_html( kounselia_community_t( 1 === $count ? 'd.cm.followers_one' : 'd.cm.followers_other', array( 'n' => number_format_i18n( $count ) ) ) ) . '</span>';
     }
     return $html;
 }
@@ -53,7 +58,7 @@ function kounselia_love_button_html( $post ) {
     $user_id = get_current_user_id();
     $loved   = kounselia_post_loved_by( $post->id, $user_id );
     $inner   = '<i class="ti ti-heart' . ( $loved ? '-filled' : '' ) . '"></i><span class="n">' . esc_html( number_format_i18n( (int) $post->love_count ) ) . '</span>';
-    $attrs   = 'class="k-love' . ( $loved ? ' on' : '' ) . '" data-post="' . (int) $post->id . '" aria-pressed="' . ( $loved ? 'true' : 'false' ) . '" aria-label="Love this article"';
+    $attrs   = 'class="k-love' . ( $loved ? ' on' : '' ) . '" data-post="' . (int) $post->id . '" aria-pressed="' . ( $loved ? 'true' : 'false' ) . '" aria-label="' . esc_attr( kounselia_community_t( 'd.cm.love_article' ) ) . '"';
     return $user_id
         ? '<button type="button" ' . $attrs . '>' . $inner . '</button>'
         : '<a href="' . esc_url( kounselia_community_login_url() ) . '" ' . $attrs . '>' . $inner . '</a>';
@@ -85,16 +90,16 @@ function kounselia_comments_section( $post ) {
         'is_pro'   => kounselia_is_pro_article( $post ),
     );
     ?>
-    <section class="k-comments" id="comments" aria-label="Conversation">
-      <h2 class="k-comments-title">Conversation <span class="k-comments-count" id="k-c-count"><?php echo (int) $post->comment_count ? (int) $post->comment_count : ''; ?></span></h2>
-      <p class="k-comments-note"><i class="ti ti-heart-handshake"></i> Be kind: people here may be going through something hard. Comments show only a first name or nickname<?php echo kounselia_is_pro_article( $post ) ? ', and are not a substitute for a session' : ''; ?>.</p>
+    <section class="k-comments" id="comments" aria-label="<?php echo esc_attr( kounselia_community_t( 'd.cm.conversation' ) ); ?>">
+      <h2 class="k-comments-title"><?php echo esc_html( kounselia_community_t( 'd.cm.conversation' ) ); ?> <span class="k-comments-count" id="k-c-count"><?php echo (int) $post->comment_count ? (int) $post->comment_count : ''; ?></span></h2>
+      <p class="k-comments-note"><i class="ti ti-heart-handshake"></i> <?php echo esc_html( kounselia_community_t( kounselia_is_pro_article( $post ) ? 'd.cm.note_pro' : 'd.cm.note' ) ); ?></p>
       <div id="k-c-compose"></div>
       <div id="k-c-list" class="k-c-list">
         <?php foreach ( $found['comments'] as $c ) : // Readable before (or without) the script. ?>
           <article class="k-c" id="comment-<?php echo (int) $c['id']; ?>"><div class="k-c-av"><?php echo esc_html( $c['author']['initial'] ); ?></div><div class="k-c-main"><div class="k-c-head"><b><?php echo esc_html( $c['author']['name'] ); ?></b> <span><?php echo esc_html( $c['time_label'] ); ?></span></div><div class="k-c-text"><?php echo nl2br( esc_html( $c['content'] ) ); ?></div></div></article>
         <?php endforeach; ?>
       </div>
-      <div class="k-c-more"><button type="button" id="k-c-more" hidden>Show more comments</button></div>
+      <div class="k-c-more"><button type="button" id="k-c-more" hidden><?php echo esc_html( kounselia_community_t( 'd.cm.show_more' ) ); ?></button></div>
       <script type="application/json" id="k-c-data"><?php echo wp_json_encode( $data, JSON_HEX_TAG | JSON_HEX_AMP ); ?></script>
     </section>
     <?php
@@ -108,6 +113,8 @@ function kounselia_community_assets() {
     }
     $done = true;
     $ctx  = function_exists( 'kounselia_public_context' ) ? kounselia_public_context() : array( 'ajax_url' => admin_url( 'admin-ajax.php' ), 'logged_in' => is_user_logged_in() );
+    $lang = function_exists( 'kounselia_current_language' ) ? kounselia_current_language() : 'en';
+    $dict = function_exists( 'kounselia_i18n_subset' ) ? kounselia_i18n_subset( $lang, 'd.cm.' ) : array();
     ?>
 <style>
 .k-follow{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;min-height:38px;border-radius:50px;border:1px solid var(--accent);background:var(--accent);color:#fff;font-family:'Outfit',sans-serif;font-size:14px;font-weight:500;cursor:pointer;text-decoration:none;transition:all .2s;white-space:nowrap}
@@ -209,14 +216,23 @@ function kounselia_community_assets() {
 <script>
 (function(){
   var CFG = { ajax: <?php echo wp_json_encode( $ctx['ajax_url'] ); ?>, nonce: <?php echo wp_json_encode( wp_create_nonce( 'kounselia_auth' ) ); ?>, loggedIn: <?php echo ! empty( $ctx['logged_in'] ) ? 'true' : 'false'; ?> };
+  // Words in the visitor's language (packages/core/src/locales).
+  var LANG = <?php echo wp_json_encode( $lang ); ?>;
+  var DICT = <?php echo wp_json_encode( $dict ); ?>;
+  var LOC = LANG === 'en' ? undefined : (LANG === 'ar' ? 'ar-u-nu-latn' : LANG);
+  function tr(key, vars){
+    var text = DICT[key] != null ? String(DICT[key]) : key;
+    return text.replace(/\{(\w+)\}/g, function(m, name){ return vars && vars[name] != null ? vars[name] : m; });
+  }
+  function num(n){ return Number(n).toLocaleString(LOC); }
 
   function call(action, data){
     var body = new URLSearchParams(data || {});
     body.append('action', action); body.append('nonce', CFG.nonce);
     return fetch(CFG.ajax, { method: 'POST', credentials: 'same-origin', body: body })
-      .then(function(r){ return r.json().catch(function(){ throw new Error('Something went wrong. Please try again.'); }); })
+      .then(function(r){ return r.json().catch(function(){ throw new Error(tr('d.cm.err')); }); })
       .then(function(res){
-        if(!res || !res.success){ var e = new Error((res && res.data && res.data.message) || 'Something went wrong. Please try again.'); e.data = res && res.data; throw e; }
+        if(!res || !res.success){ var e = new Error((res && res.data && res.data.message) || tr('d.cm.err')); e.data = res && res.data; throw e; }
         return res.data;
       });
   }
@@ -228,23 +244,23 @@ function kounselia_community_assets() {
   }
   function el(tag, cls, text){ var e = document.createElement(tag); if(cls) e.className = cls; if(text != null) e.textContent = text; return e; }
   function icon(name){ var i = document.createElement('i'); i.className = 'ti ti-' + name; return i; }
-  function plural(n, one, many){ return n.toLocaleString() + ' ' + (n === 1 ? one : many); }
+  function plural(n, oneKey, otherKey){ return tr(n === 1 ? oneKey : otherKey, { n: num(n) }); }
   window.KCommunity = { call: call, toast: toast };
 
   /* ---------- Follow ---------- */
   document.querySelectorAll('button.k-follow').forEach(function(btn){
     btn.addEventListener('click', function(){
       var on = btn.classList.contains('on');
-      if(on && !confirm('Stop following? You will no longer hear when they publish.')) return;
+      if(on && !confirm(tr('d.cm.unfollow_confirm'))) return;
       btn.disabled = true;
       call('kounselia_follow', { professional_id: btn.dataset.pro, follow: on ? 0 : 1 }).then(function(d){
         document.querySelectorAll('button.k-follow[data-pro="' + btn.dataset.pro + '"]').forEach(function(b){
           b.classList.toggle('on', d.following); b.setAttribute('aria-pressed', d.following ? 'true' : 'false');
-          b.querySelector('span').textContent = d.following ? 'Following' : 'Follow';
+          b.querySelector('span').textContent = d.following ? tr('d.cm.following') : tr('d.cm.follow');
           b.querySelector('i').className = 'ti ti-' + (d.following ? 'check' : 'plus');
         });
-        document.querySelectorAll('[data-pro-count="' + btn.dataset.pro + '"]').forEach(function(c){ c.textContent = plural(d.followers, 'follower', 'followers'); });
-        if(d.following) toast('You will hear when they publish something new.');
+        document.querySelectorAll('[data-pro-count="' + btn.dataset.pro + '"]').forEach(function(c){ c.textContent = plural(d.followers, 'd.cm.followers_one', 'd.cm.followers_other'); });
+        if(d.following) toast(tr('d.cm.follow_toast'));
       }).catch(function(e){ toast(e.message, true); }).finally(function(){ btn.disabled = false; });
     });
   });
@@ -257,7 +273,7 @@ function kounselia_community_assets() {
       btn.querySelector('i').className = 'ti ti-heart' + (on ? '-filled' : '');
       call('kounselia_post_love', { post_id: btn.dataset.post, love: on ? 1 : 0 }).then(function(d){
         document.querySelectorAll('button.k-love[data-post="' + btn.dataset.post + '"]').forEach(function(b){
-          b.classList.toggle('on', d.loved); b.querySelector('i').className = 'ti ti-heart' + (d.loved ? '-filled' : ''); b.querySelector('.n').textContent = d.count.toLocaleString();
+          b.classList.toggle('on', d.loved); b.querySelector('i').className = 'ti ti-heart' + (d.loved ? '-filled' : ''); b.querySelector('.n').textContent = num(d.count);
         });
       }).catch(function(e){ btn.classList.toggle('on', !on); btn.querySelector('i').className = 'ti ti-heart' + (!on ? '-filled' : ''); toast(e.message, true); });
     });
@@ -291,24 +307,24 @@ function kounselia_community_assets() {
   var list = document.getElementById('k-c-list'), compose = document.getElementById('k-c-compose'), moreBtn = document.getElementById('k-c-more');
   var page = 1;
 
-  function setCount(n){ D.total = n; document.getElementById('k-c-count').textContent = n ? n.toLocaleString() : ''; document.querySelectorAll('[data-comment-count]').forEach(function(e){ e.textContent = n.toLocaleString(); }); }
+  function setCount(n){ D.total = n; document.getElementById('k-c-count').textContent = n ? num(n) : ''; document.querySelectorAll('[data-comment-count]').forEach(function(e){ e.textContent = num(n); }); }
   function tone(name){ var h = 0; for(var i = 0; i < name.length; i++){ h = (h * 31 + name.charCodeAt(i)) >>> 0; } return 't' + (h % 6); }
 
   function composer(parentId, onDone){
     var box = el('div', 'k-compose');
     var ta = el('textarea'); ta.rows = parentId ? 2 : 3; ta.maxLength = D.viewer.max_length;
-    ta.placeholder = parentId ? 'Write a reply…' : (D.is_pro ? 'Share your thoughts, or ask a question…' : 'Share your thoughts…');
-    ta.setAttribute('aria-label', parentId ? 'Your reply' : 'Your comment');
+    ta.placeholder = parentId ? tr('d.cm.reply_ph') : (D.is_pro ? tr('d.cm.share_q') : tr('d.cm.share'));
+    ta.setAttribute('aria-label', parentId ? tr('d.cm.aria_reply') : tr('d.cm.aria_comment'));
     var foot = el('div', 'k-compose-foot');
     var who = el('div', 'k-compose-who');
     if(D.viewer.identity && D.viewer.identity.mode){
-      who.appendChild(document.createTextNode('Posting as ' + D.viewer.identity.name + ' · '));
-      var ch = el('button', '', 'change'); ch.type = 'button'; ch.addEventListener('click', function(){ renderIdentity(true); }); who.appendChild(ch);
+      who.appendChild(document.createTextNode(tr('d.cm.posting_as', { name: D.viewer.identity.name }) + ' · '));
+      var ch = el('button', '', tr('d.cm.change')); ch.type = 'button'; ch.addEventListener('click', function(){ renderIdentity(true); }); who.appendChild(ch);
     }
     var right = el('div', 'k-compose-right');
     var count = el('span', 'k-compose-count');
-    var post = el('button', 'k-post-btn', parentId ? 'Reply' : 'Post'); post.type = 'button'; post.disabled = true;
-    if(parentId){ var cancel = el('button', 'k-post-btn ghost', 'Cancel'); cancel.type = 'button'; cancel.addEventListener('click', function(){ box.parentNode.remove(); }); right.appendChild(cancel); }
+    var post = el('button', 'k-post-btn', parentId ? tr('d.cm.reply') : tr('d.cm.post')); post.type = 'button'; post.disabled = true;
+    if(parentId){ var cancel = el('button', 'k-post-btn ghost', tr('d.cm.cancel')); cancel.type = 'button'; cancel.addEventListener('click', function(){ box.parentNode.remove(); }); right.appendChild(cancel); }
     right.appendChild(count); right.appendChild(post);
     foot.appendChild(who); foot.appendChild(right);
     box.appendChild(ta); box.appendChild(foot);
@@ -319,7 +335,7 @@ function kounselia_community_assets() {
       post.disabled = ta.value.trim().length < 2;
     });
     post.addEventListener('click', function(){
-      post.disabled = true; post.textContent = 'Posting…';
+      post.disabled = true; post.textContent = tr('d.cm.posting');
       call('kounselia_comment_add', { post_id: D.post_id, content: ta.value, parent_id: parentId || 0 }).then(function(d){
         ta.value = ''; ta.style.height = '';
         setCount(d.count);
@@ -329,7 +345,7 @@ function kounselia_community_assets() {
       }).catch(function(e){
         if(e.data && e.data.code === 'need_identity'){ renderIdentity(true); }
         toast(e.message, true);
-      }).finally(function(){ post.textContent = parentId ? 'Reply' : 'Post'; post.disabled = ta.value.trim().length < 2; });
+      }).finally(function(){ post.textContent = parentId ? tr('d.cm.reply') : tr('d.cm.post'); post.disabled = ta.value.trim().length < 2; });
     });
     return { box: box, focus: function(){ ta.focus(); } };
   }
@@ -337,9 +353,9 @@ function kounselia_community_assets() {
   function showCare(message, url){
     var old = document.getElementById('k-care'); if(old) old.remove();
     var c = el('div', 'k-care'); c.id = 'k-care'; c.setAttribute('role', 'alert');
-    c.appendChild(el('b', '', 'You are not alone.'));
+    c.appendChild(el('b', '', tr('d.cm.alone')));
     c.appendChild(document.createTextNode(message + ' '));
-    var a = el('a', '', 'See where to get help now'); a.href = url; c.appendChild(a);
+    var a = el('a', '', tr('d.cm.get_help')); a.href = url; c.appendChild(a);
     compose.parentNode.insertBefore(c, compose);
     c.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }
@@ -348,39 +364,39 @@ function kounselia_community_assets() {
     compose.innerHTML = '';
     var id = D.viewer.identity || {};
     var box = el('div', 'k-ident');
-    box.appendChild(el('h3', '', changing && id.mode ? 'Change how your name is shown' : 'How should your name appear?'));
-    box.appendChild(el('p', '', 'To keep this space safe, we never show your full name, email or photo on comments. Choose what people see.'));
+    box.appendChild(el('h3', '', changing && id.mode ? tr('d.cm.ident_change') : tr('d.cm.ident_title')));
+    box.appendChild(el('p', '', tr('d.cm.ident_p')));
     var l1 = el('label'); var r1 = el('input'); r1.type = 'radio'; r1.name = 'k-ident'; r1.value = 'first_name'; r1.checked = id.mode !== 'nickname';
-    l1.appendChild(r1); l1.appendChild(document.createTextNode('My first name: ' + (id.first_name || 'Member')));
+    l1.appendChild(r1); l1.appendChild(document.createTextNode(tr('d.cm.ident_first', { name: id.first_name || tr('d.cm.member') })));
     var l2 = el('label'); var r2 = el('input'); r2.type = 'radio'; r2.name = 'k-ident'; r2.value = 'nickname'; r2.checked = id.mode === 'nickname';
-    var nick = el('input'); nick.type = 'text'; nick.maxLength = 24; nick.placeholder = 'A nickname'; nick.value = id.nickname || ''; nick.setAttribute('aria-label', 'Nickname');
+    var nick = el('input'); nick.type = 'text'; nick.maxLength = 24; nick.placeholder = tr('d.cm.nick_ph'); nick.value = id.nickname || ''; nick.setAttribute('aria-label', tr('d.cm.nick_aria'));
     nick.addEventListener('focus', function(){ r2.checked = true; });
-    l2.appendChild(r2); l2.appendChild(document.createTextNode('A nickname: ')); l2.appendChild(nick);
+    l2.appendChild(r2); l2.appendChild(document.createTextNode(tr('d.cm.ident_nick') + ' ')); l2.appendChild(nick);
     var err = el('div', 'k-ident-err');
-    var save = el('button', 'k-post-btn', 'Save and continue'); save.type = 'button';
+    var save = el('button', 'k-post-btn', tr('d.cm.save_continue')); save.type = 'button';
     save.addEventListener('click', function(){
       var mode = r2.checked ? 'nickname' : 'first_name';
       save.disabled = true; err.textContent = '';
       call('kounselia_community_identity', { mode: mode, nickname: nick.value }).then(function(d){
         D.viewer.identity = d; D.viewer.can_comment = true; D.viewer.reason = null; renderCompose();
-        toast('Thanks, ' + d.name + '. You are all set.');
+        toast(tr('d.cm.ident_thanks', { name: d.name }));
       }).catch(function(e){ err.textContent = e.message; }).finally(function(){ save.disabled = false; });
     });
     box.appendChild(l1); box.appendChild(l2); box.appendChild(err); box.appendChild(save);
-    if(changing && id.mode){ var c = el('button', 'k-post-btn ghost', 'Cancel'); c.type = 'button'; c.addEventListener('click', renderCompose); box.appendChild(c); }
+    if(changing && id.mode){ var c = el('button', 'k-post-btn ghost', tr('d.cm.cancel')); c.type = 'button'; c.addEventListener('click', renderCompose); box.appendChild(c); }
     compose.appendChild(box);
   }
 
   function renderCompose(){
     compose.innerHTML = '';
     var v = D.viewer;
-    if(!D.enabled){ compose.appendChild(el('div', 'k-closed', 'Comments are closed on this article.')); return; }
+    if(!D.enabled){ compose.appendChild(el('div', 'k-closed', tr('d.cm.closed'))); return; }
     if(!v.signed_in){
-      var s = el('div', 'k-signin'); s.appendChild(el('span', '', 'Sign in to join the conversation.'));
-      var a = el('a', 'k-btn', 'Sign in'); a.href = D.login; s.appendChild(a); compose.appendChild(s); return;
+      var s = el('div', 'k-signin'); s.appendChild(el('span', '', tr('d.cm.signin_prompt')));
+      var a = el('a', 'k-btn', tr('d.cm.signin')); a.href = D.login; s.appendChild(a); compose.appendChild(s); return;
     }
     if(v.reason === 'need_identity'){ renderIdentity(false); return; }
-    if(!v.can_comment){ compose.appendChild(el('div', 'k-closed', v.message || 'You cannot comment here.')); return; }
+    if(!v.can_comment){ compose.appendChild(el('div', 'k-closed', v.message || tr('d.cm.cannot'))); return; }
     var c = composer(0, function(comment){ list.insertBefore(renderComment(comment, false), list.firstChild); });
     compose.appendChild(c.box);
   }
@@ -393,16 +409,16 @@ function kounselia_community_assets() {
     var head = el('div', 'k-c-head');
     var name = el('b', '', c.author.name);
     if(c.author.profile_url){ var nl = el('a'); nl.href = c.author.profile_url; nl.appendChild(name); head.appendChild(nl); } else { head.appendChild(name); }
-    if(c.author.is_author){ var badge = el('span', 'k-c-badge'); badge.appendChild(icon('discount-check-filled')); badge.appendChild(document.createTextNode(' Author')); head.appendChild(badge); }
+    if(c.author.is_author){ var badge = el('span', 'k-c-badge'); badge.appendChild(icon('discount-check-filled')); badge.appendChild(document.createTextNode(' ' + tr('d.cm.author'))); head.appendChild(badge); }
     head.appendChild(el('span', '', '· ' + c.time_label));
-    if(c.pinned){ var pin = el('span', 'k-c-pin'); pin.appendChild(icon('pin-filled')); pin.appendChild(document.createTextNode(' Pinned')); head.appendChild(pin); }
+    if(c.pinned){ var pin = el('span', 'k-c-pin'); pin.appendChild(icon('pin-filled')); pin.appendChild(document.createTextNode(' ' + tr('d.cm.pinned'))); head.appendChild(pin); }
     main.appendChild(head);
     main.appendChild(el('div', 'k-c-text', c.content));
-    if(c.held){ main.appendChild(el('div', 'k-c-held', 'Only you can see this until it has been reviewed.')); }
+    if(c.held){ main.appendChild(el('div', 'k-c-held', tr('d.cm.held'))); }
 
     if(c.status !== 'removed' && !c.held){
       var acts = el('div', 'k-c-actions');
-      var love = el('button'); love.type = 'button'; love.className = c.loved ? 'on' : ''; love.setAttribute('aria-label', 'Love this comment');
+      var love = el('button'); love.type = 'button'; love.className = c.loved ? 'on' : ''; love.setAttribute('aria-label', tr('d.cm.love_comment'));
       love.appendChild(icon(c.loved ? 'heart-filled' : 'heart')); var n = el('span', '', c.love_count ? c.love_count : ''); love.appendChild(n);
       love.addEventListener('click', function(){
         if(!D.viewer.signed_in){ location.href = D.login; return; }
@@ -413,10 +429,10 @@ function kounselia_community_assets() {
       });
       acts.appendChild(love);
       if(D.enabled){
-        var rep = el('button'); rep.type = 'button'; rep.appendChild(icon('arrow-back-up')); rep.appendChild(document.createTextNode('Reply'));
+        var rep = el('button'); rep.type = 'button'; rep.appendChild(icon('arrow-back-up')); rep.appendChild(document.createTextNode(tr('d.cm.reply')));
         rep.addEventListener('click', function(){
           if(!D.viewer.signed_in){ location.href = D.login; return; }
-          if(!D.viewer.can_comment){ if(D.viewer.reason === 'need_identity'){ renderIdentity(false); compose.scrollIntoView({ behavior: 'smooth' }); } else { toast(D.viewer.message || 'You cannot comment here.', true); } return; }
+          if(!D.viewer.can_comment){ if(D.viewer.reason === 'need_identity'){ renderIdentity(false); compose.scrollIntoView({ behavior: 'smooth' }); } else { toast(D.viewer.message || tr('d.cm.cannot'), true); } return; }
           var root = isReply ? art.parentNode.closest('.k-c') : art;
           var holder = root.querySelector(':scope > .k-c-main > .k-c-reply');
           if(holder){ holder.querySelector('textarea').focus(); return; }
@@ -427,12 +443,12 @@ function kounselia_community_assets() {
         });
         acts.appendChild(rep);
       }
-      var more = el('button'); more.type = 'button'; more.setAttribute('aria-label', 'More options'); more.appendChild(icon('dots'));
+      var more = el('button'); more.type = 'button'; more.setAttribute('aria-label', tr('d.cm.more_options')); more.appendChild(icon('dots'));
       more.addEventListener('click', function(){ menu(c, art, isReply); });
       acts.appendChild(more);
       main.appendChild(acts);
     } else if(c.is_mine){
-      var a2 = el('div', 'k-c-actions'); var del = el('button'); del.type = 'button'; del.appendChild(icon('trash')); del.appendChild(document.createTextNode('Delete'));
+      var a2 = el('div', 'k-c-actions'); var del = el('button'); del.type = 'button'; del.appendChild(icon('trash')); del.appendChild(document.createTextNode(tr('d.cm.delete')));
       del.addEventListener('click', function(){ removeOwn(c, art); }); a2.appendChild(del); main.appendChild(a2);
     }
     if(!isReply){
@@ -445,8 +461,8 @@ function kounselia_community_assets() {
   }
 
   function removeOwn(c, art){
-    if(!confirm('Delete your comment?')) return;
-    call('kounselia_comment_delete', { comment_id: c.id }).then(function(){ art.remove(); setCount(Math.max(0, D.total - 1)); toast('Comment deleted.'); })
+    if(!confirm(tr('d.cm.delete_confirm'))) return;
+    call('kounselia_comment_delete', { comment_id: c.id }).then(function(){ art.remove(); setCount(Math.max(0, D.total - 1)); toast(tr('d.cm.deleted')); })
       .catch(function(e){ toast(e.message, true); });
   }
 
@@ -460,15 +476,15 @@ function kounselia_community_assets() {
 
   function menu(c, art, isReply){
     sheet(function(s){
-      if(c.is_mine){ sheetItem(s, 'trash', 'Delete my comment', function(){ removeOwn(c, art); }, true); }
+      if(c.is_mine){ sheetItem(s, 'trash', tr('d.cm.delete_mine'), function(){ removeOwn(c, art); }, true); }
       if(D.viewer.can_moderate){
-        if(!isReply){ sheetItem(s, c.pinned ? 'pinned-off' : 'pin', c.pinned ? 'Unpin' : 'Pin to the top', function(){ moderate(c, c.pinned ? 'unpin' : 'pin', art); }); }
-        if(!c.is_mine){ sheetItem(s, 'eye-off', 'Hide this comment', function(){ if(confirm('Hide this comment from everyone?')) moderate(c, 'hide', art); }); }
+        if(!isReply){ sheetItem(s, c.pinned ? 'pinned-off' : 'pin', c.pinned ? tr('d.cm.unpin') : tr('d.cm.pin'), function(){ moderate(c, c.pinned ? 'unpin' : 'pin', art); }); }
+        if(!c.is_mine){ sheetItem(s, 'eye-off', tr('d.cm.hide'), function(){ if(confirm(tr('d.cm.hide_confirm'))) moderate(c, 'hide', art); }); }
       }
-      if(!c.is_mine){ sheetItem(s, 'flag', 'Report', function(){ report(c); }); }
-      sheetItem(s, 'link', 'Copy link', function(){
+      if(!c.is_mine){ sheetItem(s, 'flag', tr('d.cm.report'), function(){ report(c); }); }
+      sheetItem(s, 'link', tr('d.cm.copy_link'), function(){
         var url = location.origin + location.pathname + '#comment-' + c.id;
-        if(navigator.clipboard){ navigator.clipboard.writeText(url).then(function(){ toast('Link copied.'); }); } else { prompt('Copy this link', url); }
+        if(navigator.clipboard){ navigator.clipboard.writeText(url).then(function(){ toast(tr('d.cm.link_copied')); }); } else { prompt(tr('d.cm.copy_this_link'), url); }
       });
     });
   }
@@ -476,16 +492,16 @@ function kounselia_community_assets() {
   function report(c){
     if(!D.viewer.signed_in){ location.href = D.login; return; }
     sheet(function(s){
-      s.appendChild(el('h3', '', 'What is wrong with this comment?'));
+      s.appendChild(el('h3', '', tr('d.cm.report_title')));
       var first = true;
       Object.keys(D.reasons).forEach(function(k){
         var l = el('label', 'k-sheet-item'); var r = el('input'); r.type = 'radio'; r.name = 'k-reason'; r.value = k; r.checked = first; first = false;
         l.appendChild(r); l.appendChild(document.createTextNode(D.reasons[k])); s.appendChild(l);
       });
-      var note = el('textarea'); note.placeholder = 'Anything else we should know? (optional)'; note.maxLength = 500; s.appendChild(note);
+      var note = el('textarea'); note.placeholder = tr('d.cm.report_note_ph'); note.maxLength = 500; s.appendChild(note);
       var row = el('div', 'k-sheet-actions');
-      var cancel = el('button', 'k-post-btn ghost', 'Cancel'); cancel.type = 'button'; cancel.addEventListener('click', closeSheet);
-      var send = el('button', 'k-post-btn', 'Send report'); send.type = 'button';
+      var cancel = el('button', 'k-post-btn ghost', tr('d.cm.cancel')); cancel.type = 'button'; cancel.addEventListener('click', closeSheet);
+      var send = el('button', 'k-post-btn', tr('d.cm.send_report')); send.type = 'button';
       send.addEventListener('click', function(){
         var reason = s.querySelector('input[name=k-reason]:checked').value;
         call('kounselia_comment_report', { comment_id: c.id, reason: reason, note: note.value }).then(function(d){ closeSheet(); toast(d.message); })

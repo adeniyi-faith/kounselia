@@ -15,27 +15,15 @@ import { Toast, useToast } from '@/components/chat/Toast';
 import { FormMessage } from '@/components/FormMessage';
 import { HeaderButton, ScreenHeader } from '@/components/ScreenHeader';
 import { TablerIcon } from '@/components/TablerIcon';
+import { useT } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, radius, shadows, useColors } from '@/theme';
 import { showDialog } from '@/components/Dialog';
 import { DetailSkeleton } from '@/components/Skeleton';
 
-const IMPORT_PROMPT =
-  'Please summarize everything you know about me as a person. Include my life timeline (dates and events), my emotional patterns and feelings about specific things in my life, my relationships, my work situation and goals, and any mental health themes. Write it as a clear factual summary.';
+type FieldKey = 'identity' | 'career' | 'goals' | 'values' | 'habits' | 'triggers';
 
-const TEXT_FIELDS = [
-  { key: 'identity', label: 'Who you are', icon: 'user' },
-  { key: 'career', label: 'Work and study', icon: 'briefcase' },
-] as const;
-
-const LIST_FIELDS = [
-  { key: 'goals', label: 'Goals', icon: 'target' },
-  { key: 'values', label: 'What matters to you', icon: 'heart' },
-  { key: 'habits', label: 'Habits and patterns', icon: 'repeat' },
-  { key: 'triggers', label: 'Things that are hard for you', icon: 'alert-circle' },
-] as const;
-
-type Draft = Record<'identity' | 'career' | 'goals' | 'values' | 'habits' | 'triggers', string>;
+type Draft = Record<FieldKey, string>;
 
 function toDraft(m: MemoryProfile): Draft {
   return {
@@ -58,6 +46,18 @@ function splitList(text: string) {
 export default function Memory() {
   const styles = useStyles();
   const colors = useColors();
+  const t = useT();
+  const IMPORT_PROMPT = t('m.b.memory.import_prompt');
+  const TEXT_FIELDS: { key: 'identity' | 'career'; label: string; icon: string }[] = [
+    { key: 'identity', label: t('m.b.memory.identity'), icon: 'user' },
+    { key: 'career', label: t('m.b.memory.career'), icon: 'briefcase' },
+  ];
+  const LIST_FIELDS: { key: 'goals' | 'values' | 'habits' | 'triggers'; label: string; icon: string }[] = [
+    { key: 'goals', label: t('m.b.memory.goals'), icon: 'target' },
+    { key: 'values', label: t('m.b.memory.values'), icon: 'heart' },
+    { key: 'habits', label: t('m.b.memory.habits'), icon: 'repeat' },
+    { key: 'triggers', label: t('m.b.memory.triggers'), icon: 'alert-circle' },
+  ];
   const { config } = useSession();
   const toast = useToast();
   const [memory, setMemory] = useState<MemoryProfile | null | undefined>(undefined);
@@ -103,18 +103,18 @@ export default function Memory() {
     setMemory(next);
     setEditing(null);
     setError('');
-    toast.show('Saved. Your counselors will use this from now on.');
+    toast.show(t('m.b.memory.saved'));
   }
 
   function confirmDelete() {
     showDialog({
-      title: 'Delete your memory profile?',
-      message: 'Your counselors will no longer remember these details. Your conversations stay as they are.',
+      title: t('m.b.memory.delete_title'),
+      message: t('m.b.memory.delete_body'),
       icon: 'trash',
       buttons: [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('m.b.common.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('m.b.common.delete'),
           style: 'destructive',
           onPress: async () => {
             const res = await deleteMemory(config);
@@ -124,7 +124,7 @@ export default function Memory() {
             }
             setMemory(null);
             setEditing(null);
-            toast.show('Memory profile deleted');
+            toast.show(t('m.b.memory.deleted'));
           },
         },
       ],
@@ -140,7 +140,7 @@ export default function Memory() {
 
   async function runImport() {
     if (pasted.trim().length < 50) {
-      setError('That looks too short. Paste the full reply from the other AI.');
+      setError(t('m.b.memory.too_short'));
       return;
     }
     setBusy(true);
@@ -153,14 +153,14 @@ export default function Memory() {
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     setPasted('');
-    toast.show('Your memory profile is ready');
+    toast.show(t('m.b.memory.ready'));
     load();
   }
 
   const header = (
     <ScreenHeader
-      title="Memory profile"
-      right={memory && !editing ? <HeaderButton icon="pencil" label="Edit memory profile" onPress={() => setEditing(toDraft(memory))} /> : null}
+      title={t('m.b.memory.title')}
+      right={memory && !editing ? <HeaderButton icon="pencil" label={t('m.b.memory.edit')} onPress={() => setEditing(toDraft(memory))} /> : null}
     />
   );
 
@@ -170,8 +170,8 @@ export default function Memory() {
         {header}
         {failed ? (
           <View style={styles.center}>
-            <Text style={styles.notice}>We couldn’t load your memory profile. Please check your internet connection.</Text>
-            <Button title="Try again" variant="ghost" onPress={load} />
+            <Text style={styles.notice}>{t('m.b.memory.load_failed')}</Text>
+            <Button title={t('m.b.common.try_again')} variant="ghost" onPress={load} />
           </View>
         ) : (
           <View style={styles.skeleton}>
@@ -190,7 +190,7 @@ export default function Memory() {
           <View style={styles.intro}>
             <TablerIcon name="brain" size={18} color={colors.plum} />
             <Text style={styles.introText}>
-              Your counselors use this to understand you without you repeating yourself. It’s private to you and updates as you talk.
+              {t('m.b.memory.intro')}
             </Text>
           </View>
 
@@ -202,15 +202,15 @@ export default function Memory() {
               {LIST_FIELDS.map((f) => (
                 <Field
                   key={f.key}
-                  label={`${f.label} (separate with commas)`}
+                  label={t('m.b.memory.separate', { label: f.label })}
                   value={editing[f.key]}
                   onChange={(v) => setEditing({ ...editing, [f.key]: v })}
                 />
               ))}
               {error ? <FormMessage tone="error" text={error} /> : null}
               <View style={styles.actions}>
-                <Button title="Cancel" variant="ghost" onPress={() => setEditing(null)} style={{ flex: 1 }} />
-                <Button title="Save changes" onPress={save} busy={busy} style={{ flex: 1 }} />
+                <Button title={t('m.b.common.cancel')} variant="ghost" onPress={() => setEditing(null)} style={{ flex: 1 }} />
+                <Button title={t('m.b.memory.save')} onPress={save} busy={busy} style={{ flex: 1 }} />
               </View>
             </>
           ) : memory ? (
@@ -235,46 +235,45 @@ export default function Memory() {
                   </Section>
                 ) : null,
               )}
-              <Button title="Edit details" variant="ghost" onPress={() => setEditing(toDraft(memory))} style={{ marginTop: 20 }} />
+              <Button title={t('m.b.memory.edit_details')} variant="ghost" onPress={() => setEditing(toDraft(memory))} style={{ marginTop: 20 }} />
               <Pressable onPress={confirmDelete} accessibilityRole="button" style={styles.delete} hitSlop={6}>
                 <TablerIcon name="trash" size={16} color={colors.rose} />
-                <Text style={styles.deleteText}>Delete memory profile</Text>
+                <Text style={styles.deleteText}>{t('m.b.memory.delete')}</Text>
               </Pressable>
             </>
           ) : (
             <>
-              <Text style={styles.h2}>Bring what another AI knows</Text>
+              <Text style={styles.h2}>{t('m.b.memory.bring')}</Text>
               <Text style={styles.p}>
-                If you’ve talked to ChatGPT or Gemini about your life, they can share what they know with your counselors here. Only a short
-                summary is kept; what you paste is not stored.
+                {t('m.b.memory.bring_body')}
               </Text>
 
-              <Step n={1} title="Copy this message">
+              <Step n={1} title={t('m.b.memory.step1')}>
                 <Text style={styles.prompt}>{IMPORT_PROMPT}</Text>
                 <Pressable onPress={copyPrompt} accessibilityRole="button" style={({ pressed }) => [styles.copy, pressed && { opacity: 0.85 }]}>
                   <TablerIcon name={copied ? 'check' : 'copy'} size={16} color={colors.accentText} />
-                  <Text style={styles.copyText}>{copied ? 'Copied' : 'Copy message'}</Text>
+                  <Text style={styles.copyText}>{copied ? t('m.b.memory.copied') : t('m.b.memory.copy')}</Text>
                 </Pressable>
               </Step>
-              <Step n={2} title="Send it in ChatGPT or Gemini">
-                <Text style={styles.p}>Open the other app, start a new chat, paste the message and send it.</Text>
+              <Step n={2} title={t('m.b.memory.step2')}>
+                <Text style={styles.p}>{t('m.b.memory.step2_body')}</Text>
               </Step>
-              <Step n={3} title="Paste its reply here">
+              <Step n={3} title={t('m.b.memory.step3')}>
                 <TextInput
                   value={pasted}
                   onChangeText={setPasted}
-                  placeholder="Paste the whole reply…"
+                  placeholder={t('m.b.memory.paste_placeholder')}
                   placeholderTextColor={colors.text3}
                   multiline
                   textAlignVertical="top"
-                  accessibilityLabel="The other AI's reply"
+                  accessibilityLabel={t('m.b.memory.paste_label')}
                   style={styles.paste}
                 />
               </Step>
               {error ? <FormMessage tone="error" text={error} /> : null}
-              <Button title={busy ? 'Reading it… this takes a moment' : 'Build my memory profile'} onPress={runImport} busy={busy} style={{ marginTop: 8 }} />
+              <Button title={busy ? t('m.b.memory.reading') : t('m.b.memory.build')} onPress={runImport} busy={busy} style={{ marginTop: 8 }} />
               <Pressable onPress={() => router.back()} accessibilityRole="button" style={styles.skip}>
-                <Text style={styles.skipText}>Not now. My counselors will learn as we talk.</Text>
+                <Text style={styles.skipText}>{t('m.b.memory.not_now')}</Text>
               </Pressable>
             </>
           )}

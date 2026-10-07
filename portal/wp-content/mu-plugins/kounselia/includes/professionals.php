@@ -343,11 +343,15 @@ function kounselia_submit_professional_application( $user_id, $fields, $license_
 
     $user = get_userdata( $user_id );
     if ( $user && function_exists( 'kounselia_send_html_email' ) ) {
+        $lang = kounselia_mail_lang( $user );
         kounselia_send_html_email(
             $user->user_email,
-            'Your professional application is under review',
-            'Application received',
-            '<p>Thanks for applying to join Kounselia as a professional. Our team will review your documents and get back to you, usually within a few business days.</p>'
+            kounselia_t( 'mail.apply.subject', array(), $lang ),
+            kounselia_t( 'mail.apply.headline', array(), $lang ),
+            '<p>' . esc_html( kounselia_t( 'mail.apply.body', array(), $lang ) ) . '</p>',
+            null,
+            null,
+            array( 'lang' => $lang )
         );
     }
     kounselia_notify_admins_new_professional_application( $professional_id );
@@ -448,7 +452,8 @@ function kounselia_notify_admins_new_professional_application( $professional_id 
             'New application',
             '<p>A new professional application (#' . (int) $professional_id . ') is waiting for review.</p>',
             'Review application',
-            $review_url
+            $review_url,
+            array( 'lang' => 'en' ) // Staff alert: always English.
         );
     }
 }
@@ -494,11 +499,15 @@ function kounselia_ajax_admin_review_professional() {
         if ( $user ) {
             $user->add_role( 'kounselia_professional' ); // Additive — they keep whatever role they already had.
             if ( function_exists( 'kounselia_send_html_email' ) ) {
+                $lang = kounselia_mail_lang( $user );
                 kounselia_send_html_email(
                     $user->user_email,
-                    "You're verified on Kounselia",
-                    'Application approved',
-                    '<p>Congratulations — your professional application has been approved. You can now set up your profile and start seeing clients.</p>'
+                    kounselia_t( 'mail.apply.approved_subject', array(), $lang ),
+                    kounselia_t( 'mail.apply.approved_headline', array(), $lang ),
+                    '<p>' . esc_html( kounselia_t( 'mail.apply.approved_body', array(), $lang ) ) . '</p>',
+                    null,
+                    null,
+                    array( 'lang' => $lang )
                 );
             }
         }
@@ -517,12 +526,16 @@ function kounselia_ajax_admin_review_professional() {
         if ( $user ) {
             $user->remove_role( 'kounselia_professional' );
             if ( function_exists( 'kounselia_send_html_email' ) ) {
-                $reason_html = $reason ? '<p><strong>Reason:</strong> ' . esc_html( $reason ) . '</p>' : '';
+                $lang        = kounselia_mail_lang( $user );
+                $reason_html = $reason ? '<p><strong>' . esc_html( kounselia_t( 'mail.apply.reason_label', array(), $lang ) ) . '</strong> ' . esc_html( $reason ) . '</p>' : '';
                 kounselia_send_html_email(
                     $user->user_email,
-                    'Update on your Kounselia application',
-                    'Application not approved',
-                    '<p>We were not able to approve your professional application at this time.</p>' . $reason_html . '<p>You are welcome to update your documents and reapply.</p>'
+                    kounselia_t( 'mail.apply.rejected_subject', array(), $lang ),
+                    kounselia_t( 'mail.apply.rejected_headline', array(), $lang ),
+                    '<p>' . esc_html( kounselia_t( 'mail.apply.rejected_body', array(), $lang ) ) . '</p>' . $reason_html . '<p>' . esc_html( kounselia_t( 'mail.apply.rejected_reapply', array(), $lang ) ) . '</p>',
+                    null,
+                    null,
+                    array( 'lang' => $lang )
                 );
             }
         }

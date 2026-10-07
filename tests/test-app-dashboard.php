@@ -130,6 +130,39 @@ class Test_App_Dashboard extends WP_Ajax_UnitTestCase {
         $this->assertArrayNotHasKey( 'url', (array) $res['data'] );
     }
 
+    function test_room_runs_on_8x8_with_a_host_pass_once_set_up() {
+        $key = openssl_pkey_new( array( 'private_key_bits' => 2048 ) );
+        openssl_pkey_export( $key, $pem );
+        $public = openssl_pkey_get_details( $key )['key'];
+        update_option( 'kounselia_jaas_app_id', 'vpaas-magic-cookie-abc123' );
+        update_option( 'kounselia_jaas_key_id', 'key1' );
+        update_option( 'kounselia_jaas_private_key', $pem );
+
+        $client = self::factory()->user->create( array( 'display_name' => 'Tolu' ) );
+        wp_set_current_user( $client );
+        $res = $this->ajax( 'kounselia_get_booking_room', array( 'booking_id' => $this->booking( $client, 5 * MINUTE_IN_SECONDS ) ) );
+
+        $this->assertTrue( $res['success'] );
+        $this->assertStringStartsWith( 'https://8x8.vc/vpaas-magic-cookie-abc123/kounselia-tok123?jwt=', $res['data']['url'] );
+
+        parse_str( wp_parse_url( strtok( $res['data']['url'], '#' ), PHP_URL_QUERY ), $query );
+        list( $head, $body, $sig ) = explode( '.', $query['jwt'] );
+        $decode = function ( $part ) {
+            return base64_decode( strtr( $part, '-_', '+/' ) );
+        };
+        $this->assertSame( 1, openssl_verify( $head . '.' . $body, $decode( $sig ), $public, OPENSSL_ALGO_SHA256 ), 'Signed with our key.' );
+        $this->assertSame( 'vpaas-magic-cookie-abc123/key1', json_decode( $decode( $head ), true )['kid'] );
+        $claims = json_decode( $decode( $body ), true );
+        $this->assertSame( 'kounselia-tok123', $claims['room'], 'Only good for this one room.' );
+        $this->assertSame( 'true', $claims['context']['user']['moderator'], 'A host, so nobody waits for one.' );
+        $this->assertSame( 'Tolu', $claims['context']['user']['name'] );
+        $this->assertGreaterThan( time(), $claims['exp'] );
+
+        delete_option( 'kounselia_jaas_app_id' );
+        delete_option( 'kounselia_jaas_key_id' );
+        delete_option( 'kounselia_jaas_private_key' );
+    }
+
     function test_home_has_the_check_in_and_the_care_team() {
         global $wpdb;
         $user = self::factory()->user->create();
