@@ -664,6 +664,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <button class="nav-link js-nav active" id="desk-tab-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span>Home</span></button>
         <button class="nav-link js-nav" id="desk-tab-sessions" onclick="switchTab('sessions')"><i class="ti ti-history"></i><span>Sessions</span></button>
         <button class="nav-link js-nav" id="desk-tab-professionals" onclick="switchTab('professionals')"><i class="ti ti-calendar-event"></i><span>Book a professional</span></button>
+        <button class="nav-link js-nav" id="desk-tab-growth" onclick="switchTab('growth')"><i class="ti ti-plant-2"></i><span>Growth plan</span></button>
         <button class="nav-link js-nav" id="desk-tab-memory" onclick="switchTab('memory')"><i class="ti ti-brain"></i><span>Memory Profile</span></button>
         <button class="nav-link js-nav" id="desk-tab-settings" onclick="switchTab('settings')"><i class="ti ti-settings"></i><span>Settings</span></button>
         <button class="nav-link js-nav" id="desk-tab-upgrade" onclick="switchTab('upgrade')"><i class="ti ti-sparkles"></i><span>My plan</span></button>
@@ -744,6 +745,23 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <a class="btn-rec" href="/talk.php?checkin=<?php echo (int) $next_checkin->id; ?>#<?php echo esc_attr( $checkin_slug ); ?>">Tell them</a>
         <button type="button" onclick="dismissCheckin(<?php echo (int) $next_checkin->id; ?>)" style="background:none;border:none;color:var(--text3,#8a8578);font-size:12px;cursor:pointer;font-family:inherit;padding:2px;">Not now</button>
       </div>
+    </section>
+    <?php endif; ?>
+
+    <?php if ( function_exists( 'kounselia_growth_home_summary' ) ) :
+      $growth_home = kounselia_growth_home_summary( $user->ID ); ?>
+    <section class="rec-card" id="growth-card" style="margin-bottom:20px;">
+      <div class="rec-av ic-sage"><i class="ti ti-plant-2"></i></div>
+      <div class="rec-meta">
+        <?php if ( $growth_home ) : ?>
+          <h3>Day <?php echo (int) $growth_home['current_day']; ?> of <?php echo (int) $growth_home['total_days']; ?>: <?php echo esc_html( $growth_home['title'] ); ?></h3>
+          <p class="reason"><?php echo $growth_home['today'] ? ( $growth_home['today']['done'] ? 'Today\'s step is done. Nice work.' : esc_html( $growth_home['today']['task'] ) ) : ''; ?></p>
+        <?php else : ?>
+          <h3>Grow with a 30 day plan</h3>
+          <p class="reason">Pick something to work on, like discipline, habits or confidence, and get one small step a day.</p>
+        <?php endif; ?>
+      </div>
+      <button type="button" class="btn-rec" onclick="switchTab('growth')"><?php echo $growth_home ? 'Open plan' : 'Start a plan'; ?></button>
     </section>
     <?php endif; ?>
 
@@ -1140,6 +1158,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
 
   <!-- MY PLAN PANEL (subscription, what's included, billing) -->
   <?php require __DIR__ . '/inc/dashboard-my-plan.php'; ?>
+  <?php require __DIR__ . '/inc/dashboard-growth.php'; ?>
 
   </main>
 
@@ -1360,6 +1379,8 @@ function switchTab(tab) {
       window.scrollTo({ top: 0, behavior: 'smooth' }); // Desktop uses window scrolling
     }
   }
+
+  if (tab === 'growth' && window.kounseliaGrowthOpen) window.kounseliaGrowthOpen();
 
   // 3. Update Mobile Tab Bar UI
   document.querySelectorAll('.mob-tab').forEach(b => b.classList.remove('active'));

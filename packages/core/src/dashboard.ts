@@ -63,6 +63,7 @@ export interface CareTeam {
 
 export interface HomeData {
   checkin: CheckIn | null;
+  growth: GrowthPlanSummary | null; // their running growth plan, if any
   care: CareTeam;
   mood: { options: MoodOption[]; today: string | null; week: { date: string; mood: string | null }[] };
   stats: { conversations: number; messages_this_week: number; counselors_met: number };
@@ -81,6 +82,77 @@ export const fetchCheckinQuestion = (config: KounseliaConfig, checkinId: number)
 
 export const dismissCheckin = (config: KounseliaConfig, checkinId: number) =>
   call<unknown>(config, 'kounselia_dismiss_checkin', { checkin_id: checkinId });
+
+// ---- Growth plans (Personal Development) -----------------------------------
+// A 30 day plan of one small task a day. Server side: includes/growth-plans.php.
+
+export interface GrowthDay {
+  day: number;
+  title: string;
+  task: string;
+  minutes: number;
+  done: boolean;
+  state: 'past' | 'today' | 'upcoming';
+}
+
+export interface GrowthPlanSummary {
+  id: number;
+  area: string;
+  area_label: string;
+  icon: string; // Tabler icon name, no "ti-"
+  title: string;
+  summary: string;
+  status: string;
+  start_date: string;
+  current_day: number;
+  total_days: number;
+  done_count: number;
+  streak: number;
+  today: GrowthDay | null;
+  counselor_slug: string; // who to talk to about the plan
+}
+
+export interface GrowthPlan extends GrowthPlanSummary {
+  days: GrowthDay[];
+}
+
+export interface GrowthQuestion {
+  key: string;
+  type: 'text' | 'choice';
+  required: boolean;
+  label: string;
+  hint: string;
+  choices?: { key: string; label: string }[];
+}
+
+export interface GrowthArea {
+  key: string;
+  label: string;
+  icon: string;
+  blurb: string;
+  questions: GrowthQuestion[];
+}
+
+export interface GrowthOverview {
+  plan: GrowthPlan | null;
+  previous: { id: number; title: string; area_label: string; status: string; start_date: string; done_count: number; total_days: number }[];
+  areas: GrowthArea[];
+  // limit 0 = unlimited (remaining is then null)
+  allowance: { limit: number; used: number; remaining: number | null };
+  is_pro: boolean;
+}
+
+export const fetchGrowth = (config: KounseliaConfig) => call<GrowthOverview>(config, 'kounselia_growth_get');
+
+// The AI takes a little while to write the plan; the default timeout already allows for it.
+export const createGrowthPlan = (config: KounseliaConfig, area: string, answers: Record<string, string>) =>
+  call<GrowthOverview>(config, 'kounselia_growth_create', { area, answers: JSON.stringify(answers) });
+
+export const markGrowthDay = (config: KounseliaConfig, planId: number, day: number, done: boolean) =>
+  call<{ plan: GrowthPlan | null }>(config, 'kounselia_growth_mark_day', { plan_id: planId, day, done: done ? 1 : 0 });
+
+export const endGrowthPlan = (config: KounseliaConfig, planId: number) =>
+  call<GrowthOverview>(config, 'kounselia_growth_end', { plan_id: planId });
 
 // ---- Conversations ----------------------------------------------------------
 
