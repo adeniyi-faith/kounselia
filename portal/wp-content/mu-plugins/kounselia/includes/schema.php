@@ -23,7 +23,7 @@ function kounselia_install_tables() {
     global $wpdb;
 
     $installed_version = get_option( 'kounselia_db_version', '0' );
-    $current_version   = '1.29.0'; // Bumped version: growth plans (Personal Development): progress, reminders, weekly reviews, member time zone
+    $current_version   = '1.30.0'; // Bumped version: growth plans (Personal Development): progress, reminders, weekly reviews, member time zone and language
 
     if ( $installed_version === $current_version ) {
         return;
@@ -288,6 +288,7 @@ function kounselia_install_tables() {
         total_days SMALLINT UNSIGNED NOT NULL DEFAULT 30,
         start_date DATE NOT NULL,
         timezone VARCHAR(64) NOT NULL DEFAULT '',
+        language VARCHAR(8) NOT NULL DEFAULT 'en',
         remind_hour SMALLINT NOT NULL DEFAULT 9,
         last_reminded DATE NULL,
         reviews LONGTEXT NULL,

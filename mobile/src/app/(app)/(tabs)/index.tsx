@@ -129,7 +129,7 @@ export default function Home() {
                 onLater={() => laterCheckin(home.checkin!.id)}
               />
             )}
-            <GrowthCard plan={home.growth} onOpen={() => router.push('/growth')} />
+            <GrowthCard plan={home.growth} language={home.language} onOpen={() => router.push('/growth')} />
             <CareTeamCard care={home.care} joining={joining} onJoin={join} onManage={() => router.navigate('/book')} />
             <MoodCard mood={home.mood} saving={savingMood} onPick={pickMood} />
             <StatsRow stats={home.stats} />

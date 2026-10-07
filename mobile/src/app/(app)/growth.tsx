@@ -2,7 +2,7 @@
 // few questions, and follow a 30 day plan of one small task a day. The
 // phone version of the website's "Growth plan" tab; both use the same
 // server actions.
-import { createGrowthPlan, endGrowthPlan, fetchGrowth, markGrowthDay, reviewGrowthWeek, setGrowthReminder, type GrowthArea, type GrowthOverview, type GrowthPlan } from '@kounselia/core';
+import { createGrowthPlan, deviceLanguage, endGrowthPlan, fetchGrowth, isRtl, makeT, markGrowthDay, reviewGrowthWeek, setGrowthReminder, type GrowthArea, type GrowthOverview, type GrowthPlan } from '@kounselia/core';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
@@ -20,7 +20,7 @@ import { fonts, makeStyles, useColors } from '@/theme';
 
 // The reminder times offered; the server accepts any hour, 0 to 23.
 const REMINDER_CHOICES = [
-  { hour: -1, label: 'Off' },
+  { hour: -1, label: '' }, // shown as "Off" in the member's language
   { hour: 7, label: '7 am' },
   { hour: 9, label: '9 am' },
   { hour: 12, label: '12 pm' },
@@ -39,6 +39,10 @@ export default function Growth() {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
   const [openDay, setOpenDay] = useState<number | null>(null);
+  // The member's language, from the server once it answers (their phone's until then).
+  const lang = data?.language ?? deviceLanguage();
+  const t = makeT(lang);
+  const rtl = isRtl(lang);
 
   const load = useCallback(async () => {
     const res = await fetchGrowth(config);
@@ -59,7 +63,7 @@ export default function Growth() {
     if (!picked) return;
     const missing = picked.questions.find((q) => q.required && !(answers[q.key] ?? '').trim());
     if (missing) {
-      toast.show(`Please answer: ${missing.label}`);
+      toast.show(t('growth.answer_required', { question: missing.label }));
       return;
     }
     setBusy(true);
@@ -105,19 +109,19 @@ export default function Growth() {
       return;
     }
     setData((d) => (d ? { ...d, plan: res.data.plan } : d));
-    toast.show(hour < 0 ? 'Reminder turned off.' : 'Reminder saved.');
+    toast.show(hour < 0 ? t('growth.reminder_off_toast') : t('growth.reminder_saved'));
   }
 
   function end(plan: GrowthPlan) {
     showDialog({
-      title: 'End this plan?',
-      message: 'Your progress is kept in your history, but you cannot pick this plan back up.',
+      title: t('growth.end_title'),
+      message: t('growth.end_body'),
       icon: 'flag',
       tone: 'danger',
       buttons: [
-        { text: 'Keep going', style: 'cancel' },
+        { text: t('growth.end_keep'), style: 'cancel' },
         {
-          text: 'End plan',
+          text: t('growth.end_confirm'),
           style: 'destructive',
           onPress: async () => {
             const res = await endGrowthPlan(config, plan.id);
@@ -137,8 +141,8 @@ export default function Growth() {
     if (!data) {
       return failed ? (
         <View style={styles.center}>
-          <Text style={styles.notice}>We couldn’t load your growth plan. Please check your internet connection.</Text>
-          <Button title="Try again" variant="ghost" onPress={load} />
+          <Text style={styles.notice}>{t('growth.load_failed')}</Text>
+          <Button title={t('growth.try_again')} variant="ghost" onPress={load} />
         </View>
       ) : (
         <DetailSkeleton />
@@ -151,12 +155,12 @@ export default function Growth() {
       return (
         <>
           <Text style={styles.eyebrow}>{picked.label}</Text>
-          <Text style={styles.h2}>A few quick questions</Text>
+          <Text style={styles.h2}>{t('growth.quick_questions')}</Text>
           {picked.questions.map((q) => (
             <View key={q.key} style={styles.q}>
               <Text style={styles.qLabel}>
                 {q.label}
-                {!q.required && <Text style={styles.optional}> (optional)</Text>}
+                {!q.required && <Text style={styles.optional}> {t('growth.optional')}</Text>}
               </Text>
               {!!q.hint && <Text style={styles.hint}>{q.hint}</Text>}
               {q.type === 'choice' ? (
@@ -183,9 +187,9 @@ export default function Growth() {
               )}
             </View>
           ))}
-          <Button title={busy ? 'Writing your plan…' : 'Create my plan'} onPress={create} busy={busy} />
-          {busy && <Text style={styles.note}>This can take up to a minute.</Text>}
-          <Button title="Back" variant="ghost" onPress={() => setPicked(null)} disabled={busy} style={{ marginTop: 10 }} />
+          <Button title={busy ? t('growth.creating') : t('growth.create')} onPress={create} busy={busy} />
+          {busy && <Text style={styles.note}>{t('growth.creating_wait')}</Text>}
+          <Button title={t('growth.back')} variant="ghost" onPress={() => setPicked(null)} disabled={busy} style={{ marginTop: 10 }} />
         </>
       );
     }
@@ -193,14 +197,12 @@ export default function Growth() {
     const outOfPlans = data.allowance.limit > 0 && (data.allowance.remaining ?? 0) < 1;
     return (
       <>
-        <Text style={styles.intro}>
-          Pick one thing to work on. Answer a few short questions and Kounselia writes you a 30 day plan with one small task a day. Noa, your Personal Development counselor, is there whenever you want to talk it through.
-        </Text>
+        <Text style={styles.intro}>{t('growth.intro')}</Text>
         {outOfPlans ? (
           <Card style={{ gap: 12 }}>
-            <Text style={styles.h2}>You have used your free plans</Text>
-            <Text style={styles.intro}>Upgrade to Pro for unlimited growth plans.</Text>
-            <Button title="See Pro" onPress={() => router.push('/plan')} />
+            <Text style={styles.h2}>{t('growth.used_all_title')}</Text>
+            <Text style={styles.intro}>{t('growth.used_all_body')}</Text>
+            <Button title={t('growth.see_pro')} onPress={() => router.push('/plan')} />
           </Card>
         ) : (
           <>
@@ -215,22 +217,21 @@ export default function Growth() {
               </Pressable>
             ))}
             {data.allowance.limit > 0 && (
-              <Text style={styles.note}>
-                {data.allowance.remaining} of {data.allowance.limit} plans left on your plan.
-              </Text>
+              <Text style={styles.note}>{t('growth.plans_left', { remaining: data.allowance.remaining ?? 0, limit: data.allowance.limit })}</Text>
             )}
           </>
         )}
         {data.previous.length > 0 && (
           <>
-            <SectionHead title="Earlier plans" />
+            <SectionHead title={t('growth.earlier')} />
             {data.previous.map((p) => (
               <View key={p.id} style={styles.prev}>
                 <Text style={styles.prevTitle}>
                   {p.title} <Text style={styles.prevMeta}>· {p.area_label}</Text>
                 </Text>
                 <Text style={styles.prevMeta}>
-                  {p.done_count}/{p.total_days} days{p.status === 'ended' ? ' · ended' : ''}
+                  {t('growth.days_count', { done: p.done_count, total: p.total_days })}
+                  {p.status === 'ended' ? ` · ${t('growth.ended')}` : ''}
                 </Text>
               </View>
             ))}
@@ -241,53 +242,51 @@ export default function Growth() {
   }
 
   function planView(plan: GrowthPlan, overview: GrowthOverview) {
-    const t = plan.today;
+    const today = plan.today;
     const pct = Math.round((plan.done_count / plan.total_days) * 100);
     const open = plan.days.find((d) => d.day === openDay);
     return (
       <>
         <Card style={{ gap: 12 }}>
           <Text style={styles.eyebrow}>
-            {plan.title} · Day {plan.current_day} of {plan.total_days}
+            {plan.title} · {t('growth.day_of', { day: plan.current_day, total: plan.total_days })}
           </Text>
-          {t && (
+          {today && (
             <>
-              <Text style={styles.h2}>{t.title || 'Today'}</Text>
+              <Text style={styles.h2}>{today.title || t('growth.today')}</Text>
               <Text style={styles.intro}>
-                {t.task}
-                {t.minutes ? ` (about ${t.minutes} min)` : ''}
+                {today.task}
+                {today.minutes ? ` (${t('growth.minutes', { minutes: today.minutes })})` : ''}
               </Text>
-              <Button title={t.done ? 'Done · undo' : 'Mark as done'} variant={t.done ? 'ghost' : 'primary'} onPress={() => mark(plan, t.day, !t.done)} />
-              <Button title="Talk it through" variant="ghost" onPress={() => router.push({ pathname: '/chat/[slug]', params: { slug: plan.counselor_slug } })} />
+              <Button title={today.done ? t('growth.done_undo') : t('growth.mark_done')} variant={today.done ? 'ghost' : 'primary'} onPress={() => mark(plan, today.day, !today.done)} />
+              <Button title={t('growth.talk')} variant="ghost" onPress={() => router.push({ pathname: '/chat/[slug]', params: { slug: plan.counselor_slug } })} />
             </>
           )}
           <View style={styles.bar}>
             <View style={[styles.barFill, { width: `${pct}%` }]} />
           </View>
           <View style={styles.row}>
-            <Text style={styles.prevMeta}>
-              {plan.done_count} of {plan.total_days} days done
-            </Text>
-            <Text style={styles.prevMeta}>{plan.streak ? `${plan.streak}-day streak` : 'Start your streak today'}</Text>
+            <Text style={styles.prevMeta}>{t('growth.days_done', { done: plan.done_count, total: plan.total_days })}</Text>
+            <Text style={styles.prevMeta}>{plan.streak ? t('growth.streak', { n: plan.streak }) : t('growth.streak_start')}</Text>
           </View>
         </Card>
 
         {plan.review_ready != null && (
           <Card style={{ ...styles.reviewCard, gap: 10 }}>
-            <Text style={styles.eyebrow}>{plan.review_ready === 5 ? 'Final review' : `Week ${plan.review_ready} review`}</Text>
-            <Text style={styles.detailText}>You have finished a week. Want a short look back at how it went? Kounselia can also make your next days a little easier or harder to fit you.</Text>
-            <Button title={busy ? 'Writing your review…' : 'Review my week'} onPress={() => review(plan, plan.review_ready!)} busy={busy} />
+            <Text style={styles.eyebrow}>{plan.review_ready === 5 ? t('growth.review_final') : t('growth.review_week', { week: plan.review_ready })}</Text>
+            <Text style={styles.detailText}>{t('growth.review_prompt')}</Text>
+            <Button title={busy ? t('growth.reviewing') : t('growth.review_button')} onPress={() => review(plan, plan.review_ready!)} busy={busy} />
           </Card>
         )}
         {[...plan.reviews].reverse().map((r) => (
           <Card key={r.week} style={{ gap: 8, marginTop: 12 }}>
-            <Text style={styles.eyebrow}>{r.week === 5 ? 'Final review' : `Week ${r.week} review`}</Text>
+            <Text style={styles.eyebrow}>{r.week === 5 ? t('growth.review_final') : t('growth.review_week', { week: r.week })}</Text>
             <Text style={styles.detailText}>{r.note}</Text>
-            {r.changed > 0 && <Text style={styles.prevMeta}>Your next {r.changed} days were made {r.level}.</Text>}
+            {r.changed > 0 && <Text style={styles.prevMeta}>{t('growth.review_changed', { n: r.changed, level: t(`growth.level_${r.level}`) })}</Text>}
           </Card>
         ))}
 
-        <SectionHead title="All 30 days" />
+        <SectionHead title={t('growth.all_days')} />
         <View style={styles.grid}>
           {plan.days.map((d) => {
             const upcoming = d.state === 'upcoming';
@@ -296,7 +295,7 @@ export default function Growth() {
                 key={d.day}
                 onPress={() => setOpenDay(d.day)}
                 accessibilityRole="button"
-                accessibilityLabel={`Day ${d.day}${d.done ? ', done' : ''}`}
+                accessibilityLabel={t('growth.day_label', { day: d.day })}
                 style={[styles.dayBtn, d.done && styles.dayDone, d.state === 'today' && !d.done && styles.dayToday, upcoming && { opacity: 0.5 }]}
               >
                 {d.done ? <TablerIcon name="check" size={16} color={colors.sage} /> : <Text style={[styles.dayText, d.state === 'today' && { color: colors.accentText }]}>{d.day}</Text>}
@@ -307,46 +306,44 @@ export default function Growth() {
         {open && (
           <View style={styles.detail}>
             <Text style={styles.detailTitle}>
-              Day {open.day}
+              {t('growth.day_label', { day: open.day })}
               {open.title ? `: ${open.title}` : ''}
             </Text>
             <Text style={styles.detailText}>{open.task}</Text>
             {open.state !== 'upcoming' && (
               <Pressable onPress={() => mark(plan, open.day, !open.done)} accessibilityRole="button" hitSlop={8}>
-                <Text style={styles.link}>{open.done ? 'Mark as not done' : 'Mark as done'}</Text>
+                <Text style={styles.link}>{open.done ? t('growth.mark_not_done') : t('growth.mark_done')}</Text>
               </Pressable>
             )}
           </View>
         )}
-        <Text style={styles.note}>Missed a day? That’s fine. Your plan keeps going, and you can tick off any earlier day later.</Text>
+        <Text style={styles.note}>{t('growth.missed_note')}</Text>
 
         <Card style={{ gap: 10, marginTop: 16 }}>
           <Text style={styles.detailText}>{plan.summary}</Text>
-          <Text style={styles.qLabel}>Daily reminder</Text>
+          <Text style={styles.qLabel}>{t('growth.reminder')}</Text>
           <View style={styles.choices}>
             {REMINDER_CHOICES.map((c) => {
               const on = plan.remind_hour === c.hour;
               return (
                 <Pressable key={c.hour} onPress={() => changeReminder(plan, c.hour)} accessibilityRole="button" accessibilityState={{ selected: on }} style={[styles.choice, on && styles.choiceOn]}>
-                  <Text style={[styles.choiceText, on && { color: colors.accentText, fontFamily: fonts.medium }]}>{c.label}</Text>
+                  <Text style={[styles.choiceText, on && { color: colors.accentText, fontFamily: fonts.medium }]}>{c.hour < 0 ? t('growth.reminder_off') : c.label}</Text>
                 </Pressable>
               );
             })}
           </View>
-          <Text style={styles.prevMeta}>Sent as a notification at that time on your own clock.</Text>
+          <Text style={styles.prevMeta}>{t('growth.reminder_note')}</Text>
           <Pressable onPress={() => end(plan)} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.link}>End this plan</Text>
+            <Text style={styles.link}>{t('growth.end_plan')}</Text>
           </Pressable>
         </Card>
         {overview.previous.length > 0 && (
           <>
-            <SectionHead title="Earlier plans" />
+            <SectionHead title={t('growth.earlier')} />
             {overview.previous.map((p) => (
               <View key={p.id} style={styles.prev}>
                 <Text style={styles.prevTitle}>{p.title}</Text>
-                <Text style={styles.prevMeta}>
-                  {p.done_count}/{p.total_days} days
-                </Text>
+                <Text style={styles.prevMeta}>{t('growth.days_count', { done: p.done_count, total: p.total_days })}</Text>
               </View>
             ))}
           </>
@@ -357,8 +354,8 @@ export default function Growth() {
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScreenHeader title="Growth plan" />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
+      <ScreenHeader title={t('growth.title')} />
+      <ScrollView contentContainerStyle={[styles.content, rtl && { direction: 'rtl' }]} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive">
         {body()}
       </ScrollView>
       <Toast note={toast.note} />

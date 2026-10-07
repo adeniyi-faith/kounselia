@@ -95,6 +95,11 @@ function kounselia_ajax_chat() {
     3. QUESTIONS: Do NOT end every single message with a question. That feels like an interrogation. Sometimes just share an observation, sit in the silence with them, or relate to what they said.
     4. LENGTH: Vary your length. Sometimes 1 or 2 sentences is far more powerful and human than a long explanation.";
 
+    // Answer in the language the person writes in (guests included).
+    if ( function_exists( 'kounselia_language_clause' ) ) {
+        $system_prompt .= kounselia_language_clause( $user_id );
+    }
+
     if ( $user_id ) {
         $system_prompt .= kounselia_user_context_clause( $user_id );
         $system_prompt .= kounselia_imported_memory_clause( $user_id );

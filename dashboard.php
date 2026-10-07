@@ -46,6 +46,7 @@ if ( $pro_application && 'client' !== ( $_GET['as'] ?? '' ) ) {
 
 $ajax_url = set_url_scheme( admin_url( 'admin-ajax.php' ), is_ssl() ? 'https' : 'http' );
 $nonce    = wp_create_nonce( 'kounselia_auth' );
+$dash_lang = function_exists( 'kounselia_current_language' ) ? kounselia_current_language( get_current_user_id() ) : 'en';
 
 $available_plans     = function_exists( 'kounselia_get_plans' ) ? kounselia_get_plans( true ) : array();
 $user_subscription   = function_exists( 'kounselia_get_user_subscription' ) ? kounselia_get_user_subscription( $user->ID ) : null;
@@ -664,7 +665,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <button class="nav-link js-nav active" id="desk-tab-home" onclick="switchTab('home')"><i class="ti ti-home"></i><span>Home</span></button>
         <button class="nav-link js-nav" id="desk-tab-sessions" onclick="switchTab('sessions')"><i class="ti ti-history"></i><span>Sessions</span></button>
         <button class="nav-link js-nav" id="desk-tab-professionals" onclick="switchTab('professionals')"><i class="ti ti-calendar-event"></i><span>Book a professional</span></button>
-        <button class="nav-link js-nav" id="desk-tab-growth" onclick="switchTab('growth')"><i class="ti ti-plant-2"></i><span>Growth plan</span></button>
+        <button class="nav-link js-nav" id="desk-tab-growth" onclick="switchTab('growth')"><i class="ti ti-plant-2"></i><span><?php echo esc_html( kounselia_t( 'growth.title', array(), $dash_lang ) ); ?></span></button>
         <button class="nav-link js-nav" id="desk-tab-memory" onclick="switchTab('memory')"><i class="ti ti-brain"></i><span>Memory Profile</span></button>
         <button class="nav-link js-nav" id="desk-tab-settings" onclick="switchTab('settings')"><i class="ti ti-settings"></i><span>Settings</span></button>
         <button class="nav-link js-nav" id="desk-tab-upgrade" onclick="switchTab('upgrade')"><i class="ti ti-sparkles"></i><span>My plan</span></button>
@@ -754,14 +755,14 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <div class="rec-av ic-sage"><i class="ti ti-plant-2"></i></div>
       <div class="rec-meta">
         <?php if ( $growth_home ) : ?>
-          <h3>Day <?php echo (int) $growth_home['current_day']; ?> of <?php echo (int) $growth_home['total_days']; ?>: <?php echo esc_html( $growth_home['title'] ); ?></h3>
-          <p class="reason"><?php echo $growth_home['today'] ? ( $growth_home['today']['done'] ? 'Today\'s step is done. Nice work.' : esc_html( $growth_home['today']['task'] ) ) : ''; ?></p>
+          <h3><?php echo esc_html( kounselia_t( 'growth.card_title_day', array( 'day' => (int) $growth_home['current_day'], 'total' => (int) $growth_home['total_days'], 'title' => $growth_home['title'] ), $dash_lang ) ); ?></h3>
+          <p class="reason"><?php echo $growth_home['today'] ? ( $growth_home['today']['done'] ? esc_html( kounselia_t( 'growth.card_done', array(), $dash_lang ) ) : esc_html( $growth_home['today']['task'] ) ) : ''; ?></p>
         <?php else : ?>
-          <h3>Grow with a 30 day plan</h3>
-          <p class="reason">Pick something to work on, like discipline, habits or confidence, and get one small step a day.</p>
+          <h3><?php echo esc_html( kounselia_t( 'growth.card_title_start', array(), $dash_lang ) ); ?></h3>
+          <p class="reason"><?php echo esc_html( kounselia_t( 'growth.card_body_start', array(), $dash_lang ) ); ?></p>
         <?php endif; ?>
       </div>
-      <button type="button" class="btn-rec" onclick="switchTab('growth')"><?php echo $growth_home ? 'Open plan' : 'Start a plan'; ?></button>
+      <button type="button" class="btn-rec" onclick="switchTab('growth')"><?php echo esc_html( kounselia_t( $growth_home ? 'growth.card_open' : 'growth.card_start', array(), $dash_lang ) ); ?></button>
     </section>
     <?php endif; ?>
 
@@ -1056,6 +1057,19 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
           <button class="btn-w outline" onclick="switchTab('memory')" style="width:100%; justify-content:center; margin-top:24px; display:flex;">
             <i class="ti ti-brain"></i> Manage Memory Profile
           </button>
+
+          <?php if ( function_exists( 'kounselia_languages' ) ) : ?>
+          <div style="margin-top:20px;text-align:left;">
+            <label for="lang-select" style="font-size:13px;font-weight:600;color:var(--text2);"><i class="ti ti-language"></i> <?php echo esc_html( kounselia_t( 'lang.setting', array(), $dash_lang ) ); ?></label>
+            <select id="lang-select" style="width:100%;margin-top:6px;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font:inherit;">
+              <?php foreach ( kounselia_languages() as $code => $info ) : ?>
+                <option value="<?php echo esc_attr( $code ); ?>"<?php selected( $dash_lang, $code ); ?>><?php echo esc_html( $info['name'] ); ?></option>
+              <?php endforeach; ?>
+            </select>
+            <p style="font-size:12px;color:var(--text3);margin-top:6px;line-height:1.5;"><?php echo esc_html( kounselia_t( 'lang.note', array(), $dash_lang ) ); ?></p>
+            <div class="inline-msg" id="lang-msg"></div>
+          </div>
+          <?php endif; ?>
         </div>
 
         <div class="settings-stack">
@@ -1454,6 +1468,22 @@ function setupNameSave(inputId, btnId, msgId){
   });
 }
 setupNameSave('name-input','name-save','name-msg');
+
+(function(){
+  const sel=document.getElementById('lang-select');
+  if(!sel) return;
+  sel.addEventListener('change',function(){
+    sel.disabled=true;
+    fetch(KOUNSELIA.ajaxUrl,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body:new URLSearchParams({action:'kounselia_set_language',nonce:KOUNSELIA.nonce,language:sel.value})})
+    .then(r=>r.json())
+    .then(res=>{
+      if(res.success){ showInline('lang-msg',res.data.message,true); setTimeout(()=>location.reload(),600); }
+      else { sel.disabled=false; showInline('lang-msg',res.data&&res.data.message?res.data.message:'Could not save that.',false); }
+    })
+    .catch(()=>{sel.disabled=false;showInline('lang-msg','Something went wrong, please try again.',false);});
+  });
+})();
 
 function setupPasswordSave(curId, newId, cfmId, btnId, msgId){
   const btn=document.getElementById(btnId);
