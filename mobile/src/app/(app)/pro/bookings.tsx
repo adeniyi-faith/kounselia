@@ -18,18 +18,24 @@ import { TextField } from '@/components/TextField';
 import { RescheduleSheet } from '@/components/pro/RescheduleSheet';
 import { ChoiceSheet, Panel, Pill, SmallButton } from '@/components/pro/ui';
 import { usePro } from '@/professional/ProDashboard';
+import { useLanguage } from '@/language';
 import { useSession } from '@/session';
 import { fonts, makeStyles, useColors } from '@/theme';
 
-const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const DAYS = [0, 1, 2, 3, 4, 5, 6];
+
+// A day of the week (0 is Sunday) in the app's language. 1 January 2023 was a Sunday.
+function dayName(day: number, language: string, short = false): string {
+  return new Date(2023, 0, 1 + day).toLocaleDateString(language, { weekday: short ? 'short' : 'long' });
+}
 
 // Every half hour, as the website's time boxes allow.
 const TIMES = Array.from({ length: 48 }, (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`);
 
-function timeLabel(hhmm: string): string {
+function timeLabel(hhmm: string, language: string): string {
   const [h, m] = hhmm.split(':').map(Number);
   const d = new Date(2000, 0, 1, h, m);
-  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  return d.toLocaleTimeString(language, { hour: 'numeric', minute: '2-digit' });
 }
 
 interface DayRow {
@@ -45,6 +51,7 @@ export default function ProBookings() {
   const styles = useStyles();
   const colors = useColors();
   const { data, failed, reload } = usePro();
+  const { t } = useLanguage();
   const [refreshing, setRefreshing] = useState(false);
   const toast = useToast();
 
@@ -61,14 +68,14 @@ export default function ProBookings() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accentText} />}
       >
         <Text style={styles.title} accessibilityRole="header">
-          Bookings
+          {t('m.pro.tab_bookings')}
         </Text>
-        <Text style={styles.sub}>Client session requests</Text>
+        <Text style={styles.sub}>{t('m.pro.bookings_sub')}</Text>
         {!data ? (
           failed ? (
             <View style={styles.center}>
-              <Text style={styles.notice}>We couldn’t load your bookings. Please check your internet connection.</Text>
-              <Button title="Try again" variant="ghost" onPress={refresh} busy={refreshing} />
+              <Text style={styles.notice}>{t('m.pro.bookings_load_failed')}</Text>
+              <Button title={t('m.pro.try_again')} variant="ghost" onPress={refresh} busy={refreshing} />
             </View>
           ) : (
             <View style={{ marginTop: 16 }}>
@@ -85,13 +92,11 @@ export default function ProBookings() {
                 reload();
               }}
             />
-            <SectionHead title="Upcoming sessions" note={`${data.bookings.length} scheduled`} />
+            <SectionHead title={t('m.pro.upcoming_sessions')} note={t('m.pro.n_scheduled', { n: data.bookings.length })} />
             {data.bookings.length === 0 ? (
               <EmptyState>
                 <TablerIcon name="calendar-event" size={28} color={colors.text3} />
-                <Text style={styles.notice}>
-                  No sessions booked yet. Once your availability is set and you’re verified, clients booking an open slot will show up right here.
-                </Text>
+                <Text style={styles.notice}>{t('m.pro.no_sessions')}</Text>
               </EmptyState>
             ) : (
               <Sessions bookings={data.bookings} professionalId={data.application.id} videoAllowed={data.video.allowed} toast={toast.show} reload={reload} />
@@ -110,6 +115,7 @@ function Availability({ initial, onSaved }: { initial: { day: number; start: str
   const styles = useStyles();
   const colors = useColors();
   const { config } = useSession();
+  const { language, t } = useLanguage();
   const [rows, setRows] = useState<DayRow[]>(() =>
     DAYS.map((_, d) => {
       const rule = initial.find((r) => r.day === d);
@@ -127,7 +133,7 @@ function Availability({ initial, onSaved }: { initial: { day: number; start: str
   async function save() {
     const bad = rows.findIndex((r) => r.on && r.end <= r.start);
     if (bad !== -1) {
-      setError(`${DAYS[bad]}: the end time needs to be after the start time.`);
+      setError(t('m.pro.avail_end_after_start', { day: dayName(bad, language) }));
       return;
     }
     setBusy(true);
@@ -140,44 +146,44 @@ function Availability({ initial, onSaved }: { initial: { day: number; start: str
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
-    onSaved(res.data.message || 'Availability saved.');
+    onSaved(res.data.message || t('m.pro.avail_saved'));
   }
 
   const pickingRow = picking ? rows[picking.day] : null;
   return (
-    <Panel title="Your weekly availability" note="Clients can only book inside these hours, the same hours as on the website.">
+    <Panel title={t('m.pro.avail_title')} note={t('m.pro.avail_note')}>
       {rows.map((r, day) => (
-        <View key={DAYS[day]} style={styles.dayRow}>
+        <View key={day} style={styles.dayRow}>
           <Switch
             value={r.on}
             onValueChange={(on) => change(day, { on })}
             trackColor={{ true: colors.accent, false: colors.surface3 }}
-            accessibilityLabel={`Available on ${DAYS[day]}`}
+            accessibilityLabel={t('m.pro.avail_on_day', { day: dayName(day, language) })}
           />
-          <Text style={[styles.dayName, !r.on && { color: colors.text3 }]}>{DAYS[day].slice(0, 3)}</Text>
+          <Text style={[styles.dayName, !r.on && { color: colors.text3 }]}>{dayName(day, language, true)}</Text>
           {r.on ? (
             <View style={styles.dayTimes}>
-              <Pressable onPress={() => setPicking({ day, which: 'start' })} accessibilityRole="button" accessibilityLabel={`${DAYS[day]} starts at ${timeLabel(r.start)}`} style={styles.time}>
-                <Text style={styles.timeText}>{timeLabel(r.start)}</Text>
+              <Pressable onPress={() => setPicking({ day, which: 'start' })} accessibilityRole="button" accessibilityLabel={t('m.pro.avail_starts', { day: dayName(day, language), time: timeLabel(r.start, language) })} style={styles.time}>
+                <Text style={styles.timeText}>{timeLabel(r.start, language)}</Text>
               </Pressable>
-              <Text style={styles.to}>to</Text>
-              <Pressable onPress={() => setPicking({ day, which: 'end' })} accessibilityRole="button" accessibilityLabel={`${DAYS[day]} ends at ${timeLabel(r.end)}`} style={styles.time}>
-                <Text style={styles.timeText}>{timeLabel(r.end)}</Text>
+              <Text style={styles.to}>{t('m.pro.avail_to')}</Text>
+              <Pressable onPress={() => setPicking({ day, which: 'end' })} accessibilityRole="button" accessibilityLabel={t('m.pro.avail_ends', { day: dayName(day, language), time: timeLabel(r.end, language) })} style={styles.time}>
+                <Text style={styles.timeText}>{timeLabel(r.end, language)}</Text>
               </Pressable>
             </View>
           ) : (
-            <Text style={styles.off}>Not available</Text>
+            <Text style={styles.off}>{t('m.pro.cap_not_available')}</Text>
           )}
         </View>
       ))}
       {error ? <FormMessage tone="error" text={error} /> : null}
-      <Button title="Save availability" onPress={save} busy={busy} style={{ marginTop: 8 }} />
+      <Button title={t('m.pro.avail_save')} onPress={save} busy={busy} style={{ marginTop: 8 }} />
       <ChoiceSheet
         visible={!!picking}
-        title={picking ? `${DAYS[picking.day]} ${picking.which === 'start' ? 'from' : 'until'}` : ''}
-        choices={TIMES.map((t) => ({ value: t, label: timeLabel(t) }))}
+        title={picking ? t(picking.which === 'start' ? 'm.pro.avail_day_from' : 'm.pro.avail_day_until', { day: dayName(picking.day, language) }) : ''}
+        choices={TIMES.map((time) => ({ value: time, label: timeLabel(time, language) }))}
         selected={pickingRow && picking ? pickingRow[picking.which] : null}
-        onPick={(t) => picking && change(picking.day, { [picking.which]: t })}
+        onPick={(time) => picking && change(picking.day, { [picking.which]: time })}
         onClose={() => setPicking(null)}
       />
     </Panel>
@@ -202,6 +208,7 @@ function Sessions({
   const styles = useStyles();
   const colors = useColors();
   const { config } = useSession();
+  const { language, t } = useLanguage();
   const [joining, setJoining] = useState<number | null>(null);
   const [rescheduling, setRescheduling] = useState<ProBooking | null>(null);
   const [linkFor, setLinkFor] = useState<ProBooking | null>(null);
@@ -222,26 +229,26 @@ function Sessions({
 
   async function join(b: ProBooking) {
     setJoining(b.id);
-    const problem = await joinSession(config, b.id);
+    const problem = await joinSession(config, b.id, t);
     setJoining(null);
     if (problem) toast(problem);
   }
 
   function confirmCancel(b: ProBooking, wholeSeries: boolean) {
     showDialog({
-      title: wholeSeries ? 'Cancel the weekly sessions?' : 'Cancel this session?',
+      title: wholeSeries ? t('m.pro.cancel_weekly_q') : t('m.pro.cancel_session_q'),
       message: wholeSeries
-        ? `This cancels every upcoming weekly session with ${b.client_name}. They’ll be told.`
-        : `Your session with ${b.client_name} on ${sessionWhen(b.start_utc)} will be cancelled, and they’ll be told.`,
+        ? t('m.pro.cancel_weekly_body', { name: b.client_name })
+        : t('m.pro.cancel_session_body', { name: b.client_name, when: sessionWhen(b.start_utc, false, language) }),
       icon: 'calendar-x',
       buttons: [
-        { text: 'Keep it', style: 'cancel' },
+        { text: t('m.pro.keep_it'), style: 'cancel' },
         {
-          text: wholeSeries ? 'Cancel weekly' : 'Cancel session',
+          text: wholeSeries ? t('m.pro.cancel_weekly') : t('m.pro.cancel_session'),
           style: 'destructive',
           onPress: async () => {
             const res = wholeSeries ? await cancelSeries(config, b.series_id) : await cancelBooking(config, b.id);
-            toast(res.ok ? res.data.message || 'Cancelled.' : res.message);
+            toast(res.ok ? res.data.message || t('m.pro.cancelled') : res.message);
             reload();
           },
         },
@@ -258,39 +265,38 @@ function Sessions({
               <TablerIcon name="calendar-event" size={18} color={colors.sage} />
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={styles.when}>{sessionWhen(b.start_utc)}</Text>
+              <Text style={styles.when}>{sessionWhen(b.start_utc, false, language)}</Text>
               <Text style={styles.with}>{b.client_name}</Text>
             </View>
           </View>
           {b.series_id || b.is_free ? (
             <View style={styles.tags}>
-              {b.series_id ? <Pill label="Weekly" /> : null}
-              {b.is_free ? <Pill label="Free" tone="sage" /> : null}
+              {b.series_id ? <Pill label={t('m.pro.weekly')} /> : null}
+              {b.is_free ? <Pill label={t('m.pro.free')} tone="sage" /> : null}
             </View>
           ) : null}
           {b.client_note ? <Text style={styles.note}>“{b.client_note}”</Text> : null}
           {b.video_provider ? (
             <Text style={styles.videoNote}>
-              On {b.video_provider}
-              {b.video_link ? ' (link for this session)' : ''}
+              {t(b.video_link ? 'm.pro.on_provider_session' : 'm.pro.on_provider', { provider: b.video_provider })}
             </Text>
           ) : null}
           <View style={styles.actions}>
             {canJoin(b) && (
               <Pressable onPress={() => join(b)} accessibilityRole="button" style={styles.joinBtn}>
                 {joining === b.id ? <ActivityIndicator size="small" color="#fff" /> : <TablerIcon name="video" size={16} color="#fff" />}
-                <Text style={styles.joinText}>Join</Text>
+                <Text style={styles.joinText}>{t('m.pro.join')}</Text>
               </Pressable>
             )}
             <SmallButton
               icon="message-circle"
-              label="Message"
+              label={t('m.pro.message')}
               onPress={() => router.push({ pathname: '/booking/[id]', params: { id: String(b.id), name: b.client_name } })}
             />
-            <SmallButton icon="calendar-cog" label="Reschedule" onPress={() => setRescheduling(b)} />
-            {videoAllowed && <SmallButton icon="link" label="Video link" onPress={() => setLinkFor(b)} />}
-            <SmallButton label="Cancel" tone="danger" onPress={() => confirmCancel(b, false)} />
-            {b.series_id ? <SmallButton label="Cancel weekly" tone="danger" onPress={() => confirmCancel(b, true)} /> : null}
+            <SmallButton icon="calendar-cog" label={t('m.pro.reschedule')} onPress={() => setRescheduling(b)} />
+            {videoAllowed && <SmallButton icon="link" label={t('m.pro.video_link')} onPress={() => setLinkFor(b)} />}
+            <SmallButton label={t('m.pro.cancel')} tone="danger" onPress={() => confirmCancel(b, false)} />
+            {b.series_id ? <SmallButton label={t('m.pro.cancel_weekly')} tone="danger" onPress={() => confirmCancel(b, true)} /> : null}
           </View>
         </View>
       ))}
@@ -324,6 +330,7 @@ function Sessions({
 function SessionLinkSheet({ booking, onClose }: { booking: ProBooking | null; onClose: (message?: string) => void }) {
   const styles = useStyles();
   const { config } = useSession();
+  const { t } = useLanguage();
   const [link, setLink] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -348,15 +355,12 @@ function SessionLinkSheet({ booking, onClose }: { booking: ProBooking | null; on
   }
 
   return (
-    <Sheet visible={!!booking} title="Video link" onClose={() => onClose()}>
-      <Text style={styles.sheetText}>
-        A Zoom, Google Meet, Teams or Whereby link for just this session. Your client only gets it by pressing Join at session time. Leave it empty to use your
-        usual setting.
-      </Text>
-      <TextField label="Meeting link" value={link} onChangeText={setLink} placeholder="https://zoom.us/j/…" autoCapitalize="none" keyboardType="url" autoCorrect={false} />
+    <Sheet visible={!!booking} title={t('m.pro.video_link')} onClose={() => onClose()}>
+      <Text style={styles.sheetText}>{t('m.pro.session_link_body')}</Text>
+      <TextField label={t('m.pro.meeting_link')} value={link} onChangeText={setLink} placeholder="https://zoom.us/j/…" autoCapitalize="none" keyboardType="url" autoCorrect={false} />
       {error ? <FormMessage tone="error" text={error} /> : null}
-      <Button title="Save link" onPress={() => save(link)} busy={busy} />
-      {booking?.video_link ? <Button title="Use my usual setting" variant="ghost" onPress={() => save('')} style={{ marginTop: 10 }} /> : null}
+      <Button title={t('m.pro.save_link')} onPress={() => save(link)} busy={busy} />
+      {booking?.video_link ? <Button title={t('m.pro.use_usual')} variant="ghost" onPress={() => save('')} style={{ marginTop: 10 }} /> : null}
       <View style={{ height: 8 }} />
     </Sheet>
   );
