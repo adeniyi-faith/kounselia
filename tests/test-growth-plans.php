@@ -185,4 +185,130 @@ class Test_Growth_Plans extends WP_Ajax_UnitTestCase {
         $this->assertStringContainsString( 'Do small thing 1.', $clause );
         $this->assertSame( '', kounselia_growth_chat_clause( $user, 'someone_else' ) );
     }
+
+    private function make_plan_on_day( $user, $day ) {
+        $this->use_fake_ai();
+        $id = kounselia_growth_create_plan( $user, 'discipline', $this->answers() );
+        global $wpdb;
+        $wpdb->update( kounselia_growth_table(), array( 'start_date' => gmdate( 'Y-m-d', strtotime( current_time( 'Y-m-d' ) ) - ( $day - 1 ) * DAY_IN_SECONDS ) ), array( 'id' => $id ) );
+        return $id;
+    }
+
+    private function fake_review_json( $first_day, $level = 'easier', $count = 7 ) {
+        $up = array();
+        for ( $d = $first_day; $d < $first_day + $count; $d++ ) {
+            $up[] = array( 'day' => $d, 'title' => "Gentler $d", 'task' => "A smaller step $d.", 'minutes' => 5 );
+        }
+        return wp_json_encode( array( 'note' => 'Good first week. Keep it light.', 'level' => $level, 'upcoming' => $up ) );
+    }
+
+    function test_reminder_defaults_to_nine_and_can_be_changed_or_turned_off() {
+        $user = self::factory()->user->create();
+        $this->use_fake_ai();
+        $id = kounselia_growth_create_plan( $user, 'discipline', $this->answers() );
+
+        $this->assertSame( 9, kounselia_growth_format_plan( kounselia_growth_active_plan( $user ), false )['remind_hour'] );
+        $this->assertTrue( kounselia_growth_set_reminder( $user, $id, 18 ) );
+        $this->assertSame( 18, kounselia_growth_format_plan( kounselia_growth_active_plan( $user ), false )['remind_hour'] );
+        $this->assertTrue( kounselia_growth_set_reminder( $user, $id, -1 ) );
+        $this->assertWPError( kounselia_growth_set_reminder( $user, $id, 40 ) );
+    }
+
+    function test_reminders_go_out_once_a_day_and_skip_done_days() {
+        global $wpdb;
+        $due   = self::factory()->user->create();
+        $done  = self::factory()->user->create();
+        $off   = self::factory()->user->create();
+        $ids   = array();
+        foreach ( array( 'due' => $due, 'done' => $done, 'off' => $off ) as $key => $user ) {
+            $ids[ $key ] = $this->make_plan_on_day( $user, 3 );
+            // Not reminded yet today, and the hour has already come.
+            $wpdb->update( kounselia_growth_table(), array( 'last_reminded' => '2020-01-01', 'remind_hour' => 0 ), array( 'id' => $ids[ $key ] ) );
+        }
+        kounselia_growth_set_day_done( $done, $ids['done'], 3, true );
+        kounselia_growth_set_reminder( $off, $ids['off'], -1 );
+
+        kounselia_growth_send_reminders();
+        kounselia_growth_send_reminders(); // A second run the same day sends nothing more.
+
+        $count = function ( $user ) use ( $wpdb ) {
+            return (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$wpdb->prefix}kounselia_notifications WHERE user_id = %d AND type = 'growth_reminder'", $user ) );
+        };
+        $this->assertSame( 1, $count( $due ) );
+        $this->assertSame( 0, $count( $done ) );
+        $this->assertSame( 0, $count( $off ) );
+    }
+
+    function test_a_review_is_not_ready_until_the_week_is_over() {
+        $user = self::factory()->user->create();
+        $id   = $this->make_plan_on_day( $user, 5 );
+        $this->assertNull( kounselia_growth_format_plan( kounselia_growth_active_plan( $user ), false )['review_ready'] );
+        $this->assertWPError( kounselia_growth_review_week( $user, $id, 1 ) );
+    }
+
+    function test_the_weekly_review_is_saved_once_and_rewrites_the_next_days() {
+        $user = self::factory()->user->create();
+        $id   = $this->make_plan_on_day( $user, 7 );
+        kounselia_growth_set_day_done( $user, $id, 7, true );
+        $this->assertSame( 1, kounselia_growth_format_plan( kounselia_growth_active_plan( $user ), false )['review_ready'] );
+
+        add_filter( 'kounselia_growth_review_ai_response', function () {
+            return $this->fake_review_json( 8 );
+        } );
+        $this->assertTrue( kounselia_growth_review_week( $user, $id, 1 ) );
+
+        $plan = kounselia_growth_format_plan( kounselia_growth_active_plan( $user ) );
+        $this->assertNull( $plan['review_ready'] );
+        $this->assertSame( 'Good first week. Keep it light.', $plan['reviews'][0]['note'] );
+        $this->assertSame( 7, $plan['reviews'][0]['changed'] );
+        $this->assertSame( 'A smaller step 8.', $plan['days'][7]['task'] );
+        $this->assertSame( 'Do small thing 15.', $plan['days'][14]['task'], 'Days beyond the next seven are untouched.' );
+        $this->assertSame( 'Do small thing 7.', $plan['days'][6]['task'], 'Days already passed are untouched.' );
+
+        $this->assertWPError( kounselia_growth_review_week( $user, $id, 1 ) );
+    }
+
+    function test_a_review_with_the_wrong_days_keeps_the_note_but_changes_nothing() {
+        $user = self::factory()->user->create();
+        $id   = $this->make_plan_on_day( $user, 7 );
+        add_filter( 'kounselia_growth_review_ai_response', function () {
+            return $this->fake_review_json( 8, 'easier', 3 );
+        } );
+
+        $this->assertTrue( kounselia_growth_review_week( $user, $id, 1 ) );
+        $plan = kounselia_growth_format_plan( kounselia_growth_active_plan( $user ) );
+        $this->assertSame( 0, $plan['reviews'][0]['changed'] );
+        $this->assertSame( 'Do small thing 8.', $plan['days'][7]['task'] );
+    }
+
+    function test_the_final_review_comes_on_day_thirty() {
+        $user = self::factory()->user->create();
+        $id   = $this->make_plan_on_day( $user, 30 );
+        $done = array();
+        // Weeks 1 to 4 reviewed already.
+        global $wpdb;
+        for ( $n = 1; $n <= 4; $n++ ) {
+            $done[ $n ] = array( 'week' => $n, 'note' => 'ok', 'level' => 'same', 'changed' => 0, 'at' => '2020-01-01 00:00:00' );
+        }
+        $wpdb->update( kounselia_growth_table(), array( 'reviews' => wp_json_encode( $done ) ), array( 'id' => $id ) );
+
+        $this->assertSame( 5, kounselia_growth_format_plan( kounselia_growth_active_plan( $user ), false )['review_ready'] );
+    }
+
+    function test_the_review_ajax_action_round_trips() {
+        $user = self::factory()->user->create();
+        wp_set_current_user( $user );
+        $id = $this->make_plan_on_day( $user, 7 );
+        add_filter( 'kounselia_growth_review_ai_response', function () {
+            return $this->fake_review_json( 8, 'same', 7 );
+        } );
+
+        $res = $this->ajax( 'kounselia_growth_review', array( 'plan_id' => $id, 'week' => 1 ) );
+        $this->assertTrue( $res['success'] );
+        $this->assertCount( 1, $res['data']['plan']['reviews'] );
+
+        $res = $this->ajax( 'kounselia_growth_set_reminder', array( 'plan_id' => $id, 'hour' => 7 ) );
+        $this->assertTrue( $res['success'] );
+        $this->assertSame( 7, $res['data']['plan']['remind_hour'] );
+    }
 }
