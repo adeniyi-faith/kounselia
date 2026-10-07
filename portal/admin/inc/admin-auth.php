@@ -51,6 +51,50 @@ if ( ! kounselia_user_is_admin() ) {
     kounselia_admin_bounce_to_login( 'signed_out' );
 }
 
+// Only a session started on the admin sign-in screen (where the 2FA code
+// is asked for) opens the admin panel. One from the website's member
+// sign-in, the app or wp-login.php is sent back to sign in here.
+if ( ! kounselia_admin_session_is_verified() ) {
+    kounselia_admin_bounce_to_login( 'admin_signin' );
+}
+
+/* -------------------------------------------------------------------------
+ * Area permissions.
+ *
+ * Staff only see the areas they were given on the Team page (admin-nav.php
+ * hides the rest of the menu). This makes the pages themselves match, so
+ * typing a page's address can't open an area the menu hides. Pages that
+ * check their own area (blog, pages, newsletter, professionals, team,
+ * email delivery) aren't listed. Dashboard and Settings stay open to all
+ * staff, as in the menu.
+ * ---------------------------------------------------------------------- */
+if ( ! function_exists( 'kounselia_admin_page_area' ) ) {
+    function kounselia_admin_page_area( $script ) {
+        $areas = array(
+            'members.php'          => 'members',
+            'member-profile.php'   => 'members',
+            'memory-center.php'    => 'memory-center',
+            'counselors.php'       => 'counselors',
+            'ai-brain.php'         => 'ai-brain',
+            'ai-collaboration.php' => 'ai-collaboration',
+            'clinical-board.php'   => 'ai-collaboration',
+            'safety-flags.php'     => 'safety',
+            'conversations.php'    => 'conversations',
+            'session.php'          => 'conversations',
+            'bookings.php'         => 'bookings',
+            'booking-messages.php' => 'bookings',
+            'plans.php'            => 'plans',
+            'audit-log.php'        => 'audit-log',
+        );
+        return isset( $areas[ $script ] ) ? $areas[ $script ] : '';
+    }
+}
+
+$kounselia_admin_area = kounselia_admin_page_area( basename( (string) $_SERVER['SCRIPT_FILENAME'] ) );
+if ( $kounselia_admin_area && ! kounselia_admin_can( $kounselia_admin_area ) ) {
+    wp_die( 'You do not have permission to open this part of the admin panel. <a href="/portal/admin/pages/dashboard.php">Back to the dashboard</a>', 'No access', array( 'response' => 403 ) );
+}
+
 /* -------------------------------------------------------------------------
  * Inactivity timeout.
  * ---------------------------------------------------------------------- */

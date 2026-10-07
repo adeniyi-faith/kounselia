@@ -21,7 +21,7 @@ require_once $kounselia_admin_wp_load;
 header( 'X-Robots-Tag: noindex, nofollow', true );
 
 // Already signed in as a confirmed admin? Skip the form entirely.
-if ( is_user_logged_in() && kounselia_user_is_admin() ) {
+if ( is_user_logged_in() && kounselia_user_is_admin() && kounselia_admin_session_is_verified() ) {
     wp_safe_redirect( '/portal/admin/pages/dashboard.php' );
     exit;
 }
@@ -49,8 +49,7 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['totp_code'] ) ) {
             $kounselia_error = 'Incorrect code. Please try again.';
         } else {
             kounselia_2fa_clear_pending_login();
-            wp_set_auth_cookie( $kounselia_pending_2fa_user, false, is_ssl() );
-            wp_set_current_user( $kounselia_pending_2fa_user );
+            kounselia_admin_set_auth_cookie( $kounselia_pending_2fa_user );
             update_user_meta( $kounselia_pending_2fa_user, 'kounselia_admin_last_seen', time() );
             kounselia_admin_log( 'admin_login', 'user', $kounselia_pending_2fa_user );
             wp_safe_redirect( '/portal/admin/pages/dashboard.php' );
@@ -80,9 +79,9 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['totp_code'] ) ) {
             kounselia_2fa_start_pending_login( $kounselia_user->ID );
             $kounselia_pending_2fa_user = $kounselia_user->ID;
         } else {
-            wp_set_auth_cookie( $kounselia_user->ID, false, is_ssl() );
-            wp_set_current_user( $kounselia_user->ID );
+            kounselia_admin_set_auth_cookie( $kounselia_user->ID );
             update_user_meta( $kounselia_user->ID, 'kounselia_admin_last_seen', time() );
+            kounselia_admin_log( 'admin_login', 'user', $kounselia_user->ID );
             wp_safe_redirect( '/portal/admin/pages/dashboard.php' );
             exit;
         }
@@ -92,6 +91,7 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['totp_code'] ) ) {
 $kounselia_reason  = isset( $_GET['reason'] ) ? sanitize_key( $_GET['reason'] ) : '';
 $kounselia_notices = array(
     'timed_out'  => 'You were signed out after a period of inactivity. Please sign in again.',
+    'admin_signin' => 'Please sign in here to open the admin panel.',
 );
 if ( empty( $kounselia_error ) && ! empty( $kounselia_notices[ $kounselia_reason ] ) ) {
     $kounselia_notice = $kounselia_notices[ $kounselia_reason ];

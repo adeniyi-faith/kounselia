@@ -950,8 +950,8 @@ function updateUserUI(name) {
   if(navRight) {
     navRight.innerHTML = `
       <div class="user-menu">
-        <div class="user-av">${init}</div>
-        <span class="user-name">${name}</span>
+        <div class="user-av">${esc(init)}</div>
+        <span class="user-name">${esc(name)}</span>
         <button class="btn-ghost" onclick="logout()" style="padding: 7px 16px;">${kH('c.nav.sign_out')}</button>
       </div>
     `;

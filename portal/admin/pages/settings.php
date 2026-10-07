@@ -18,6 +18,34 @@ require_once __DIR__ . '/../inc/admin-helpers.php';
 $kounselia_notice = '';
 $kounselia_error  = '';
 
+// API keys (Gemini, Paystack, 8x8 video), money settings (currency,
+// commission), platform limits and maintenance are for Super Admins only.
+// The safety keyword list, safety alert recipients and the AI risk check
+// need the Safety area. Every admin can still manage their own sign-in
+// security at the bottom of the page.
+$kounselia_is_super_admin    = current_user_can( 'administrator' );
+$kounselia_can_safety        = kounselia_admin_can( 'safety' );
+$kounselia_safety_actions    = array(
+    'add_keyword',
+    'bulk_add_keywords',
+    'remove_keyword',
+    'reset_keywords',
+    'save_safety_alert_emails',
+    'save_ai_safety_screening',
+);
+$kounselia_super_admin_only  = array(
+    'flush_tts_cache',
+    'reset_rate_limits',
+    'force_db_upgrade',
+    'compress_existing_images',
+    'save_gemini_keys',
+    'test_gemini',
+    'save_paystack_key',
+    'save_jaas_settings',
+    'save_currency_settings',
+    'save_platform_settings',
+);
+
 // -------------------------------------------------------------------------
 // POST Action Handling & Nonce Verification
 // -------------------------------------------------------------------------
@@ -25,8 +53,14 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
 
     $kounselia_action = sanitize_key( $_POST['kounselia_action'] );
 
+    if ( ! $kounselia_is_super_admin && in_array( $kounselia_action, $kounselia_super_admin_only, true ) ) {
+        $kounselia_error = 'Only a Super Admin can change that setting.';
+
+    } elseif ( ! $kounselia_can_safety && in_array( $kounselia_action, $kounselia_safety_actions, true ) ) {
+        $kounselia_error = 'You need access to the Safety area to change that setting.';
+
     // 1. Save Gemini API Keys
-    if ( 'save_gemini_keys' === $kounselia_action
+    } elseif ( 'save_gemini_keys' === $kounselia_action
         && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_gemini' ) ) {
 
         $raw  = isset( $_POST['gemini_keys'] ) ? (string) wp_unslash( $_POST['gemini_keys'] ) : '';
@@ -306,6 +340,9 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
         update_option( 'kounselia_live_model', sanitize_text_field( wp_unslash( $_POST['live_model'] ) ) );
         update_option( 'kounselia_booking_commission_percent', max( 0, min( 100, (float) $_POST['booking_commission_percent'] ) ) );
         update_option( 'kounselia_booking_lead_hours', max( 0, (float) $_POST['booking_lead_hours'] ) );
+        if ( isset( $_POST['cancel_refund_hours'] ) ) {
+            update_option( 'kounselia_cancel_refund_hours', max( 0, (float) $_POST['cancel_refund_hours'] ) );
+        }
 
         kounselia_admin_log( 'update_platform_settings', 'settings' );
         $kounselia_notice = 'Platform configuration saved successfully.';
@@ -350,6 +387,7 @@ $opt_voice_pro     = (int) get_option('kounselia_voice_pro_minutes', 15);
 $opt_live_model    = get_option('kounselia_live_model', 'gemini-3.1-flash-live-preview');
 $opt_booking_commission_percent = (float) get_option( 'kounselia_booking_commission_percent', 15 );
 $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_hours', 2 );
+$opt_cancel_refund_hours        = kounselia_cancel_refund_hours();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -390,6 +428,7 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
     <div class="login-msg error" style="margin-bottom:20px;"><?php echo esc_html( $kounselia_error ); ?></div>
   <?php endif; ?>
 
+  <?php if ( $kounselia_is_super_admin ) : ?>
   <!-- ===============================================================
        1. AI PROVIDER & KEY MANAGEMENT
   ================================================---------------- -->
@@ -436,7 +475,9 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
       <span style="font-size:12px;color:var(--text3);">Fires a live request through the model cascade and benchmarks round-trip network latency.</span>
     </form>
   </div>
+  <?php endif; ?>
 
+  <?php if ( $kounselia_can_safety ) : ?>
   <!-- ===============================================================
        2. SAFETY GUARDRAILS & MODERATION ENGINE
   ================================================---------------- -->
@@ -532,6 +573,7 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
       <button type="submit" class="login-submit" style="width:auto;padding:10px 20px;margin-top:12px;">Save</button>
     </form>
   </div>
+  <?php endif; ?>
 
   <!-- ===============================================================
        2B-2. EMAIL DELIVERY (full settings on their own page)
@@ -550,6 +592,7 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
   </div>
   <?php endif; ?>
 
+  <?php if ( $kounselia_is_super_admin ) : ?>
   <!-- ===============================================================
        2B-2. VIDEO CALLS (8x8 hosted Jitsi)
   ================================================---------------- -->
@@ -589,7 +632,9 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
       <button type="submit" class="login-submit" style="width:auto;padding:11px 22px;">Save video settings</button>
     </form>
   </div>
+  <?php endif; ?>
 
+  <?php if ( $kounselia_is_super_admin ) : ?>
   <!-- ===============================================================
        2C. PAYSTACK PAYMENTS
   ================================================---------------- -->
@@ -687,7 +732,9 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
       <?php endif; ?>
     </div>
   </div>
+  <?php endif; ?>
 
+  <?php if ( $kounselia_is_super_admin ) : ?>
   <!-- ===============================================================
        2D. CURRENCY & PRICING
   ================================================---------------- -->
@@ -744,7 +791,9 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
       </div>
     </form>
   </div>
+  <?php endif; ?>
 
+  <?php if ( $kounselia_is_super_admin ) : ?>
   <!-- ===============================================================
        3. PLATFORM CONFIGURATION & LIMITS
   ================================================---------------- -->
@@ -797,13 +846,20 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
           <input type="number" id="booking_lead_hours" name="booking_lead_hours" class="op-val-input" min="0" step="0.25" value="<?php echo esc_attr( $opt_booking_lead_hours ); ?>">
           <div class="op-desc">How far ahead a client must book — the app hides any slot closer than this. Fractions allowed (0.5 = 30 minutes); 0 allows booking right up to the start time. Applies platform-wide, to every professional.</div>
         </div>
+        <div class="op-card">
+          <label class="op-label" for="cancel_refund_hours">Refund Cut-off (hours)</label>
+          <input type="number" id="cancel_refund_hours" name="cancel_refund_hours" class="op-val-input" min="0" step="0.25" value="<?php echo esc_attr( $opt_cancel_refund_hours ); ?>">
+          <div class="op-desc">A client who cancels closer than this to the start is not refunded, and can't move the session either; the professional keeps the fee. A professional cancelling always refunds the client. 0 refunds any cancellation before the start.</div>
+        </div>
       </div>
       <div style="margin-top: 20px;">
         <button type="submit" class="login-submit" style="width:auto;padding:10px 20px;">Save Configuration</button>
       </div>
     </form>
   </div>
+  <?php endif; ?>
 
+  <?php if ( $kounselia_is_super_admin ) : ?>
   <!-- ===============================================================
        4. SYSTEM MAINTENANCE & CACHE OPERATIONS
   ================================================---------------- -->
@@ -868,6 +924,7 @@ $opt_booking_lead_hours         = (float) get_option( 'kounselia_booking_lead_ho
       </form>
     </div>
   </div>
+  <?php endif; ?>
 
   <!-- ===============================================================
        5. YOUR ACCOUNT SECURITY (2FA + active sessions)

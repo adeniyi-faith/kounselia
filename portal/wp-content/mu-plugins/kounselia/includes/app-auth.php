@@ -263,6 +263,9 @@ function kounselia_ajax_app_login() {
     // wp_authenticate checks the password without setting a cookie,
     // unlike wp_signon which the website uses.
     $user = wp_authenticate( $email, $password );
+    if ( is_wp_error( $user ) && 'kounselia_account_locked' === $user->get_error_code() ) {
+        wp_send_json_error( array( 'message' => KOUNSELIA_LOCKED_ACCOUNT_MESSAGE ), 403 );
+    }
     if ( is_wp_error( $user ) ) {
         set_transient( $fail_key, (int) get_transient( $fail_key ) + 1, 10 * MINUTE_IN_SECONDS );
         wp_send_json_error( array( 'message' => 'That email and password do not match.' ), 401 );

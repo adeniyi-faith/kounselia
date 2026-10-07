@@ -805,7 +805,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
       <div class="stat-card">
         <div class="stat-icon" style="background:var(--sage-light);color:var(--sage);"><i class="ti ti-wallet"></i></div>
         <div class="stat-num">₦<?php echo esc_html( number_format( $balance['available'] ) ); ?></div>
-        <div class="stat-label">Available to pay out</div>
+        <div class="stat-label">Available to pay out<?php if ( ! empty( $balance['upcoming'] ) ) : ?> · ₦<?php echo esc_html( number_format( $balance['upcoming'] ) ); ?> more after upcoming sessions<?php endif; ?></div>
       </div>
       <div class="stat-card">
         <div class="stat-icon" style="background:var(--accent-light);color:var(--accent);"><i class="ti ti-cash"></i></div>
@@ -873,7 +873,7 @@ body{font-family:'Outfit',sans-serif;color:var(--text);-webkit-font-smoothing:an
         <?php if ( ! $payout_account ) : ?>
           <div class="section-sub" style="margin-top:10px">Add a payout account above first.</div>
         <?php elseif ( $balance['available'] <= 0 ) : ?>
-          <div class="section-sub" style="margin-top:10px">Nothing to pay out yet — this fills up as clients pay for booked sessions.</div>
+          <div class="section-sub" style="margin-top:10px">Nothing to pay out yet. Each session's fee becomes available once the session has taken place.</div>
         <?php endif; ?>
         <div class="pro-msg" id="payout-request-msg"></div>
       </div>

@@ -2275,7 +2275,7 @@ function submitReview(){
 }
 
 function cancelMyBooking(bookingId, linkEl){
-  if (!confirm(tr('d.book.cancel_confirm'))) return;
+  if (!confirm(tr('d.book.cancel_confirm_cutoff', { hours: <?php echo wp_json_encode( kounselia_cancel_refund_hours() + 0 ); ?> }))) return;
   fetch(KOUNSELIA.ajaxUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2286,7 +2286,7 @@ function cancelMyBooking(bookingId, linkEl){
     if (res.success) {
       const row = document.querySelector('#my-booking-list [data-booking-id="' + bookingId + '"]');
       if (row) row.remove();
-      toast(tr('d.book.cancelled'), false);
+      toast(tr(res.data && res.data.refunded === false ? 'd.book.cancelled_no_refund' : 'd.book.cancelled'), false);
     } else {
       toast((res.data && res.data.message) || tr('d.book.cancel_fail'), true);
     }

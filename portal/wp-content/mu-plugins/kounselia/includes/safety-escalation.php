@@ -411,7 +411,7 @@ function kounselia_handle_safety_acknowledge_post() {
         wp_die( 'Security check failed, please go back and try again.' );
     }
 
-    if ( ! kounselia_user_is_admin() ) {
+    if ( ! kounselia_admin_can( 'safety' ) ) {
         wp_die( 'Unauthorized.' );
     }
 
