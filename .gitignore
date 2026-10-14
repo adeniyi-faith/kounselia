@@ -51,3 +51,11 @@ vendor/
 !mobile/.htaccess
 !packages/.htaccess
 .phpunit.result.cache
+
+# Tool and editor leftovers
+node_modules/
+.DS_Store
+.vscode/
+.idea/
+chat-app/dist/
+mobile/e2e-output/
