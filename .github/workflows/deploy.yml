@@ -11,7 +11,16 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: SSH and Pull Latest Code
+      # The server keeps its own copy of this repository. Instead of
+      # "git pull" (which tries to blend the server's history with GitHub's
+      # and gets stuck if the history is ever rewritten), this makes the
+      # server's copy match GitHub's main exactly.
+      #
+      # It stops without changing anything if someone has edited a tracked
+      # file directly on the server, so hand edits are never wiped silently.
+      # Files the repository ignores (WordPress itself, uploads,
+      # wp-config.php) are never touched.
+      - name: SSH and match the server to main
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.CPANEL_HOST }}
@@ -19,5 +28,14 @@ jobs:
           password: ${{ secrets.CPANEL_PASSWORD }}
           port: 22
           script: |
+            set -e
             cd /home2/rainofbl/public_html/kounselia.com
-            git pull origin main
+            git fetch origin main
+            git update-index -q --refresh || true
+            CHANGED="$(git status --porcelain --untracked-files=no)"
+            if [ -n "$CHANGED" ]; then
+              echo "STOPPED: files were edited directly on the server. Nothing was changed."
+              echo "$CHANGED"
+              exit 1
+            fi
+            git reset --hard origin/main
