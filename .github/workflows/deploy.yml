@@ -18,8 +18,9 @@ jobs:
       #
       # It stops without changing anything if someone has edited a tracked
       # file directly on the server, so hand edits are never wiped silently.
-      # Files the repository ignores (WordPress itself, uploads,
-      # wp-config.php) are never touched.
+      # A file that was only deleted by hand is not an edit (there is nothing
+      # to lose), so it is put back. Files the repository ignores
+      # (WordPress itself, uploads, wp-config.php) are never touched.
       - name: SSH and match the server to main
         uses: appleboy/ssh-action@master
         with:
@@ -32,10 +33,15 @@ jobs:
             cd /home2/rainofbl/public_html/kounselia.com
             git fetch origin main
             git update-index -q --refresh || true
-            CHANGED="$(git status --porcelain --untracked-files=no)"
+            DELETED="$(git status --porcelain --untracked-files=no | grep '^ D ' || true)"
+            CHANGED="$(git status --porcelain --untracked-files=no | grep -v '^ D ' || true)"
             if [ -n "$CHANGED" ]; then
               echo "STOPPED: files were edited directly on the server. Nothing was changed."
               echo "$CHANGED"
               exit 1
+            fi
+            if [ -n "$DELETED" ]; then
+              echo "Putting back files that were deleted by hand on the server:"
+              echo "$DELETED"
             fi
             git reset --hard origin/main
