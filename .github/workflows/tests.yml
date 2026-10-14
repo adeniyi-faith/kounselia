@@ -3,8 +3,11 @@ name: Tests
 on:
   pull_request:
   push:
-    branches:
-      - main
+
+# A newer push to the same branch makes an unfinished older run pointless.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   phpunit:
