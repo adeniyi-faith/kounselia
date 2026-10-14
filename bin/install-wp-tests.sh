@@ -48,17 +48,48 @@ install_wp() {
 	rm "$ARCHIVE"
 }
 
+# The WordPress test tools must come from the same version as WordPress itself.
+# They used to come from "trunk" (the unreleased development version), which
+# broke the tests as soon as trunk added something the released WordPress
+# doesn't have yet. This works out the real version number (asking
+# wordpress.org when WP_VERSION is "latest") so the matching tools are used.
+resolve_wp_version() {
+	if [ "$WP_VERSION" != "latest" ]; then
+		RESOLVED_WP_VERSION="$WP_VERSION"
+		return
+	fi
+
+	RESOLVED_WP_VERSION=$(curl -s https://api.wordpress.org/core/version-check/1.7/ \
+		| grep -o '"version":"[0-9][0-9.]*"' | head -1 | sed 's/"version":"//; s/"//')
+
+	if [ -z "$RESOLVED_WP_VERSION" ]; then
+		echo "Could not work out the latest WordPress version; using trunk for the test tools." >&2
+		RESOLVED_WP_VERSION="trunk"
+	fi
+}
+
 install_test_suite() {
 	if [ -d "$WP_TESTS_DIR" ] && [ "$WP_TESTS_FORCE_DOWNLOAD" != "1" ]; then
 		return
 	fi
 
+	resolve_wp_version
+
+	if [ "$RESOLVED_WP_VERSION" == "trunk" ]; then
+		SVN_BASE="https://develop.svn.wordpress.org/trunk"
+		CONFIG_REF="trunk"
+	else
+		SVN_BASE="https://develop.svn.wordpress.org/tags/$RESOLVED_WP_VERSION"
+		CONFIG_REF="$RESOLVED_WP_VERSION"
+	fi
+	echo "Using the WordPress $RESOLVED_WP_VERSION test tools."
+
 	mkdir -p "$WP_TESTS_DIR"
-	svn export --quiet https://develop.svn.wordpress.org/trunk/tests/phpunit/includes/ "$WP_TESTS_DIR/includes"
-	svn export --quiet https://develop.svn.wordpress.org/trunk/tests/phpunit/data/ "$WP_TESTS_DIR/data"
+	svn export --quiet "$SVN_BASE/tests/phpunit/includes/" "$WP_TESTS_DIR/includes"
+	svn export --quiet "$SVN_BASE/tests/phpunit/data/" "$WP_TESTS_DIR/data"
 
 	if [ ! -f "$WP_TESTS_DIR/wp-tests-config.php" ]; then
-		curl -s https://raw.githubusercontent.com/WordPress/wordpress-develop/trunk/wp-tests-config-sample.php \
+		curl -s "https://raw.githubusercontent.com/WordPress/wordpress-develop/$CONFIG_REF/wp-tests-config-sample.php" \
 			> "$WP_TESTS_DIR/wp-tests-config.php"
 
 		sed -i "s:dirname( __FILE__ ) . '/src/':'$WP_CORE_DIR/':" "$WP_TESTS_DIR/wp-tests-config.php"
