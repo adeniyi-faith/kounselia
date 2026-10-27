@@ -39,6 +39,7 @@ $kounselia_super_admin_only  = array(
     'force_db_upgrade',
     'compress_existing_images',
     'save_gemini_keys',
+    'clear_gemini_keys',
     'test_gemini',
     'save_paystack_key',
     'save_jaas_settings',
@@ -59,18 +60,33 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
     } elseif ( ! $kounselia_can_safety && in_array( $kounselia_action, $kounselia_safety_actions, true ) ) {
         $kounselia_error = 'You need access to the Safety area to change that setting.';
 
-    // 1. Save Gemini API Keys
+    // 1. Replace Gemini API Keys
     } elseif ( 'save_gemini_keys' === $kounselia_action
         && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_gemini' ) ) {
 
         $raw  = isset( $_POST['gemini_keys'] ) ? (string) wp_unslash( $_POST['gemini_keys'] ) : '';
-        $keys = array_filter( array_map( 'trim', explode( ',', str_replace( array( "\r", "\n" ), ',', $raw ) ) ) );
-        $keys = array_values( array_unique( $keys ) );
+        $keys = kounselia_parse_gemini_keys( $raw );
 
-        update_option( 'kounselia_gemini_key', implode( ',', $keys ) );
-        kounselia_admin_log( 'update_settings', 'settings' );
+        if ( empty( $keys ) ) {
+            $kounselia_error = 'Enter one or more keys to replace the pool. Use Clear Pool to remove all saved keys.';
+        } else {
+            update_option( 'kounselia_gemini_key', implode( ',', $keys ) );
+            update_option( 'kounselia_gemini_key_rotation_cursor', 0, false );
+            delete_transient( 'kounselia_key_cooldowns' );
+            kounselia_admin_log( 'update_settings', 'settings' );
 
-        $kounselia_notice = count( $keys ) . ' Gemini API key' . ( 1 === count( $keys ) ? '' : 's' ) . ' saved in active rotation pool.';
+            $kounselia_notice = count( $keys ) . ' Gemini API key' . ( 1 === count( $keys ) ? '' : 's' ) . ' saved in the rotation pool.';
+        }
+
+    // 1B. Clear Gemini API Keys
+    } elseif ( 'clear_gemini_keys' === $kounselia_action
+        && wp_verify_nonce( $_POST['_wpnonce'] ?? '', 'kounselia_settings_gemini_clear' ) ) {
+
+        update_option( 'kounselia_gemini_key', '' );
+        update_option( 'kounselia_gemini_key_rotation_cursor', 0, false );
+        delete_transient( 'kounselia_key_cooldowns' );
+        kounselia_admin_log( 'clear_gemini_keys', 'settings' );
+        $kounselia_notice = 'The saved Gemini API key pool has been cleared.';
 
     // 2. Test Gemini API Connectivity
     } elseif ( 'test_gemini' === $kounselia_action
@@ -354,7 +370,8 @@ if ( 'POST' === $_SERVER['REQUEST_METHOD'] && isset( $_POST['kounselia_action'] 
 // -------------------------------------------------------------------------
 $kounselia_gemini_keys       = kounselia_get_gemini_keys();
 $kounselia_gemini_key_count  = count( $kounselia_gemini_keys );
-$kounselia_gemini_key_source = ( empty( get_option( 'kounselia_gemini_key', '' ) ) && defined( 'KOUNSELIA_GEMINI_KEY' ) && $kounselia_gemini_key_count )
+$kounselia_gemini_option     = get_option( 'kounselia_gemini_key', false );
+$kounselia_gemini_key_source = ( false === $kounselia_gemini_option && defined( 'KOUNSELIA_GEMINI_KEY' ) && $kounselia_gemini_key_count )
     ? 'wp-config.php constant (KOUNSELIA_GEMINI_KEY)'
     : 'database option';
 
@@ -441,31 +458,24 @@ $opt_cancel_refund_hours        = kounselia_cancel_refund_hours();
     </div>
 
     <p style="color:var(--text2);font-size:13px;margin-bottom:16px;line-height:1.55;max-width:64ch;">
-      Every text chat, TTS generation, and memory extraction call is routed through <code>kounselia_call_gemini()</code>. The engine picks one key at random per request to distribute API quotas across multiple Google Cloud projects. 
+      The full pool is rotated server-side for text, TTS, and voice-token requests. On key-specific quota or authentication errors, Kounselia cools that key down and tries the next configured key. Only use keys you are authorized to operate and in accordance with Google's API terms; a key pool does not raise any individual project’s free-tier quota.
     </p>
 
     <form method="post">
       <?php wp_nonce_field( 'kounselia_settings_gemini' ); ?>
       <input type="hidden" name="kounselia_action" value="save_gemini_keys">
       <div class="login-field">
-        <label for="gemini_keys">API Keys (comma or newline separated)</label>
-        <div class="pw-wrap">
-          <input
-            type="password"
-            id="gemini_keys"
-            name="gemini_keys"
-            autocomplete="off"
-            spellcheck="false"
-            style="font-family:'SF Mono',Menlo,Consolas,monospace;font-size:13px;"
-            value="<?php echo esc_attr( implode( ',', $kounselia_gemini_keys ) ); ?>"
-            placeholder="AIzaSy..., AIzaSy...">
-          <button type="button" class="pw-toggle" id="geminiKeyToggle" aria-label="Show keys" aria-pressed="false">
-            <svg id="geminiKeyIconOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
-            <svg id="geminiKeyIconClosed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a20.6 20.6 0 0 1 5.06-6.06M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a20.7 20.7 0 0 1-3.22 4.44M14.12 14.12a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
-          </button>
-        </div>
+        <label for="gemini_keys">Replacement key pool (comma or newline separated)</label>
+        <textarea class="bulk-input" id="gemini_keys" name="gemini_keys" rows="6" autocomplete="off" spellcheck="false" placeholder="Paste the complete replacement pool here; one key per line is easiest."></textarea>
+        <p class="op-desc">Write-only: stored keys are not sent back into this page. Submitting replaces the entire pool; blank input is rejected. Current pool contains <?php echo (int) $kounselia_gemini_key_count; ?> key<?php echo 1 === $kounselia_gemini_key_count ? '' : 's'; ?>.</p>
       </div>
-      <button type="submit" class="login-submit" style="width:auto;padding:11px 22px;">Save Keys to Pool</button>
+      <button type="submit" class="login-submit" style="width:auto;padding:11px 22px;">Replace Key Pool</button>
+    </form>
+
+    <form method="post" style="margin-top:12px;">
+      <?php wp_nonce_field( 'kounselia_settings_gemini_clear' ); ?>
+      <input type="hidden" name="kounselia_action" value="clear_gemini_keys">
+      <button type="submit" class="login-submit" style="width:auto;padding:9px 16px;background:var(--rose);" onclick="return confirm('Clear the entire Gemini key pool? AI chat, TTS, and voice will stop until keys are configured again.');">Clear Pool</button>
     </form>
 
     <form method="post" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
@@ -1100,23 +1110,5 @@ function revokeAllSessions() {
 loadSessions();
 </script>
 
-<script>
-(function(){
-  // Password reveal toggle for Gemini API key display
-  var btn = document.getElementById('geminiKeyToggle');
-  var input = document.getElementById('gemini_keys');
-  var open = document.getElementById('geminiKeyIconOpen');
-  var closed = document.getElementById('geminiKeyIconClosed');
-  if(!btn || !input) return;
-  btn.addEventListener('click', function(){
-    var showing = input.type === 'text';
-    input.type = showing ? 'password' : 'text';
-    open.style.display = showing ? '' : 'none';
-    closed.style.display = showing ? 'none' : '';
-    btn.setAttribute('aria-label', showing ? 'Show keys' : 'Hide keys');
-    btn.setAttribute('aria-pressed', showing ? 'false' : 'true');
-  });
-})();
-</script>
 </body>
 </html>
