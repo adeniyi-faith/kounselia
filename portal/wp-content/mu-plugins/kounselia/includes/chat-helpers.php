@@ -382,20 +382,35 @@ function kounselia_user_context_clause( $user_id ) {
     return "\n\nCONTEXT: You're speaking with a signed-in member named {$first_name}. You can use their first name naturally when it fits the moment, for example in a greeting or when checking in, but don't force it into every reply, that reads as scripted rather than warm.";
 }
 
+function kounselia_parse_gemini_keys( $raw ) {
+    $values = is_array( $raw ) ? $raw : preg_split( '/[\r\n,;]+/', (string) $raw );
+    $keys   = array();
+
+    foreach ( $values as $value ) {
+        if ( is_string( $value ) || is_numeric( $value ) ) {
+            $value = trim( (string) $value );
+            if ( '' !== $value ) {
+                $keys[] = $value;
+            }
+        }
+    }
+
+    return array_values( array_unique( $keys ) );
+}
+
 function kounselia_get_gemini_keys() {
-    $raw = get_option( 'kounselia_gemini_key', '' );
-    if ( empty( $raw ) && defined( 'KOUNSELIA_GEMINI_KEY' ) ) {
+    $raw = get_option( 'kounselia_gemini_key', false );
+    if ( false === $raw && defined( 'KOUNSELIA_GEMINI_KEY' ) ) {
         $raw = KOUNSELIA_GEMINI_KEY;
     }
-    $keys = array_filter( array_map( 'trim', explode( ',', $raw ) ) );
-    return array_values( $keys );
+    return kounselia_parse_gemini_keys( $raw );
 }
 
 function kounselia_key_cooldown_hash( $api_key ) {
     return substr( md5( $api_key ), 0, 12 );
 }
 
-function kounselia_mark_key_throttled( $api_key ) {
+function kounselia_mark_key_throttled( $api_key, $seconds = 60 ) {
     $cooldowns = get_transient( 'kounselia_key_cooldowns' );
     $cooldowns = is_array( $cooldowns ) ? $cooldowns : array();
 
@@ -406,14 +421,16 @@ function kounselia_mark_key_throttled( $api_key ) {
         }
     }
 
-    $cooldowns[ kounselia_key_cooldown_hash( $api_key ) ] = $now + 60; // 60s rest
-    set_transient( 'kounselia_key_cooldowns', $cooldowns, 120 );
+    $cooldowns[ kounselia_key_cooldown_hash( $api_key ) ] = $now + max( 60, (int) $seconds );
+    $latest_expiry = max( $cooldowns );
+    set_transient( 'kounselia_key_cooldowns', $cooldowns, max( 120, $latest_expiry - $now + 60 ) );
 }
 
 function kounselia_filter_available_keys( $keys ) {
+    $keys = array_values( array_unique( $keys ) );
     $cooldowns = get_transient( 'kounselia_key_cooldowns' );
     if ( empty( $cooldowns ) || ! is_array( $cooldowns ) ) {
-        return $keys;
+        return kounselia_rotate_gemini_key_order( $keys );
     }
 
     $now = time();
@@ -422,24 +439,126 @@ function kounselia_filter_available_keys( $keys ) {
         return ! isset( $cooldowns[ $hash ] ) || $cooldowns[ $hash ] < $now;
     } ) );
 
-    return empty( $available ) ? $keys : $available;
+    $cooling = array_values( array_diff( $keys, $available ) );
+    $primary = empty( $available ) ? $keys : $available;
+    $cursor  = count( $primary ) > 1 ? absint( get_option( 'kounselia_gemini_key_rotation_cursor', 0 ) ) % count( $primary ) : 0;
+
+    if ( count( $primary ) > 1 ) {
+        update_option( 'kounselia_gemini_key_rotation_cursor', ( $cursor + 1 ) % count( $primary ), false );
+        $primary = array_merge( array_slice( $primary, $cursor ), array_slice( $primary, 0, $cursor ) );
+    }
+
+    // Cooldowns are a preference, not a hard exclusion: if the active keys
+    // fail too, this request still gets a chance to use the rest of the pool.
+    return empty( $available ) ? $primary : array_merge( $primary, $cooling );
+}
+
+function kounselia_rotate_gemini_key_order( $keys ) {
+    $keys = array_values( $keys );
+    $count = count( $keys );
+    if ( $count < 2 ) {
+        return $keys;
+    }
+
+    $cursor = absint( get_option( 'kounselia_gemini_key_rotation_cursor', 0 ) ) % $count;
+    update_option( 'kounselia_gemini_key_rotation_cursor', ( $cursor + 1 ) % $count, false );
+
+    return array_merge( array_slice( $keys, $cursor ), array_slice( $keys, 0, $cursor ) );
+}
+
+function kounselia_gemini_response_is_key_error( $status, $data ) {
+    $error   = isset( $data['error'] ) && is_array( $data['error'] ) ? $data['error'] : array();
+    $code    = isset( $error['status'] ) ? strtoupper( (string) $error['status'] ) : '';
+    $message = isset( $error['message'] ) ? (string) $error['message'] : '';
+
+    if ( 429 === (int) $status || in_array( $code, array( 'RESOURCE_EXHAUSTED', 'QUOTA_EXCEEDED', 'UNAUTHENTICATED', 'PERMISSION_DENIED', 'API_KEY_INVALID', 'INVALID_API_KEY' ), true ) ) {
+        return true;
+    }
+
+    if ( in_array( (int) $status, array( 401, 403 ), true ) ) {
+        return true;
+    }
+
+    return false !== stripos( $message, 'api key' ) || false !== stripos( $message, 'api_key' );
+}
+
+function kounselia_gemini_key_cooldown_seconds( $status, $data, $response ) {
+    $error   = isset( $data['error'] ) && is_array( $data['error'] ) ? $data['error'] : array();
+    $code    = isset( $error['status'] ) ? strtoupper( (string) $error['status'] ) : '';
+    $message = isset( $error['message'] ) ? (string) $error['message'] : '';
+    $quota   = 429 === (int) $status || in_array( $code, array( 'RESOURCE_EXHAUSTED', 'QUOTA_EXCEEDED' ), true )
+        || ( false !== stripos( $message, 'quota' ) || false !== stripos( $message, 'rate limit' ) );
+
+    if ( ! $quota ) {
+        return HOUR_IN_SECONDS;
+    }
+
+    $retry_after = (int) wp_remote_retrieve_header( $response, 'retry-after' );
+    if ( $retry_after < 1 && ! empty( $error['details'] ) && is_array( $error['details'] ) ) {
+        foreach ( $error['details'] as $detail ) {
+            if ( isset( $detail['retryDelay'] ) && preg_match( '/^(\d+(?:\.\d+)?)s$/', (string) $detail['retryDelay'], $matches ) ) {
+                $retry_after = (int) ceil( (float) $matches[1] );
+                break;
+            }
+        }
+    }
+
+    return max( 60, min( HOUR_IN_SECONDS, $retry_after ) );
 }
 
 /**
- * STREAMING_CHUNK:Integrating Gemini API communication...
- * Call Gemini with model cascade and key rotation.
+ * POST to a Gemini endpoint, moving through every configured key after a
+ * key-specific quota/authentication failure. The API key stays server-side.
  */
-function kounselia_call_gemini( $system_prompt, $contents, $primary_model, $temperature, $max_tokens, &$error_out, $response_mime_type = 'text/plain', $timeout = 25 ) {
+function kounselia_gemini_post_with_key_rotation( $endpoint, $body, $timeout, &$error_out ) {
     $keys = kounselia_get_gemini_keys();
     if ( empty( $keys ) ) {
-        $error_out = 'AI is not configured yet, please set kounselia_gemini_key.';
+        $error_out = 'AI is not configured yet.';
         return null;
     }
+
     $keys = kounselia_filter_available_keys( $keys );
-    shuffle( $keys );
 
-    $max_keys_per_model = min( 4, count( $keys ) );
+    foreach ( $keys as $api_key ) {
+        $response = wp_remote_post( $endpoint, array(
+            'headers' => array(
+                'Content-Type'   => 'application/json',
+                'x-goog-api-key' => $api_key,
+            ),
+            'body'    => $body,
+            'timeout' => $timeout,
+        ) );
 
+        if ( is_wp_error( $response ) ) {
+            $error_out = 'Could not reach the Gemini API.';
+            return null;
+        }
+
+        $status = (int) wp_remote_retrieve_response_code( $response );
+        $data   = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        if ( kounselia_gemini_response_is_key_error( $status, is_array( $data ) ? $data : array() ) ) {
+            kounselia_mark_key_throttled( $api_key, kounselia_gemini_key_cooldown_seconds( $status, $data, $response ) );
+            continue;
+        }
+
+        if ( $status >= 200 && $status < 300 ) {
+            return $response;
+        }
+
+        $message = isset( $data['error']['message'] ) ? (string) $data['error']['message'] : 'Unexpected response from Gemini.';
+        $error_out = 'Gemini API request failed (HTTP ' . $status . '): ' . $message;
+        return $response;
+    }
+
+    $error_out = 'The AI service is temporarily unavailable. Please retry shortly.';
+    return null;
+}
+
+/**
+ * Call Gemini with a model cascade and failover across the entire key pool.
+ */
+function kounselia_call_gemini( $system_prompt, $contents, $primary_model, $temperature, $max_tokens, &$error_out, $response_mime_type = 'text/plain', $timeout = 25 ) {
     $model_stack = array( $primary_model );
     
     // Model Cascade Logic (Hybrid Routing):
@@ -451,62 +570,48 @@ function kounselia_call_gemini( $system_prompt, $contents, $primary_model, $temp
         $model_stack[] = 'gemini-3.5-flash-lite';
     }
 
-    $error_out = 'Empty response from AI.';
-
     foreach ( $model_stack as $model ) {
-        for ( $i = 0; $i < $max_keys_per_model; $i++ ) {
-            $api_key = $keys[ $i ];
-            
-            $url  = 'https://generativelanguage.googleapis.com/v1beta/models/' . $model . ':generateContent?key=' . $api_key;
-            
-            $generation_config = array(
-                'temperature'     => (float) $temperature,
-                'maxOutputTokens' => (int) $max_tokens,
-                'responseMimeType'=> $response_mime_type,
-            );
+        $generation_config = array(
+            'temperature'     => (float) $temperature,
+            'maxOutputTokens' => (int) $max_tokens,
+            'responseMimeType'=> $response_mime_type,
+        );
 
-            // CRITICAL FIX: We have completely removed the thinkingConfig payload here. 
-            // It was causing the 400 Bad Request errors for any model that did not contain "lite" in its name.
+        $body = wp_json_encode( array(
+            'system_instruction' => array( 'parts' => array( array( 'text' => $system_prompt ) ) ),
+            'contents'           => $contents,
+            'generationConfig'   => $generation_config,
+        ) );
 
-            $body = wp_json_encode( array(
-                'system_instruction' => array( 'parts' => array( array( 'text' => $system_prompt ) ) ),
-                'contents'           => $contents,
-                'generationConfig'   => $generation_config,
-            ) );
-
-            $response = wp_remote_post( $url, array(
-                'headers' => array( 'Content-Type' => 'application/json' ),
-                'body'    => $body,
-                'timeout' => $timeout,
-            ) );
-
-            if ( is_wp_error( $response ) ) {
-                $error_out = $response->get_error_message();
-                continue; 
-            }
-
-            $status = wp_remote_retrieve_response_code( $response );
-            $data   = json_decode( wp_remote_retrieve_body( $response ), true );
-
-            $is_quota_error = isset( $data['error']['message'] ) &&
-                ( false !== stripos( $data['error']['message'], 'quota' ) || false !== stripos( $data['error']['message'], 'limit' ) );
-
-            if ( 429 === $status || $is_quota_error || 400 === $status || 404 === $status ) {
-                // If it's a quota error, missing model (404), or payload structure rejection (400), mark and skip
-                kounselia_mark_key_throttled( $api_key );
-                $error_out = isset( $data['error']['message'] ) ? $data['error']['message'] : 'API request rejected.';
-                continue; 
-            }
-
-            $reply = isset( $data['candidates'][0]['content']['parts'][0]['text'] ) ? $data['candidates'][0]['content']['parts'][0]['text'] : null;
-            if ( ! empty( $reply ) ) {
-                return trim( $reply );
-            }
-
-            $error_out = isset( $data['error']['message'] ) ? $data['error']['message'] : 'Unexpected response from AI.';
-            break; 
+        $endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/' . rawurlencode( $model ) . ':generateContent';
+        $response = kounselia_gemini_post_with_key_rotation( $endpoint, $body, $timeout, $error_out );
+        if ( null === $response ) {
+            return null;
         }
+
+        $status = (int) wp_remote_retrieve_response_code( $response );
+        $data   = json_decode( wp_remote_retrieve_body( $response ), true );
+
+        // An unavailable model can use the configured fallback model; malformed
+        // prompts and other request-wide errors should not burn through keys.
+        if ( 404 === $status ) {
+            $error_out = isset( $data['error']['message'] ) ? (string) $data['error']['message'] : 'The selected Gemini model is unavailable.';
+            continue;
+        }
+
+        $reply = isset( $data['candidates'][0]['content']['parts'][0]['text'] ) ? $data['candidates'][0]['content']['parts'][0]['text'] : null;
+        if ( ! empty( $reply ) ) {
+            return trim( $reply );
+        }
+
+        if ( empty( $error_out ) ) {
+            $error_out = isset( $data['error']['message'] ) ? (string) $data['error']['message'] : 'Unexpected response from AI.';
+        }
+        return null;
     }
 
+    if ( empty( $error_out ) ) {
+        $error_out = 'Empty response from AI.';
+    }
     return null;
 }

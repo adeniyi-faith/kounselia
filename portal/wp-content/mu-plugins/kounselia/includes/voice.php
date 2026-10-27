@@ -28,15 +28,8 @@ function kounselia_pcm_to_wav( $pcm, $sample_rate = 24000, $channels = 1, $bits_
 }
 
 function kounselia_call_gemini_tts( $text, $voice_name, &$error_out ) {
-    $keys = kounselia_get_gemini_keys();
-    if ( empty( $keys ) ) {
-        $error_out = 'Voice is not configured yet, please set kounselia_gemini_key.';
-        return null;
-    }
-    $api_key = $keys[ array_rand( $keys ) ];
-
     $model = 'gemini-2.5-flash-preview-tts';
-    $url   = 'https://generativelanguage.googleapis.com/v1beta/models/' . $model . ':generateContent?key=' . $api_key;
+    $url   = 'https://generativelanguage.googleapis.com/v1beta/models/' . $model . ':generateContent';
 
     $body = wp_json_encode( array(
         'contents'         => array( array( 'parts' => array( array( 'text' => $text ) ) ) ),
@@ -50,14 +43,8 @@ function kounselia_call_gemini_tts( $text, $voice_name, &$error_out ) {
         ),
     ) );
 
-    $response = wp_remote_post( $url, array(
-        'headers' => array( 'Content-Type' => 'application/json' ),
-        'body'    => $body,
-        'timeout' => 30,
-    ) );
-
-    if ( is_wp_error( $response ) ) {
-        $error_out = $response->get_error_message();
+    $response = kounselia_gemini_post_with_key_rotation( $url, $body, 30, $error_out );
+    if ( null === $response ) {
         return null;
     }
 
@@ -67,12 +54,19 @@ function kounselia_call_gemini_tts( $text, $voice_name, &$error_out ) {
         : null;
 
     if ( ! $b64 ) {
-        $error_out = isset( $data['error']['message'] ) ? $data['error']['message'] : 'No audio returned.';
+        if ( empty( $error_out ) ) {
+            $error_out = isset( $data['error']['message'] ) ? $data['error']['message'] : 'No audio returned.';
+        }
         return null;
     }
 
-    $pcm = base64_decode( $b64 );
-    return ( false === $pcm ) ? null : $pcm;
+    $pcm = base64_decode( $b64, true );
+    if ( false === $pcm ) {
+        $error_out = 'Gemini returned invalid audio data.';
+        return null;
+    }
+
+    return $pcm;
 }
 
 function kounselia_ajax_tts() {
@@ -171,13 +165,6 @@ function kounselia_voice_allowed_seconds( $user_id ) {
 }
 
 function kounselia_mint_live_token( $system_prompt, $voice_name, $manual_turn_control, &$error_out ) {
-    $keys = kounselia_get_gemini_keys();
-    if ( empty( $keys ) ) {
-        $error_out = 'Voice is not configured yet, please set kounselia_gemini_key.';
-        return null;
-    }
-    $api_key = $keys[ array_rand( $keys ) ];
-
     $now            = time();
     $expire_time    = gmdate( 'Y-m-d\TH:i:s\Z', $now + ( 30 * MINUTE_IN_SECONDS ) );
     $new_session_by = gmdate( 'Y-m-d\TH:i:s\Z', $now + MINUTE_IN_SECONDS );
@@ -221,17 +208,14 @@ function kounselia_mint_live_token( $system_prompt, $voice_name, $manual_turn_co
         ),
     ) );
 
-    $response = wp_remote_post( 'https://generativelanguage.googleapis.com/v1alpha/auth_tokens', array(
-        'headers' => array(
-            'Content-Type'  => 'application/json',
-            'x-goog-api-key' => $api_key,
-        ),
-        'body'    => $body,
-        'timeout' => 20,
-    ) );
+    $response = kounselia_gemini_post_with_key_rotation(
+        'https://generativelanguage.googleapis.com/v1alpha/auth_tokens',
+        $body,
+        20,
+        $error_out
+    );
 
-    if ( is_wp_error( $response ) ) {
-        $error_out = $response->get_error_message();
+    if ( null === $response ) {
         return null;
     }
 
